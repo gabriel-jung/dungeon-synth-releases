@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #1a1410;
+  --color-bg-card: #231e18;
+  --color-bg-hover: #2a2319;
+  --color-border: #3d3228;
+  --color-text: #d4c8b8;
+  --color-text-dim: #8a7e6e;
+  --color-text-bright: #f0e6d6;
+  --color-accent: #a63d2f;
+  --color-accent-hover: #c44a3a;
+  --color-tag-include: #4a7a4a;
+  --color-tag-exclude: #7a3a3a;
+  --color-tag-neutral: #3d3228;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 1. Catacombs — warm dark (default) */
+:root,
+[data-theme="catacombs"] {
+  --color-bg: #1a1410;
+  --color-bg-card: #231e18;
+  --color-bg-hover: #2a2319;
+  --color-border: #3d3228;
+  --color-text: #d4c8b8;
+  --color-text-dim: #8a7e6e;
+  --color-text-bright: #f0e6d6;
+  --color-accent: #a63d2f;
+  --color-accent-hover: #c44a3a;
+  --color-tag-include: #4a7a4a;
+  --color-tag-exclude: #7a3a3a;
+  --color-tag-neutral: #3d3228;
+}
+
+/* 2. Stone — cool dark */
+[data-theme="stone"] {
+  --color-bg: #12151a;
+  --color-bg-card: #1a1e25;
+  --color-bg-hover: #21262e;
+  --color-border: #2e3440;
+  --color-text: #c0c8d8;
+  --color-text-dim: #6b7a8e;
+  --color-text-bright: #e2e8f0;
+  --color-accent: #5b8fb9;
+  --color-accent-hover: #7bafd6;
+  --color-tag-include: #3d7a5a;
+  --color-tag-exclude: #7a3d4a;
+  --color-tag-neutral: #2e3440;
+}
+
+/* 3. Moonlit — dark navy + gold */
+[data-theme="moonlit"] {
+  --color-bg: #141520;
+  --color-bg-card: #1c1d2e;
+  --color-bg-hover: #242538;
+  --color-border: #33344a;
+  --color-text: #d0ccc0;
+  --color-text-dim: #7e7b6e;
+  --color-text-bright: #f0ece0;
+  --color-accent: #c4993c;
+  --color-accent-hover: #dab04e;
+  --color-tag-include: #4a7a4a;
+  --color-tag-exclude: #7a4a3a;
+  --color-tag-neutral: #33344a;
+}
+
+/* 4. Abyss — deep black + purple */
+[data-theme="abyss"] {
+  --color-bg: #0c0a12;
+  --color-bg-card: #141220;
+  --color-bg-hover: #1c192a;
+  --color-border: #2a2640;
+  --color-text: #c4c0d8;
+  --color-text-dim: #6e6a88;
+  --color-text-bright: #e8e4f8;
+  --color-accent: #8b5ec4;
+  --color-accent-hover: #a474dd;
+  --color-tag-include: #4a6a7a;
+  --color-tag-exclude: #7a4a5a;
+  --color-tag-neutral: #2a2640;
+}
+
+/* 5. Ember — dark with orange/fire */
+[data-theme="ember"] {
+  --color-bg: #181210;
+  --color-bg-card: #221a14;
+  --color-bg-hover: #2c2018;
+  --color-border: #3e3020;
+  --color-text: #d4c4a8;
+  --color-text-dim: #8a7a5e;
+  --color-text-bright: #f0e0c0;
+  --color-accent: #cc6a2e;
+  --color-accent-hover: #e07a38;
+  --color-tag-include: #5a7a3a;
+  --color-tag-exclude: #7a3a2a;
+  --color-tag-neutral: #3e3020;
+}
+
+/* 6. Mire — dark green/swamp */
+[data-theme="mire"] {
+  --color-bg: #101410;
+  --color-bg-card: #181e18;
+  --color-bg-hover: #1e261e;
+  --color-border: #2e3a2e;
+  --color-text: #b8c8b4;
+  --color-text-dim: #6e8268;
+  --color-text-bright: #d8e8d4;
+  --color-accent: #5a9a4a;
+  --color-accent-hover: #6eb45c;
+  --color-tag-include: #4a7a5a;
+  --color-tag-exclude: #7a5a3a;
+  --color-tag-neutral: #2e3a2e;
+}
+
+/* 7. Fog — cool light */
+[data-theme="fog"] {
+  --color-bg: #e8e6e1;
+  --color-bg-card: #d8d5ce;
+  --color-bg-hover: #cec9c2;
+  --color-border: #b8b3aa;
+  --color-text: #3a3832;
+  --color-text-dim: #6e6b62;
+  --color-text-bright: #1a1810;
+  --color-accent: #4a7a5a;
+  --color-accent-hover: #5a8e6a;
+  --color-tag-include: #4a7a4a;
+  --color-tag-exclude: #8a4a4a;
+  --color-tag-neutral: #c4c0b8;
+}
+
+/* 8. Parchment — warm light */
+[data-theme="parchment"] {
+  --color-bg: #f0e8d8;
+  --color-bg-card: #e4daca;
+  --color-bg-hover: #d8ccb8;
+  --color-border: #c4b8a0;
+  --color-text: #3a3020;
+  --color-text-dim: #7a6e58;
+  --color-text-bright: #1a1408;
+  --color-accent: #8b2e20;
+  --color-accent-hover: #a83828;
+  --color-tag-include: #4a7a3a;
+  --color-tag-exclude: #8a3a3a;
+  --color-tag-neutral: #d0c4ae;
+}
+
+/* 9. Overcast — neutral medium */
+[data-theme="overcast"] {
+  --color-bg: #2a2a2e;
+  --color-bg-card: #333338;
+  --color-bg-hover: #3a3a40;
+  --color-border: #4a4a52;
+  --color-text: #c8c8cc;
+  --color-text-dim: #7a7a82;
+  --color-text-bright: #e8e8ec;
+  --color-accent: #8a9ab0;
+  --color-accent-hover: #a0b0c8;
+  --color-tag-include: #4a7a5a;
+  --color-tag-exclude: #7a4a4a;
+  --color-tag-neutral: #4a4a52;
+}
+
+/* 10. Bone — pale warm */
+[data-theme="bone"] {
+  --color-bg: #f5f0e8;
+  --color-bg-card: #eae4da;
+  --color-bg-hover: #dfd8cc;
+  --color-border: #ccc4b4;
+  --color-text: #44403a;
+  --color-text-dim: #8a8478;
+  --color-text-bright: #1c1a14;
+  --color-accent: #6a5040;
+  --color-accent-hover: #806050;
+  --color-tag-include: #5a7a4a;
+  --color-tag-exclude: #8a5040;
+  --color-tag-neutral: #d4ccbe;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text-bright);
+}
