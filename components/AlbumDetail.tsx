@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Album, AlbumListItem, coverUrl, searchFor } from "@/lib/types"
 
 export function AlbumGrid({ albums }: { albums: AlbumListItem[] }) {
@@ -22,7 +23,7 @@ export function ReleaseCard({ album }: { album: AlbumListItem }) {
     <>
       <div
         onClick={() => setOpen(true)}
-        className="w-full text-left px-3 py-1.5 hover:bg-bg-hover transition-colors cursor-pointer"
+        className="w-full text-left px-3 py-2 hover:bg-bg-hover transition-colors cursor-pointer border-l-2 border-transparent hover:border-accent"
       >
         <span
           role="link"
@@ -76,34 +77,36 @@ export default function AlbumDetail({
   const img = album ? coverUrl(album.art_id) : null
   const showHost = album?.host_name && album.host_name.toLowerCase() !== albumStub.artist.toLowerCase()
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ zIndex: 10000 }}
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/60" />
-
       <div
-        className="relative bg-bg-card border border-border rounded-lg shadow-xl max-w-lg w-full mx-4 flex flex-col sm:flex-row overflow-hidden max-h-[90vh] overflow-y-auto"
+        className="relative bg-bg-card border-[3px] border-double border-border rounded-sm max-w-lg w-full mx-4 flex flex-col sm:flex-row overflow-hidden max-h-[90vh] overflow-y-auto animate-modal-in"
+        style={{ boxShadow: "inset 0 0 30px -10px color-mix(in srgb, var(--color-accent) 10%, transparent), 0 25px 50px -12px rgba(0,0,0,0.4)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cover */}
-        <div className="sm:w-48 shrink-0 bg-bg flex items-center justify-center">
+        <div className="sm:w-48 shrink-0 bg-bg flex items-center justify-center aspect-square sm:aspect-auto sm:min-h-48">
           {img ? (
             <img
               src={img}
               alt={`${albumStub.artist} — ${albumStub.title}`}
               className="w-full h-auto"
             />
+          ) : album ? (
+            <span className="text-5xl text-border select-none">♜</span>
           ) : (
-            <span className="text-5xl text-border select-none py-8 sm:py-0">♜</span>
+            <div className="w-full h-full animate-pulse bg-bg-hover" />
           )}
         </div>
 
         {/* Info */}
-        <div className="flex-1 p-4 flex flex-col gap-2 min-w-0">
+        <div className="flex-1 p-5 flex flex-col gap-3 min-w-0">
           <div>
-            <h2 className="text-text-bright font-medium truncate">
+            <h2 className="font-display text-text-bright font-bold truncate">
               {albumStub.title}
             </h2>
             <button
@@ -138,7 +141,7 @@ export default function AlbumDetail({
                   {album.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-[11px] px-1.5 py-0.5 rounded bg-tag-neutral text-text-dim"
+                      className="text-[11px] px-1.5 py-0.5 rounded-sm bg-tag-neutral text-text-dim border border-border/50"
                     >
                       {tag}
                     </span>
@@ -174,11 +177,12 @@ export default function AlbumDetail({
 
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 w-9 h-9 flex items-center justify-center rounded-full bg-bg/80 text-text-dim hover:text-text transition-colors cursor-pointer text-lg"
+          className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-sm bg-bg/80 text-text-dim hover:text-text transition-colors cursor-pointer text-sm"
         >
           ×
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

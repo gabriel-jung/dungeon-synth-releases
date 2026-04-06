@@ -22,7 +22,7 @@ function HorizontalSlider({
 }) {
   return (
     <div className="flex items-center gap-2 w-full px-3 py-1">
-      <span className="text-xs text-text-bright whitespace-nowrap shrink-0">
+      <span className="font-display text-xs text-text-bright whitespace-nowrap shrink-0 tracking-wide">
         {formatDateShort(dates[index] ?? "")}
       </span>
       <div
@@ -56,7 +56,7 @@ function HorizontalSlider({
 
         {/* Thumb */}
         <div className="absolute" style={{ left: `calc(${pos} - 5px)`, top: "4px" }}>
-          <div className="w-3 h-3 rounded-full bg-accent shadow-sm shadow-accent/30 ring-2 ring-bg" />
+          <div className="w-3 h-3 rounded-full bg-accent ring-2 ring-bg" style={{ boxShadow: "0 0 8px 1px color-mix(in srgb, var(--color-accent) 50%, transparent)" }} />
         </div>
       </div>
     </div>
@@ -239,7 +239,7 @@ export default function DateSlider({
   return (
     <div className="flex flex-col items-center h-full">
       {/* Current date label */}
-      <div className="mb-3 px-2 py-1 rounded bg-bg-card border border-border text-xs text-text-bright text-center whitespace-nowrap">
+      <div className="mb-3 px-2 py-1 rounded bg-bg-card border border-border font-display text-xs text-text-bright text-center whitespace-nowrap tracking-wide">
         {formatDateShort(dates[index] ?? "")}
       </div>
 
@@ -285,7 +285,7 @@ export default function DateSlider({
             className="absolute"
             style={{ top: m.pos, left: "22px", transform: "translateY(-50%)" }}
           >
-            <span className="text-[11px] text-text-dim leading-none whitespace-nowrap">
+            <span className="font-display text-[11px] text-text-dim leading-none whitespace-nowrap tracking-wide">
               {m.label}
             </span>
           </div>
@@ -296,7 +296,7 @@ export default function DateSlider({
           className="absolute flex items-center"
           style={{ top: `calc(${pos} - 7px)`, left: "5px" }}
         >
-          <div className="w-3.5 h-3.5 rounded-full bg-accent shadow-md shadow-accent/30 ring-2 ring-bg" />
+          <div className="w-3.5 h-3.5 rounded-full bg-accent ring-2 ring-bg" style={{ boxShadow: "0 0 8px 1px color-mix(in srgb, var(--color-accent) 50%, transparent)" }} />
         </div>
       </div>
     </div>

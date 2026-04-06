@@ -27,7 +27,7 @@ export default function ThemePicker() {
       setTheme(saved)
       document.documentElement.setAttribute("data-theme", saved)
     }
-    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0")
+    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0.06")
     setTextureOpacity(savedOpacity)
     applyTexture(savedOpacity)
   }, [])
@@ -51,7 +51,6 @@ export default function ThemePicker() {
   }
 
   function applyTexture(opacity: number) {
-    document.documentElement.toggleAttribute("data-texture", opacity > 0)
     document.documentElement.style.setProperty("--texture-opacity", String(opacity))
   }
 
@@ -76,7 +75,7 @@ export default function ThemePicker() {
       />
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-lg shadow-lg z-50 flex flex-col gap-3">
+        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-lg shadow-lg flex flex-col gap-3" style={{ zIndex: 10000 }}>
           {[themes.slice(0, 5), themes.slice(5, 10)].map((row, i) => (
             <div key={i} className="flex gap-3">
               {row.map((t) => (

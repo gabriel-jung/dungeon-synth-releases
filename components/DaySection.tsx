@@ -20,17 +20,13 @@ export default function DaySection({
 
   return (
     <section>
-      <div className="flex items-baseline gap-3 border-b border-border pb-2 mb-2">
-        <h3 className="text-text-dim text-sm tracking-wider">
-          {label}
-        </h3>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-text-dim hover:text-text text-xs transition-colors cursor-pointer"
-        >
-          {expanded ? "▾ hide covers" : "▸ show covers"}
-        </button>
-      </div>
+      <div className="ornamental-divider">{label}</div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="font-display text-[10px] tracking-[0.1em] uppercase text-text-dim hover:text-accent px-2 py-1 border border-border hover:border-accent rounded-sm transition-colors cursor-pointer mb-3"
+      >
+        {expanded ? "▾ hide covers" : "▸ show covers"}
+      </button>
 
       {expanded ? (
         <RecentGrid albums={albums} />

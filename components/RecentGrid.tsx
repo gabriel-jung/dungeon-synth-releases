@@ -12,7 +12,7 @@ export default function RecentGrid({ albums }: { albums: AlbumListItem[] }) {
     <>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {albums.map((album) => {
-          const img = coverUrl(album.art_id)
+          const img = coverUrl(album.art_id, "thumb")
           return (
           <button
             key={album.id}
@@ -21,12 +21,13 @@ export default function RecentGrid({ albums }: { albums: AlbumListItem[] }) {
             onMouseEnter={() => setHoveredId(album.id)}
             onMouseLeave={() => setHoveredId(null)}
           >
-            <div className="aspect-square rounded bg-bg-card border border-border overflow-hidden flex items-center justify-center transition-colors group-hover:border-accent">
+            <div className="aspect-square rounded bg-bg-card border border-border overflow-hidden flex items-center justify-center hover-candlelight">
               {img ? (
                 <img
                   src={img}
                   alt={`${album.artist} — ${album.title}`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <span className="text-3xl text-border select-none">♜</span>

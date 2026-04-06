@@ -195,7 +195,12 @@ export default function ReleaseList({
         const sectionCls = gi === 0 ? "" : "pt-4 sm:pt-6"
         const heading = date === "Unknown" ? "Unknown date" : formatDateHeading(date, includeYear)
         return (
-          <section key={date} id={`date-${date}`} className={sectionCls}>
+          <section
+            key={date}
+            id={`date-${date}`}
+            className={`${sectionCls} animate-fade-slide-in`}
+            style={{ animationDelay: `${Math.min(gi * 50, 300)}ms` }}
+          >
             {!listOnly && recentDates.has(date) ? (
               <DaySection
                 label={heading}
@@ -204,9 +209,9 @@ export default function ReleaseList({
               />
             ) : (
               <>
-                <h3 className="text-text-dim text-sm tracking-wider border-b border-border pb-2 mb-2">
+                <div className="ornamental-divider">
                   {heading}
-                </h3>
+                </div>
                 {listOnly ? (
                   dayAlbums.map((album) => (
                     <ReleaseCard key={album.id} album={album} />
@@ -235,7 +240,7 @@ export default function ReleaseList({
       {!isSearching && hasMore && !exhausted && (
         <LoadTrigger loading={loading} onVisible={loadMore} />
       )}
-      <div style={{ minHeight: "calc(100vh - 200px)" }} />
+      <div className="shrink-0" style={{ height: "40vh" }} />
     </>
   )
 }

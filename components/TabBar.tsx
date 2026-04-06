@@ -11,17 +11,17 @@ export default function TabBar() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex gap-4 px-4 sm:px-6 border-b border-border">
+    <nav className="flex gap-1 px-4 sm:px-6 bg-bg-card/50 border-b border-border">
       {tabs.map((tab) => {
         const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href)
         return (
           <a
             key={tab.href}
             href={tab.href}
-            className={`py-2 text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-3 py-2 font-display text-xs tracking-[0.12em] uppercase transition-colors border-b-2 -mb-px ${
               active
-                ? "border-accent text-text-bright"
-                : "border-transparent text-text-dim hover:text-text"
+                ? "bg-bg-hover border-accent text-text-bright"
+                : "border-transparent text-text-dim hover:text-text hover:bg-bg-hover/50"
             }`}
           >
             {tab.label}

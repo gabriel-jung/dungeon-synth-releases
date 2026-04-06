@@ -19,9 +19,7 @@ export default async function Page({
   const today = localDateStr(new Date())
   const yearStart = `${new Date().getFullYear()}-01-01`
   const allDates = dateRange(today, yearStart)
-  const last7 = new Set(allDates.slice(0, 7))
-
-  // Fetch albums — lightweight list items (art_id only for last 7 days)
+  // Fetch albums — lightweight list items
   const allRows: AlbumListItem[] = []
   const PAGE = 1000
   let from = 0
@@ -43,7 +41,7 @@ export default async function Page({
     for (const tag of includeTags) {
       const ids = await albumIdsForTag(tag)
       matchIds = matchIds
-        ? new Set([...matchIds].filter((id) => ids.has(id)))
+        ? new Set([...(matchIds as Set<string>)].filter((id) => ids.has(id)))
         : ids
     }
 
@@ -61,7 +59,7 @@ export default async function Page({
 
   const hasTagFilters = tagFilterIds !== null
 
-  // Without tag filters, only fetch last 7 days for fast initial load
+  // Without tag filters, only fetch last 7 days for fast initial load (covers only for latest day)
   const cutoff = !hasTagFilters ? allDates[6] : null
 
   while (true) {
@@ -80,9 +78,7 @@ export default async function Page({
 
     for (const r of data) {
       if (excludeTags.length > 0 && tagFilterIds && tagFilterIds.has(r.id)) continue
-      const item = toAlbumListItem(r)
-      if (!last7.has(item.date ?? "")) item.art_id = undefined
-      allRows.push(item)
+      allRows.push(toAlbumListItem(r))
     }
 
     if (data.length < PAGE) break
@@ -106,16 +102,27 @@ export default async function Page({
     .sort((a, b) => b[1] - a[1])
     .map(([tag]) => tag)
 
-  const last7Array = allDates.slice(0, 7)
-  const expandDate = last7Array.find((d) => allRows.some((a) => a.date === d)) ?? null
+  // Deduplicate albums (same ID can appear if data has dupes)
+  const seen = new Set<string>()
+  const deduped = allRows.filter((a) => { if (seen.has(a.id)) return false; seen.add(a.id); return true })
+
+  // Only the most recent day with releases gets cover art
+  const latestDate = allDates.find((d) => deduped.some((a) => a.date === d)) ?? null
+  const recentArray = latestDate ? [latestDate] : []
+  const expandDate = latestDate
+
+  // Strip art_id for all days except the latest to avoid unnecessary cover fetches
+  for (const item of deduped) {
+    if (item.date !== latestDate) item.art_id = undefined
+  }
 
   return (
     <>
       <Suspense>
         <TagFilter tags={allTags} />
       </Suspense>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6" style={{ height: "calc(100dvh - 140px)" }}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
+        <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6 h-full">
           {/* Horizontal date slider — mobile only */}
           <div className="sm:hidden shrink-0">
             <Suspense>
@@ -126,7 +133,7 @@ export default async function Page({
 
           <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
             <Suspense>
-              <ReleaseList albums={allRows} recentDates={last7Array} expandDate={expandDate} hasMore={!hasTagFilters} />
+              <ReleaseList albums={deduped} recentDates={recentArray} expandDate={expandDate} hasMore={!hasTagFilters} />
             </Suspense>
           </div>
 

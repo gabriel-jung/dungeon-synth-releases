@@ -32,9 +32,11 @@ export function formatDateShort(date: string): string {
   return relativeOrFormat(date, { month: "short", day: "numeric" })
 }
 
-export function coverUrl(artId: string | null | undefined): string | null {
+export function coverUrl(artId: string | null | undefined, size: "thumb" | "full" = "full"): string | null {
   if (!artId) return null
-  return `/api/cover?url=${encodeURIComponent(`https://f4.bcbits.com/img/a${artId}_2.jpg`)}`
+  // _7 = 150px thumb (grid), _2 = 350px (detail)
+  const suffix = size === "thumb" ? "_7.jpg" : "_2.jpg"
+  return `/api/cover?url=${encodeURIComponent(`https://f4.bcbits.com/img/a${artId}${suffix}`)}`
 }
 
 export function searchFor(value: string) {

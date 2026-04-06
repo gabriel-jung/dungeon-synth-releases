@@ -44,13 +44,11 @@ export default async function UpcomingPage() {
   const lastAlbumDate = maxRow?.date && maxRow.date <= yearEnd ? maxRow.date : yearEnd
   const allDates = dateRange(tomorrow, lastAlbumDate)
 
-  // "Recent" dates for upcoming = next 7 days (show covers)
-  const next7 = allDates.slice(0, 7)
-  const expandDate = next7.find((d) => allRows.some((a) => a.date === d)) ?? null
+  const expandDate = allDates.find((d) => allRows.some((a) => a.date === d)) ?? null
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6">
-      <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6" style={{ height: "calc(100dvh - 140px)" }}>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
+      <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6 h-full">
         {/* Horizontal date slider — mobile only */}
         <div className="sm:hidden shrink-0">
           <Suspense>
@@ -61,7 +59,7 @@ export default async function UpcomingPage() {
 
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
           <Suspense>
-            <ReleaseList albums={allRows} recentDates={next7} expandDate={expandDate} hasMore direction="future" listOnly includeYear />
+            <ReleaseList albums={allRows} recentDates={[]} expandDate={expandDate} hasMore direction="future" listOnly includeYear />
           </Suspense>
         </div>
 

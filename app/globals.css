@@ -13,7 +13,8 @@
   --color-tag-include: #4a7a4a;
   --color-tag-exclude: #7a3a3a;
   --color-tag-neutral: #3d3228;
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-crimson);
+  --font-display: var(--font-cinzel);
 }
 
 /* 1. Catacombs — warm dark (default) */
@@ -177,20 +178,84 @@
   --color-tag-neutral: #d4ccbe;
 }
 
+/* Font utility — explicit to avoid conflict with CSS font-display property */
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+/* Ornamental divider */
+.ornamental-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--color-text-dim);
+}
+.ornamental-divider::before,
+.ornamental-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent 10%, var(--color-border) 50%, var(--color-text-dim) 100%);
+}
+.ornamental-divider::after {
+  background: linear-gradient(to left, transparent 10%, var(--color-border) 50%, var(--color-text-dim) 100%);
+}
+
+/* Candlelight hover glow */
+.hover-candlelight {
+  transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+}
+.hover-candlelight:hover {
+  box-shadow: 0 0 15px -3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  transform: scale(1.02);
+  border-color: var(--color-accent);
+}
+
+/* Animations */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fade-slide-in {
+  animation: fadeSlideIn 0.4s ease both;
+}
+.animate-modal-in {
+  animation: modalIn 0.2s ease both;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   position: relative;
 }
 
-[data-texture] body::before {
+/* Vignette overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.12) 100%);
+}
+
+body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: var(--texture-opacity, 0.08);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--texture-opacity, 0.06);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
 }
 
