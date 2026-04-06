@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist } from "next/font/google"
 import ThemePicker from "@/components/ThemePicker"
 import SearchBar from "@/components/SearchBar"
+import TabBar from "@/components/TabBar"
 import { Suspense } from "react"
 import "./globals.css"
 
@@ -10,10 +11,6 @@ const geistSans = Geist({
   subsets: ["latin"],
 })
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   title: "Dungeon Synth Releases",
@@ -28,7 +25,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      className={`${geistSans.variable} antialiased`}
     >
       <body className="min-h-screen flex flex-col font-sans">
         <header className="border-b border-border px-4 sm:px-6 py-3 sm:py-4">
@@ -55,6 +52,7 @@ export default function RootLayout({
             </Suspense>
           </div>
         </header>
+        <TabBar />
         <main className="flex-1">{children}</main>
         <footer className="px-4 sm:px-6 py-3" />
       </body>

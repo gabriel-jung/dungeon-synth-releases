@@ -124,6 +124,9 @@ export default function DateSlider({
     if (el && list) {
       const offset = el.offsetTop - list.offsetTop
       list.scrollTo({ top: offset, behavior: smooth ? "smooth" : "instant" })
+    } else {
+      // Date section not loaded yet — request it
+      window.dispatchEvent(new CustomEvent("load-until-date", { detail: dateStr }))
     }
   }, [])
 

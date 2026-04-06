@@ -17,6 +17,7 @@ const themes = [
 
 export default function ThemePicker() {
   const [theme, setTheme] = useState("catacombs")
+  const [textureOpacity, setTextureOpacity] = useState(0)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -26,6 +27,9 @@ export default function ThemePicker() {
       setTheme(saved)
       document.documentElement.setAttribute("data-theme", saved)
     }
+    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0")
+    setTextureOpacity(savedOpacity)
+    applyTexture(savedOpacity)
   }, [])
 
   useEffect(() => {
@@ -46,6 +50,17 @@ export default function ThemePicker() {
     document.documentElement.setAttribute("data-theme", id)
   }
 
+  function applyTexture(opacity: number) {
+    document.documentElement.toggleAttribute("data-texture", opacity > 0)
+    document.documentElement.style.setProperty("--texture-opacity", String(opacity))
+  }
+
+  function handleTextureChange(value: number) {
+    setTextureOpacity(value)
+    localStorage.setItem("texture-opacity", String(value))
+    applyTexture(value)
+  }
+
   const current = themes.find((t) => t.id === theme) ?? themes[0]
 
   return (
@@ -62,41 +77,37 @@ export default function ThemePicker() {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-lg shadow-lg z-50 flex flex-col gap-3">
-          <div className="flex gap-3">
-            {themes.slice(0, 5).map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                onClick={() => pick(t.id)}
-                className={`w-8 h-8 rounded-full cursor-pointer transition-transform hover:scale-125 ${
-                  theme === t.id
-                    ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-card"
-                    : ""
-                }`}
-                style={{
-                  background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)`,
-                }}
-                aria-label={t.id}
-              />
-            ))}
-          </div>
-          <div className="flex gap-3">
-            {themes.slice(5, 10).map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                onClick={() => pick(t.id)}
-                className={`w-8 h-8 rounded-full cursor-pointer transition-transform hover:scale-125 ${
-                  theme === t.id
-                    ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-card"
-                    : ""
-                }`}
-                style={{
-                  background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)`,
-                }}
-                aria-label={t.id}
-              />
-            ))}
+          {[themes.slice(0, 5), themes.slice(5, 10)].map((row, i) => (
+            <div key={i} className="flex gap-3">
+              {row.map((t) => (
+                <button
+                  type="button"
+                  key={t.id}
+                  onClick={() => pick(t.id)}
+                  className={`w-8 h-8 rounded-full cursor-pointer transition-transform hover:scale-125 ${
+                    theme === t.id
+                      ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-card"
+                      : ""
+                  }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)`,
+                  }}
+                  aria-label={t.id}
+                />
+              ))}
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <span className={`text-xs ${textureOpacity > 0 ? "text-accent" : "text-text-dim"}`}>Texture</span>
+            <input
+              type="range"
+              min="0"
+              max="0.15"
+              step="0.01"
+              value={textureOpacity}
+              onChange={(e) => handleTextureChange(parseFloat(e.target.value))}
+              className="flex-1 h-1 accent-accent cursor-pointer"
+            />
           </div>
         </div>
       )}

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { AlbumListItem } from "@/lib/types"
 import RecentGrid from "./RecentGrid"
-import { ReleaseCard } from "./AlbumDetail"
+import { AlbumGrid } from "./AlbumDetail"
 
 export default function DaySection({
   label,
@@ -35,13 +35,7 @@ export default function DaySection({
       {expanded ? (
         <RecentGrid albums={albums} />
       ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3" style={{ columnGap: "1rem" }}>
-          {albums.map((album) => (
-            <div key={album.id} style={{ breakInside: "avoid" }}>
-              <ReleaseCard album={album} />
-            </div>
-          ))}
-        </div>
+        <AlbumGrid albums={albums} />
       )}
     </section>
   )

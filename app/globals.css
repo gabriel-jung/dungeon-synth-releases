@@ -14,7 +14,6 @@
   --color-tag-exclude: #7a3a3a;
   --color-tag-neutral: #3d3228;
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 /* 1. Catacombs — warm dark (default) */
@@ -181,6 +180,18 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
+  position: relative;
+}
+
+[data-texture] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--texture-opacity, 0.08);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
 }
 
 ::selection {

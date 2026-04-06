@@ -3,6 +3,18 @@
 import { useEffect, useState } from "react"
 import { Album, AlbumListItem, coverUrl, searchFor } from "@/lib/types"
 
+export function AlbumGrid({ albums }: { albums: AlbumListItem[] }) {
+  return (
+    <div className="columns-1 sm:columns-2 lg:columns-3" style={{ columnGap: "1rem" }}>
+      {albums.map((album) => (
+        <div key={album.id} style={{ breakInside: "avoid" }}>
+          <ReleaseCard album={album} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ReleaseCard({ album }: { album: AlbumListItem }) {
   const [open, setOpen] = useState(false)
 
