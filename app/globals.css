@@ -183,7 +183,25 @@
   font-family: var(--font-display);
 }
 
-/* Ornamental divider */
+/* Masthead rule — decorative header separator */
+.masthead-rule {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(to right, var(--color-accent), var(--color-border) 30%, var(--color-border) 70%, var(--color-accent));
+}
+.masthead-rule::before {
+  content: "⟡";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-bg);
+  padding: 0 0.75rem;
+  color: var(--color-accent);
+  font-size: 0.875rem;
+}
+
+/* Ornamental divider — date sections */
 .ornamental-divider {
   display: flex;
   align-items: center;
@@ -198,12 +216,14 @@
 .ornamental-divider::before,
 .ornamental-divider::after {
   content: "";
-  flex: 1;
+  display: block;
+  flex: 1 1 0%;
+  min-width: 2rem;
   height: 1px;
-  background: linear-gradient(to right, transparent 10%, var(--color-border) 50%, var(--color-text-dim) 100%);
+  background: linear-gradient(to right, transparent 5%, var(--color-border));
 }
 .ornamental-divider::after {
-  background: linear-gradient(to left, transparent 10%, var(--color-border) 50%, var(--color-text-dim) 100%);
+  background: linear-gradient(to left, transparent 5%, var(--color-border));
 }
 
 /* Candlelight hover glow */
@@ -254,8 +274,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: var(--texture-opacity, 0.06);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--texture-opacity, 0.075);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
 }
 

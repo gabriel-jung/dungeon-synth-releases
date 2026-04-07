@@ -110,7 +110,10 @@ export default function DateSlider({
       }
       if (closestDate) {
         const idx = dates.indexOf(closestDate)
-        if (idx >= 0) setIndex(idx)
+        if (idx >= 0) {
+          setIndex(idx)
+          emitDateChange(idx)
+        }
       }
     }
 
@@ -153,20 +156,29 @@ export default function DateSlider({
     return Math.round(pct * (count - 1))
   }
 
+  function emitDateChange(idx: number) {
+    const frac = count <= 1 ? 0 : idx / (count - 1)
+    window.dispatchEvent(new CustomEvent("visible-date-change", { detail: frac }))
+  }
+
   function startDrag(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault()
     dragging.current = true
     const idx = indexFromEvent(e)
     setIndex(idx)
+    emitDateChange(idx)
 
     function onMove(ev: MouseEvent | TouchEvent) {
       ev.preventDefault()
-      setIndex(indexFromEvent(ev))
+      const i = indexFromEvent(ev)
+      setIndex(i)
+      emitDateChange(i)
     }
 
     function onUp(ev: MouseEvent | TouchEvent) {
       const idx = indexFromEvent(ev)
       setIndex(idx)
+      emitDateChange(idx)
       if (dates[idx]) scrollToDate(dates[idx])
       // Keep dragging flag on briefly so scroll handler doesn't snap back
       setTimeout(() => { dragging.current = false }, 100)
@@ -185,6 +197,7 @@ export default function DateSlider({
   function handleClick(e: React.MouseEvent) {
     const idx = indexFromEvent(e)
     setIndex(idx)
+    emitDateChange(idx)
     if (dates[idx]) scrollToDate(dates[idx])
   }
 

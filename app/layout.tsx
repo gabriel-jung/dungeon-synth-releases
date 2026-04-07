@@ -3,6 +3,7 @@ import { Cinzel, Crimson_Text } from "next/font/google"
 import ThemePicker from "@/components/ThemePicker"
 import SearchBar from "@/components/SearchBar"
 import TabBar from "@/components/TabBar"
+import ScrollDescent from "@/components/ScrollDescent"
 import { Suspense } from "react"
 import "./globals.css"
 
@@ -35,12 +36,18 @@ export default function RootLayout({
       className={`${cinzel.variable} ${crimsonText.variable} antialiased`}
     >
       <body className="h-screen flex flex-col font-sans overflow-hidden">
-        <header className="px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2">
-            <a href="/" className="font-display text-lg sm:text-2xl font-bold text-accent hover:text-accent-hover transition-colors whitespace-nowrap tracking-[0.08em]">
-              Dungeon Synth Releases
+        <ScrollDescent />
+        <header className="px-4 sm:px-6 pt-6 sm:pt-8 pb-3 sm:pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <a href="/" className="group flex flex-col">
+              <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.12em] leading-tight">
+                Dungeon Synth
+              </span>
+              <span className="font-display text-[10px] sm:text-xs tracking-[0.3em] uppercase text-text-dim mt-1">
+                — Releases from Bandcamp —
+              </span>
             </a>
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0 pt-1">
               <div id="tag-filter-slot" />
               <div className="hidden sm:block">
                 <Suspense>
@@ -55,13 +62,11 @@ export default function RootLayout({
               <SearchBar />
             </Suspense>
           </div>
-          <div className="ornamental-divider mt-3 sm:mt-4 !mb-0">◆</div>
+          <div className="masthead-rule mt-4 sm:mt-6"></div>
+          <TabBar />
         </header>
-        <TabBar />
         <main className="flex-1 min-h-0">{children}</main>
-        <footer className="px-4 sm:px-6 py-3 text-center">
-          <a href="https://bandcamp.com" target="_blank" rel="noopener noreferrer" className="text-text-dim hover:text-text text-xs transition-colors">from Bandcamp</a>
-        </footer>
+        <footer className="shrink-0" />
       </body>
     </html>
   )

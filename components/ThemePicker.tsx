@@ -27,7 +27,7 @@ export default function ThemePicker() {
       setTheme(saved)
       document.documentElement.setAttribute("data-theme", saved)
     }
-    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0.06")
+    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0.075")
     setTextureOpacity(savedOpacity)
     applyTexture(savedOpacity)
   }, [])

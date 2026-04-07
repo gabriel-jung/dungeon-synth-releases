@@ -23,7 +23,7 @@ export default function DaySection({
       <div className="ornamental-divider">{label}</div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="font-display text-[10px] tracking-[0.1em] uppercase text-text-dim hover:text-accent px-2 py-1 border border-border hover:border-accent rounded-sm transition-colors cursor-pointer mb-3"
+        className="font-display text-[10px] tracking-[0.1em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer mb-3"
       >
         {expanded ? "▾ hide covers" : "▸ show covers"}
       </button>
