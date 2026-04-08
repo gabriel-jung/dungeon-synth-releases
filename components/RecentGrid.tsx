@@ -10,14 +10,9 @@ export default function RecentGrid({ albums }: { albums: AlbumListItem[] }) {
 
   return (
     <>
-      <div className={`grid gap-4 mx-auto ${
-        albums.length === 1 ? "grid-cols-1 max-w-[280px]" :
-        albums.length === 2 ? "grid-cols-2 max-w-[560px]" :
-        albums.length === 3 ? "grid-cols-2 sm:grid-cols-3 max-w-[840px]" :
-        "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-      }`}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {albums.map((album) => {
-          const img = coverUrl(album.art_id, "thumb")
+          const img = coverUrl(album.art_id, "full")
           return (
           <button
             key={album.id}
