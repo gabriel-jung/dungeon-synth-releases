@@ -28,7 +28,7 @@ function TagButton({
   return createPortal(
     <button
       onClick={() => setOpen(!open)}
-      className="text-xs text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
+      className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
     >
       {open ? "▾" : "▸"} Tags
       {activeCount > 0 && (
@@ -125,12 +125,12 @@ export default function TagFilter({ tags }: { tags: string[] }) {
                 <button
                   key={tag}
                   onClick={() => toggle(tag)}
-                  className={`text-[11px] px-2 py-1 rounded cursor-pointer transition-colors ${
+                  className={`text-xs tracking-wide px-2 py-1 cursor-pointer transition-colors ${
                     state === "include"
-                      ? "bg-tag-include text-text-bright border border-tag-include"
+                      ? "bg-tag-include/20 text-tag-include border-b-2 border-tag-include"
                       : state === "exclude"
-                        ? "bg-tag-exclude text-text-bright border border-tag-exclude line-through"
-                        : "bg-tag-neutral text-text-dim border border-transparent hover:border-border"
+                        ? "bg-tag-exclude/20 text-tag-exclude border-b-2 border-tag-exclude line-through"
+                        : "text-text-dim border-b border-border/40 hover:border-border hover:text-text"
                   }`}
                 >
                   {tag}
@@ -140,7 +140,7 @@ export default function TagFilter({ tags }: { tags: string[] }) {
             {tags.length > TOP_COUNT && (
               <button
                 onClick={() => setShowAll(!showAll)}
-                className="text-[11px] text-text-dim hover:text-text transition-colors cursor-pointer px-1"
+                className="font-display text-[11px] tracking-wide text-text-dim hover:text-text transition-colors cursor-pointer px-1"
               >
                 {showAll ? "▾ top tags" : `▸ all ${tags.length} tags`}
               </button>

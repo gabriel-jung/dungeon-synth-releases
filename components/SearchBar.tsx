@@ -36,21 +36,20 @@ export default function SearchBar() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full sm:w-52">
+    <form onSubmit={handleSubmit} className="flex items-center w-full sm:w-56">
+      <span className="font-display text-text-dim text-xs tracking-wide mr-2 hidden sm:inline select-none">⌕</span>
       <input
         type="text"
         value={query}
         onChange={handleChange}
-        placeholder="Search..."
-        className={`flex-1 min-w-0 bg-bg-card border border-border px-3 py-1.5 text-base sm:text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors ${
-          query ? "rounded-l border-r-0" : "rounded"
-        }`}
+        placeholder="Search releases..."
+        className="flex-1 min-w-0 bg-transparent border-b border-border px-1 py-1.5 text-base sm:text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors font-sans"
       />
       {query && (
         <button
           type="button"
           onClick={clear}
-          className="w-10 h-10 bg-bg-card border border-border border-l-0 rounded-r flex items-center justify-center text-text-dim hover:text-text transition-colors cursor-pointer text-xl shrink-0"
+          className="ml-1 w-6 h-6 flex items-center justify-center text-text-dim hover:text-text transition-colors cursor-pointer text-sm shrink-0"
         >
           ×
         </button>

@@ -250,7 +250,7 @@ export default function DateSlider({
 
   // Vertical (default)
   return (
-    <div className="flex flex-col items-center h-full">
+    <div className="flex flex-col items-center h-full pb-8">
       {/* Current date label */}
       <div className="mb-3 px-2 py-1 rounded bg-bg-card border border-border font-display text-xs text-text-bright text-center whitespace-nowrap tracking-wide">
         {formatDateShort(dates[index] ?? "")}
@@ -286,8 +286,8 @@ export default function DateSlider({
         {monthDots.map((m, i) => (
           <div
             key={`tick-${i}`}
-            className="absolute bg-text-dim"
-            style={{ top: m.pos, left: "9px", width: "9px", height: "1px" }}
+            className="absolute bg-border"
+            style={{ top: m.pos, left: "7px", width: "13px", height: "2px" }}
           />
         ))}
 
@@ -303,6 +303,18 @@ export default function DateSlider({
             </span>
           </div>
         ))}
+
+        {/* End caps — horizontal ticks at track top and bottom */}
+        {monthDots[0]?.frac !== 0 && (
+          <div
+            className="absolute bg-border"
+            style={{ top: "8px", left: "7px", width: "13px", height: "2px" }}
+          />
+        )}
+        <div
+          className="absolute bg-border"
+          style={{ bottom: "8px", left: "7px", width: "13px", height: "2px" }}
+        />
 
         {/* Thumb */}
         <div

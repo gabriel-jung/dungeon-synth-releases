@@ -6,11 +6,9 @@ import { Album, AlbumListItem, coverUrl, searchFor } from "@/lib/types"
 
 export function AlbumGrid({ albums }: { albums: AlbumListItem[] }) {
   return (
-    <div className="columns-1 sm:columns-2 lg:columns-3" style={{ columnGap: "1rem" }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4">
       {albums.map((album, i) => (
-        <div key={`${album.id}-${i}`} style={{ breakInside: "avoid" }}>
-          <ReleaseCard album={album} />
-        </div>
+        <ReleaseCard key={`${album.id}-${i}`} album={album} />
       ))}
     </div>
   )
@@ -23,27 +21,27 @@ export function ReleaseCard({ album }: { album: AlbumListItem }) {
     <>
       <div
         onClick={() => setOpen(true)}
-        className="w-full text-left px-3 py-2.5 hover:bg-bg-hover transition-colors cursor-pointer border-l-2 border-transparent hover:border-accent group"
+        className="w-full text-left py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors cursor-pointer group"
       >
-        <span
-          role="link"
+        <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); searchFor(album.artist) }}
-          className="font-display text-[0.8rem] tracking-[0.04em] text-accent group-hover:text-accent-hover transition-colors"
+          className="font-display text-sm tracking-[0.05em] text-accent group-hover:text-accent-hover transition-colors text-left cursor-pointer"
         >
           {album.artist}
-        </span>
+        </button>
         <br />
-        <span className="text-text-bright italic text-[0.9rem]">{album.title}</span>
+        <span className="text-text-bright italic text-sm">{album.title}</span>
         {album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase() && (
           <>
             <span className="text-text-dim"> · </span>
-            <span
-              role="link"
+            <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); searchFor(album.host_name!) }}
-              className="text-text-dim hover:text-accent transition-colors text-[0.7rem] tracking-wide uppercase"
+              className="text-text-dim hover:text-accent transition-colors text-xs tracking-wide uppercase cursor-pointer"
             >
               {album.host_name}
-            </span>
+            </button>
           </>
         )}
       </div>
@@ -79,13 +77,13 @@ export default function AlbumDetail({
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center"
-      style={{ zIndex: 10000, background: "rgba(0,0,0,0.5)" }}
+      className="fixed inset-0 flex items-center justify-center animate-backdrop-in backdrop-blur-xs"
+      style={{ zIndex: 10000, background: "rgba(0,0,0,0.55)" }}
       onClick={onClose}
     >
       <div
-        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col sm:flex-row"
-        style={{ boxShadow: "0 0 60px -10px rgba(0,0,0,0.7)" }}
+        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col sm:flex-row border border-border"
+        style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cover — left side on desktop, top on mobile */}
@@ -101,7 +99,9 @@ export default function AlbumDetail({
               <span className="text-5xl text-border select-none">♜</span>
             </div>
           ) : (
-            <div className="w-full aspect-square animate-pulse bg-bg-hover" />
+            <div className="w-full aspect-square bg-bg-hover flex items-center justify-center">
+              <span className="text-3xl text-border select-none animate-pulse">♜</span>
+            </div>
           )}
         </div>
 
@@ -121,6 +121,7 @@ export default function AlbumDetail({
 
           {album ? (
             <>
+              <div className="modal-rule" />
               <div className="flex items-center gap-2 text-xs text-text-dim font-display tracking-wide">
                 {album.date && (
                   <span>
@@ -154,7 +155,8 @@ export default function AlbumDetail({
                 </div>
               )}
 
-              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+              <div className="modal-rule mt-auto" />
+              <div className="flex items-center justify-between">
                 {showHost && (
                   <button
                     onClick={() => { onClose(); searchFor(album.host_name!) }}
@@ -167,22 +169,22 @@ export default function AlbumDetail({
                   href={album.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-display text-xs tracking-wide text-accent hover:text-accent-hover transition-colors ml-auto"
+                  className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors ml-auto"
                 >
                   Bandcamp →
                 </a>
               </div>
             </>
           ) : (
-            <div className="py-4">
-              <span className="text-text-dim text-sm italic">Loading...</span>
+            <div className="py-8 flex flex-col items-center gap-2">
+              <span className="text-text-dim text-sm italic font-display tracking-wide">Retrieving...</span>
             </div>
           )}
         </div>
 
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/70 transition-colors cursor-pointer text-lg rounded-full"
+          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/80 border border-border/50 transition-colors cursor-pointer text-lg"
         >
           ×
         </button>

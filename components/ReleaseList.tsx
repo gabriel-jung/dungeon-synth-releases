@@ -37,8 +37,10 @@ function LoadTrigger({ loading, onVisible }: { loading: boolean; onVisible: () =
   }, [])
 
   return (
-    <div ref={ref} className="py-4 text-center text-text-dim text-sm">
-      {loading ? "Loading..." : ""}
+    <div ref={ref} className="py-6 text-center text-text-dim">
+      {loading ? (
+        <span className="font-display text-xs tracking-[0.1em]">· · ·</span>
+      ) : null}
     </div>
   )
 }
@@ -225,17 +227,15 @@ export default function ReleaseList({
         )
       })}
       {isSearching && searching && (
-        <div className="py-4 flex items-center justify-center gap-2 text-text-dim text-sm">
-          <span className="flex gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: "0ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: "150ms" }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: "300ms" }} />
-          </span>
-          <span>{direction === "past" ? "Searching older releases" : "Searching more releases"}</span>
+        <div className="py-6 flex items-center justify-center text-text-dim">
+          <span className="font-display text-xs tracking-[0.1em] animate-pulse">Searching the archives...</span>
         </div>
       )}
       {isSearching && !searching && displayAlbums.length === 0 && (
-        <div className="py-4 text-center text-text-dim text-sm">No results</div>
+        <div className="py-8 text-center text-text-dim">
+          <span className="text-2xl block mb-2 select-none">♜</span>
+          <span className="font-display text-xs tracking-[0.1em]">No releases found</span>
+        </div>
       )}
       {!isSearching && hasMore && !exhausted && (
         <LoadTrigger loading={loading} onVisible={loadMore} />

@@ -40,10 +40,10 @@ export default function RootLayout({
         <header className="px-4 sm:px-6 pt-6 sm:pt-8 pb-3 sm:pb-4">
           <div className="flex items-start justify-between gap-4">
             <a href="/" className="group flex flex-col">
-              <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.12em] leading-tight">
+              <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.1em] leading-tight">
                 Dungeon Synth
               </span>
-              <span className="font-display text-[10px] sm:text-xs tracking-[0.3em] uppercase text-text-dim mt-1">
+              <span className="font-display text-[10px] sm:text-xs tracking-[0.2em] uppercase text-text-dim mt-1">
                 — Releases from Bandcamp —
               </span>
             </a>

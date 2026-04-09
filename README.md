@@ -25,6 +25,8 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 - **Date slider** — scrub through dates, auto-loads albums when navigating to unloaded dates
 - **10 color themes** — dark and light options, persisted in localStorage
 - **Cover image proxy** — Bandcamp images cached 1 week via Vercel edge
+- **Scroll descent** — page gradually darkens as you browse older releases
+- **Adjustable paper texture** — desaturated fractal noise overlay with opacity slider
 
 ## Setup
 

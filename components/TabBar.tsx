@@ -11,20 +11,20 @@ export default function TabBar() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex items-center gap-6 px-4 sm:px-6 pt-3 pb-1">
-      {tabs.map((tab, i) => {
+    <nav className="flex items-center gap-6 pt-3 pb-1">
+      {tabs.map((tab) => {
         const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href)
         return (
           <a
             key={tab.href}
             href={tab.href}
-            className={`font-display text-[11px] tracking-[0.2em] uppercase transition-colors ${
+            className={`font-display text-xs tracking-[0.1em] uppercase transition-colors pb-1 ${
               active
-                ? "text-accent"
-                : "text-text-dim hover:text-text"
+                ? "text-accent border-b border-accent"
+                : "text-text-dim hover:text-text border-b border-transparent"
             }`}
           >
-            {active ? `· ${tab.label} ·` : tab.label}
+            {tab.label}
           </a>
         )
       })}
