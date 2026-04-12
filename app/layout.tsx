@@ -63,7 +63,10 @@ export default function RootLayout({
             </Suspense>
           </div>
           <div className="masthead-rule mt-4 sm:mt-6"></div>
-          <TabBar />
+          <div className="flex items-end justify-between gap-4">
+            <TabBar />
+            <div id="year-count-slot" />
+          </div>
         </header>
         <main className="flex-1 min-h-0">{children}</main>
         <footer className="shrink-0" />
