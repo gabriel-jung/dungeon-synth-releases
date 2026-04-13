@@ -17,6 +17,12 @@
   --font-display: var(--font-cinzel);
 }
 
+:root {
+  --color-plot-bar-min: color-mix(in srgb, var(--color-accent) 35%, var(--color-bg));
+  --color-plot-bar-max: var(--color-accent);
+  --color-plot-bar-hover: var(--color-accent-hover);
+}
+
 /* 1. Catacombs — warm dark (default) */
 :root,
 [data-theme="catacombs"] {

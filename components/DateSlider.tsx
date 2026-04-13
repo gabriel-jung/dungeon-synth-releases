@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
-import { formatDateShort } from "@/lib/types"
+import { ShortDate } from "./DateHeading"
 
 function HorizontalSlider({
   trackRef,
@@ -23,7 +23,7 @@ function HorizontalSlider({
   return (
     <div className="flex items-center gap-2 w-full px-3 py-1">
       <span className="font-display text-xs text-text-bright whitespace-nowrap shrink-0 tracking-wide">
-        {formatDateShort(dates[index] ?? "")}
+        <ShortDate date={dates[index] ?? ""} />
       </span>
       <div
         ref={trackRef}
@@ -253,7 +253,7 @@ export default function DateSlider({
     <div className="flex flex-col items-center h-full pb-8">
       {/* Current date label */}
       <div className="mb-3 px-2 py-1 rounded bg-bg-card border border-border font-display text-xs text-text-bright text-center whitespace-nowrap tracking-wide">
-        {formatDateShort(dates[index] ?? "")}
+        <ShortDate date={dates[index] ?? ""} />
       </div>
 
       {/* Track area */}

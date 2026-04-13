@@ -4,8 +4,12 @@ import ThemePicker from "@/components/ThemePicker"
 import SearchBar from "@/components/SearchBar"
 import TabBar from "@/components/TabBar"
 import ScrollDescent from "@/components/ScrollDescent"
+import { yearCountQuery } from "@/lib/supabase"
+import { localDateStr } from "@/lib/types"
 import { Suspense } from "react"
 import "./globals.css"
+
+export const revalidate = 3600
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",
@@ -25,11 +29,15 @@ export const metadata: Metadata = {
   description: "Latest dungeon synth releases from Bandcamp",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const year = new Date().getFullYear()
+  const today = localDateStr(new Date())
+  const { count: yearCount } = await yearCountQuery(year, today)
+
   return (
     <html
       lang="en"
@@ -65,7 +73,11 @@ export default function RootLayout({
           <div className="masthead-rule mt-4 sm:mt-6"></div>
           <div className="flex items-end justify-between gap-4">
             <TabBar />
-            <div id="year-count-slot" />
+            {yearCount !== null && (
+              <span className="font-display text-[10px] sm:text-xs tracking-[0.2em] uppercase text-text-dim pb-1">
+                {yearCount.toLocaleString()} releases in {year}
+              </span>
+            )}
           </div>
         </header>
         <main className="flex-1 min-h-0">{children}</main>

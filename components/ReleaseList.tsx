@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { AlbumListItem, formatDateHeading } from "@/lib/types"
+import { AlbumListItem } from "@/lib/types"
 import DaySection from "./DaySection"
+import DateHeading from "./DateHeading"
 import { AlbumGrid, ReleaseCard } from "./AlbumDetail"
 
 function groupByDate(albums: AlbumListItem[]): [string, AlbumListItem[]][] {
@@ -195,7 +196,9 @@ export default function ReleaseList({
     <>
       {grouped.map(([date, dayAlbums], gi) => {
         const sectionCls = gi === 0 ? "" : "pt-4 sm:pt-6"
-        const heading = date === "Unknown" ? "Unknown date" : formatDateHeading(date, includeYear)
+        const heading: React.ReactNode = date === "Unknown"
+          ? "Unknown date"
+          : <DateHeading date={date} includeYear={includeYear} />
         return (
           <section
             key={date}

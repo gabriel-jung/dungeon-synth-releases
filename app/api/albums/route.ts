@@ -5,10 +5,13 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const before = params.get("before")
   const after = params.get("after")
+  const hostId = params.get("host_id")
+  const year = params.get("year")
+  const date = params.get("date")
   const limit = Math.min(Number(params.get("limit") ?? 500), 1000)
 
-  if (!before && !after) {
-    return Response.json({ error: "Missing 'before' or 'after' param" }, { status: 400 })
+  if (!before && !after && !hostId && !date) {
+    return Response.json({ error: "Missing 'before', 'after', 'host_id', or 'date' param" }, { status: 400 })
   }
 
   let query = supabase
@@ -16,7 +19,14 @@ export async function GET(request: NextRequest) {
     .select(ALBUM_LIST_SELECT)
     .limit(limit)
 
-  if (before) {
+  if (date) {
+    query = query.eq("date", date).order("artist", { ascending: true })
+  } else if (hostId) {
+    query = query.eq("host_id", hostId).order("date", { ascending: false })
+    if (year) {
+      query = query.gte("date", `${year}-01-01`).lte("date", `${year}-12-31`)
+    }
+  } else if (before) {
     query = query.lt("date", before).order("date", { ascending: false })
   } else {
     query = query.gt("date", after!).order("date", { ascending: true })

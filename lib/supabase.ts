@@ -8,6 +8,14 @@ export const supabase = createClient(url, key)
 
 export const ALBUM_LIST_SELECT = "id, date, artist, title, url, art_id, hosts!inner(name)"
 
+export function yearCountQuery(year: number, upTo: string) {
+  return supabase
+    .from("albums")
+    .select("*", { count: "exact", head: true })
+    .gte("date", `${year}-01-01`)
+    .lte("date", upTo)
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toAlbumListItem(r: any): AlbumListItem {
   return {

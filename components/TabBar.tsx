@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 const tabs = [
   { href: "/", label: "Recent" },
   { href: "/upcoming", label: "Upcoming" },
+  { href: "/stats", label: "Stats" },
 ]
 
 export default function TabBar() {

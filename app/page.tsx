@@ -3,7 +3,6 @@ import { AlbumListItem, localDateStr, dateRange } from "@/lib/types"
 import DateSlider from "@/components/DateSlider"
 import TagFilter from "@/components/TagFilter"
 import ReleaseList from "@/components/ReleaseList"
-import YearCount from "@/components/YearCount"
 import { Suspense } from "react"
 
 export const revalidate = 3600
@@ -18,15 +17,9 @@ export default async function Page({
   const excludeTags = Array.isArray(sp.xtag) ? sp.xtag : sp.xtag ? [sp.xtag] : []
 
   const today = localDateStr(new Date())
-  const year = new Date().getFullYear()
-  const yearStart = `${year}-01-01`
+  const yearStart = `${new Date().getFullYear()}-01-01`
   const allDates = dateRange(today, yearStart)
 
-  const yearCountPromise = supabase
-    .from("albums")
-    .select("*", { count: "exact", head: true })
-    .gte("date", yearStart)
-    .lte("date", today)
   // Fetch albums — lightweight list items
   const allRows: AlbumListItem[] = []
   const PAGE = 1000
@@ -110,8 +103,6 @@ export default async function Page({
     .sort((a, b) => b[1] - a[1])
     .map(([tag]) => tag)
 
-  const { count: yearCount } = await yearCountPromise
-
   // Deduplicate albums (same ID can appear if data has dupes)
   const seen = new Set<string>()
   const deduped = allRows.filter((a) => { if (seen.has(a.id)) return false; seen.add(a.id); return true })
@@ -131,7 +122,6 @@ export default async function Page({
       <Suspense>
         <TagFilter tags={allTags} />
       </Suspense>
-      {!hasTagFilters && yearCount !== null && <YearCount count={yearCount} year={year} />}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
         <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6 h-full">
           {/* Horizontal date slider — mobile only */}
