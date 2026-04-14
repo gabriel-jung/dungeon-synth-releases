@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 type TagState = "neutral" | "include" | "exclude"
 
@@ -30,7 +30,7 @@ function TagButton({
       onClick={() => setOpen(!open)}
       className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
     >
-      {open ? "▾" : "▸"} Tags
+      {open ? "▾" : "▸"} Genres
       {activeCount > 0 && (
         <span className="bg-accent/20 text-accent text-[10px] px-1.5 rounded-full">
           {activeCount}
@@ -53,6 +53,7 @@ const DEBOUNCE_MS = 600
 export default function TagFilter({ tags }: { tags: string[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
@@ -89,8 +90,8 @@ export default function TagFilter({ tags }: { tags: string[] }) {
     for (const t of inc) params.append("tag", t)
     for (const t of exc) params.append("xtag", t)
     const qs = params.toString()
-    router.push(qs ? `/?${qs}` : "/")
-  }, [router, searchParams])
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+  }, [router, searchParams, pathname])
 
   function toggle(tag: string) {
     const next = cycle(stateOf(tag))
@@ -142,7 +143,7 @@ export default function TagFilter({ tags }: { tags: string[] }) {
                 onClick={() => setShowAll(!showAll)}
                 className="font-display text-[11px] tracking-wide text-text-dim hover:text-text transition-colors cursor-pointer px-1"
               >
-                {showAll ? "▾ top tags" : `▸ all ${tags.length} tags`}
+                {showAll ? "▾ top genres" : `▸ all ${tags.length} genres`}
               </button>
             )}
           </div>

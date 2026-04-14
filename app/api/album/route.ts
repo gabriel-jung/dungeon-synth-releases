@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   const [albumRes, tagsRes] = await Promise.all([
     supabase
       .from("albums")
-      .select("*, hosts!inner(name)")
+      .select("id, artist, title, url, art_id, date, host_id, num_tracks, duration_sec, hosts!inner(name)")
       .eq("id", id)
       .single(),
-    supabase.from("tags").select("tag_name").eq("album_id", id),
+    supabase.from("album_tags").select("tags!inner(name)").eq("album_id", id),
   ])
 
   if (!albumRes.data) {
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
     art_id: r.art_id,
     date: r.date,
     host_id: r.host_id,
-    host_name: r.hosts?.name ?? null,
-    tags: (tagsRes.data ?? []).map((t: { tag_name: string }) => t.tag_name),
+    host_name: (r.hosts as unknown as { name: string } | null)?.name ?? null,
+    tags: ((tagsRes.data ?? []) as unknown as { tags: { name: string } }[]).map((t) => t.tags.name),
     num_tracks: r.num_tracks ?? 0,
     duration_sec: r.duration_sec ?? 0,
   })

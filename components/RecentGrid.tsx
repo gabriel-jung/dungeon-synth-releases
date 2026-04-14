@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { AlbumListItem, coverUrl } from "@/lib/types"
+import { AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
 import AlbumDetail from "./AlbumDetail"
 
-export default function RecentGrid({ albums }: { albums: AlbumListItem[] }) {
+export default function RecentGrid({ albums, showDate = false }: { albums: AlbumListItem[]; showDate?: boolean }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [selected, setSelected] = useState<AlbumListItem | null>(null)
 
@@ -44,6 +44,11 @@ export default function RecentGrid({ albums }: { albums: AlbumListItem[] }) {
               <span className="text-xs text-text-dim truncate">
                 {album.artist}
               </span>
+              {showDate && album.date && (
+                <span className="text-[10px] tracking-wide tabular-nums text-text-dim/80 truncate mt-0.5">
+                  {formatDateShort(album.date, true)}
+                </span>
+              )}
             </div>
           </button>
           )

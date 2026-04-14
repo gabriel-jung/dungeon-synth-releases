@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { ReactNode, useState } from "react"
 import { AlbumListItem } from "@/lib/types"
 import RecentGrid from "./RecentGrid"
 import { AlbumGrid } from "./AlbumDetail"
@@ -10,7 +10,7 @@ export default function DaySection({
   albums,
   defaultExpanded = false,
 }: {
-  label: string
+  label: ReactNode
   albums: AlbumListItem[]
   defaultExpanded?: boolean
 }) {

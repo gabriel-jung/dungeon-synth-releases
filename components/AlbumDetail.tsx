@@ -1,21 +1,40 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Album, AlbumListItem, coverUrl, searchFor } from "@/lib/types"
+import { Album, AlbumListItem, coverUrl, formatDateShort, searchFor } from "@/lib/types"
+import { useModal } from "@/lib/useModal"
 
-export function AlbumGrid({ albums }: { albums: AlbumListItem[] }) {
+export function AlbumGrid({
+  albums,
+  hideHost = false,
+  showDate = false,
+}: {
+  albums: AlbumListItem[]
+  hideHost?: boolean
+  showDate?: boolean
+}) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4">
       {albums.map((album, i) => (
-        <ReleaseCard key={`${album.id}-${i}`} album={album} />
+        <ReleaseCard key={`${album.id}-${i}`} album={album} hideHost={hideHost} showDate={showDate} />
       ))}
     </div>
   )
 }
 
-export function ReleaseCard({ album }: { album: AlbumListItem }) {
+export function ReleaseCard({
+  album,
+  hideHost = false,
+  showDate = false,
+}: {
+  album: AlbumListItem
+  hideHost?: boolean
+  showDate?: boolean
+}) {
   const [open, setOpen] = useState(false)
+  const showHostInline =
+    !hideHost && album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
 
   return (
     <>
@@ -32,7 +51,7 @@ export function ReleaseCard({ album }: { album: AlbumListItem }) {
         </button>
         <br />
         <span className="text-text-bright italic text-sm">{album.title}</span>
-        {album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase() && (
+        {showHostInline && (
           <>
             <span className="text-text-dim"> · </span>
             <button
@@ -42,6 +61,14 @@ export function ReleaseCard({ album }: { album: AlbumListItem }) {
             >
               {album.host_name}
             </button>
+          </>
+        )}
+        {showDate && album.date && (
+          <>
+            <span className="text-text-dim"> · </span>
+            <span className="text-text-dim text-xs tracking-wide tabular-nums">
+              {formatDateShort(album.date, true)}
+            </span>
           </>
         )}
       </div>
@@ -65,12 +92,25 @@ export default function AlbumDetail({
   onClose: () => void
 }) {
   const [album, setAlbum] = useState<Album | null>(null)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = `album-modal-title-${albumStub.id}`
+
+  useModal(onClose, dialogRef)
 
   useEffect(() => {
+    let cancelled = false
+    setError(false)
     fetch(`/api/album?id=${albumStub.id}`)
-      .then((r) => r.json())
-      .then((data) => setAlbum(data))
-  }, [albumStub.id])
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((data) => { if (!cancelled) setAlbum(data) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [albumStub.id, reloadKey])
 
   const img = album ? coverUrl(album.art_id) : null
   const showHost = album?.host_name && album.host_name.toLowerCase() !== albumStub.artist.toLowerCase()
@@ -82,7 +122,12 @@ export default function AlbumDetail({
       onClick={onClose}
     >
       <div
-        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col sm:flex-row border border-border"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -108,7 +153,7 @@ export default function AlbumDetail({
         {/* Info — right side on desktop, below on mobile */}
         <div className="flex-1 px-6 py-5 flex flex-col gap-3 sm:border-l border-t sm:border-t-0 border-border">
           <div>
-            <h2 className="font-display text-lg text-text-bright font-bold leading-tight">
+            <h2 id={titleId} className="font-display text-lg text-text-bright font-bold leading-tight">
               {albumStub.title}
             </h2>
             <button
@@ -119,19 +164,21 @@ export default function AlbumDetail({
             </button>
           </div>
 
-          {album ? (
+          {error ? (
+            <div className="py-8 flex flex-col items-center gap-2 text-text-dim font-display text-xs tracking-wide">
+              <span>Failed to load album</span>
+              <button
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="text-accent hover:text-accent-hover transition-colors cursor-pointer uppercase tracking-[0.2em] text-[10px]"
+              >
+                Retry
+              </button>
+            </div>
+          ) : album ? (
             <>
               <div className="modal-rule" />
               <div className="flex items-center gap-2 text-xs text-text-dim font-display tracking-wide">
-                {album.date && (
-                  <span>
-                    {new Date(album.date + "T00:00:00").toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                )}
+                {album.date && <span>{formatDateShort(album.date, true)}</span>}
                 {album.num_tracks > 0 && (
                   <>
                     <span className="text-border">·</span>
@@ -184,6 +231,7 @@ export default function AlbumDetail({
 
         <button
           onClick={onClose}
+          aria-label="Close"
           className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/80 border border-border/50 transition-colors cursor-pointer text-lg"
         >
           ×

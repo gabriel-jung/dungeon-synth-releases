@@ -3,9 +3,16 @@ import { Cinzel, Crimson_Text } from "next/font/google"
 import ThemePicker from "@/components/ThemePicker"
 import SearchBar from "@/components/SearchBar"
 import TabBar from "@/components/TabBar"
+import TagFilter from "@/components/TagFilter"
+import FilterChips from "@/components/FilterChips"
+import YearReleaseCount from "@/components/YearReleaseCount"
 import ScrollDescent from "@/components/ScrollDescent"
+import { fetchGenreTags, yearCountQuery } from "@/lib/supabase"
+import { localDateStr } from "@/lib/types"
 import { Suspense } from "react"
 import "./globals.css"
+
+export const revalidate = 300
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",
@@ -25,11 +32,18 @@ export const metadata: Metadata = {
   description: "Latest dungeon synth releases from Bandcamp",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const year = new Date().getUTCFullYear()
+  const today = localDateStr(new Date())
+  const [{ count: yearCount }, allTags] = await Promise.all([
+    yearCountQuery(year, today),
+    fetchGenreTags(),
+  ])
+
   return (
     <html
       lang="en"
@@ -63,8 +77,21 @@ export default function RootLayout({
             </Suspense>
           </div>
           <div className="masthead-rule mt-4 sm:mt-6"></div>
-          <TabBar />
+          <div className="flex items-end justify-between gap-4">
+            <TabBar />
+            {yearCount !== null && (
+              <Suspense>
+                <YearReleaseCount initialCount={yearCount} year={year} />
+              </Suspense>
+            )}
+          </div>
         </header>
+        <Suspense>
+          <TagFilter tags={allTags} />
+        </Suspense>
+        <Suspense>
+          <FilterChips />
+        </Suspense>
         <main className="flex-1 min-h-0">{children}</main>
         <footer className="shrink-0" />
       </body>

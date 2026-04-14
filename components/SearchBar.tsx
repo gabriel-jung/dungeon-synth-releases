@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { searchFor } from "@/lib/types"
 
 export default function SearchBar() {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [query, setQuery] = useState(searchParams.get("q") ?? "")
+  const onGenres = pathname?.startsWith("/genres") ?? false
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync input when search changes externally (e.g. clicking artist name)
@@ -42,7 +44,7 @@ export default function SearchBar() {
         type="text"
         value={query}
         onChange={handleChange}
-        placeholder="Search releases..."
+        placeholder={onGenres ? "Search genres..." : "Search releases..."}
         className="flex-1 min-w-0 bg-transparent border-b border-border px-1 py-1.5 text-base sm:text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors font-sans"
       />
       {query && (
