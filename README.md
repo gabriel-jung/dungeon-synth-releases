@@ -6,14 +6,18 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 
 - **/** — Recent releases, newest first. Shows last 7 days initially, older releases load on scroll.
 - **/upcoming** — Upcoming releases, sorted by date ascending. Next 7 days initially, further dates load on scroll.
+- **/stats** — Aggregate stats for the current year: calendar heatmap of daily activity, top Bandcamp hosts, track-count and duration histograms. See [docs/stats.md](docs/stats.md).
+- **/genres** — Interactive force-directed graph of genre co-occurrence, with Louvain clustering and four selectable similarity metrics (Jaccard, PMI, cosine, raw). See [docs/genres.md](docs/genres.md).
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 16 (App Router, Server Components) |
-| Database | Supabase (PostgreSQL) |
+| Database | Supabase (PostgreSQL, RPC functions for aggregates) |
 | Styling | Tailwind CSS v4 with CSS custom properties (10 themes) |
+| Visualizations | D3 (force simulation, scales, zoom, selection — subpackage imports) |
+| Math rendering | KaTeX (for similarity-metric formulas on /genres) |
 | Hosting | Vercel (free tier) |
 | Data pipeline | Python + uv + [bandcamp-explorer](https://github.com/gabriel-jung/bandcamp-explorer) |
 
@@ -27,6 +31,8 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 - **Cover image proxy** — Bandcamp images cached 1 week via Vercel edge
 - **Scroll descent** — page gradually darkens as you browse older releases
 - **Adjustable paper texture** — desaturated fractal noise overlay with opacity slider
+- **Stats dashboard** — calendar heatmap, host ranking, track-count & duration histograms ([docs](docs/stats.md))
+- **Genre graph** — D3 force-directed co-occurrence map with community clustering and tunable similarity metrics ([docs](docs/genres.md))
 
 ## Setup
 

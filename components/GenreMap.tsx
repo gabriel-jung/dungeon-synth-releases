@@ -1,7 +1,27 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import * as d3 from "d3"
+import { hsl } from "d3-color"
+import { max, mean, group } from "d3-array"
+import { scaleSqrt, scaleLinear } from "d3-scale"
+import { polygonHull } from "d3-polygon"
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
+  type Simulation,
+  type ForceLink,
+  type ForceManyBody,
+  type ForceCollide,
+} from "d3-force"
+import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
+import { drag as d3Drag } from "d3-drag"
+import { select, type Selection } from "d3-selection"
+import "d3-transition"
 import katex from "katex"
 import "katex/dist/katex.min.css"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -11,14 +31,14 @@ export type GenreCount = { name: string; n: number }
 export type GenrePair = { a: string; b: string; n: number }
 
 type Metric = "raw" | "jaccard" | "pmi" | "cosine"
-type Node = d3.SimulationNodeDatum & { id: string; count: number; cluster: number }
-type Edge = d3.SimulationLinkDatum<Node> & { weight: number; inter: number }
+type Node = SimulationNodeDatum & { id: string; count: number; cluster: number }
+type Edge = SimulationLinkDatum<Node> & { weight: number; inter: number }
 
 type HoverInfo =
   | { kind: "node"; name: string; count: number; conns: number }
   | { kind: "edge"; a: string; b: string; inter: number; weight: number }
 
-type MetricInfo = { value: Metric; label: string; tex: string; blurb: string }
+type MetricInfo = { value: Metric; label: string; tex: string; blurb: string; wiki?: string }
 
 const METRICS: MetricInfo[] = [
   {
@@ -27,6 +47,7 @@ const METRICS: MetricInfo[] = [
     tex: String.raw`J(A,B) = \frac{|A \cap B|}{|A \cup B|}`,
     blurb:
       "How much two genres overlap, as a share of everything tagged with either one. A good all-purpose default.",
+    wiki: "https://en.wikipedia.org/wiki/Jaccard_index",
   },
   {
     value: "raw",
@@ -41,6 +62,7 @@ const METRICS: MetricInfo[] = [
     tex: String.raw`\mathrm{PMI}(A,B) = \log_2 \frac{|A \cap B| \cdot N}{|A| \cdot |B|}`,
     blurb:
       "How much more often two genres appear together than pure chance would predict. Great for spotting surprising pairings.",
+    wiki: "https://en.wikipedia.org/wiki/Pointwise_mutual_information",
   },
   {
     value: "cosine",
@@ -48,6 +70,7 @@ const METRICS: MetricInfo[] = [
     tex: String.raw`\cos(A,B) = \frac{|A \cap B|}{\sqrt{|A| \cdot |B|}}`,
     blurb:
       "Similar to Jaccard, but kinder when one genre is much bigger than the other.",
+    wiki: "https://en.wikipedia.org/wiki/Cosine_similarity",
   },
 ]
 
@@ -67,7 +90,7 @@ function clusterColor(idx: number, lightDelta = 0): string {
     ? CLUSTER_HUES[idx]
     : (CLUSTER_HUES[0] + idx * GOLDEN_ANGLE) % 360
   const l = Math.min(0.5 + lightDelta, 0.75)
-  return d3.hsl(h, 0.4, l).formatHex()
+  return hsl(h, 0.4, l).formatHex()
 }
 
 type LouvainGraph = {
@@ -333,13 +356,13 @@ export default function GenreMap({
   const [simReady, setSimReady] = useState(false)
   const [settling, setSettling] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
-  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const labelSizeRef = useRef(1)
   const labelLimitRef = useRef<number | null>(null)
   const labelPosRef = useRef<LabelPos>("inside")
   const recomputeLabelsRef = useRef<() => void>(() => {})
-  const simRef = useRef<d3.Simulation<Node, Edge> | null>(null)
-  const linkSelRef = useRef<d3.Selection<SVGLineElement, Edge, SVGGElement, unknown> | null>(null)
+  const simRef = useRef<Simulation<Node, Edge> | null>(null)
+  const linkSelRef = useRef<Selection<SVGLineElement, Edge, SVGGElement, unknown> | null>(null)
   const rebuildLinksRef = useRef<(visible: Set<Edge>) => void>(() => {})
   const visibleEdgesRef = useRef<Set<Edge>>(new Set())
   const cohesionRef = useRef(0.08)
@@ -521,7 +544,7 @@ export default function GenreMap({
 
   // Render with d3
   useEffect(() => {
-    const svg = d3.select(svgRef.current!)
+    const svg = select(svgRef.current!)
     const container = containerRef.current!
     const w = container.clientWidth
     const h = container.clientHeight
@@ -543,8 +566,7 @@ export default function GenreMap({
     setSettling(true)
     let tickedOnce = false
 
-    const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
+    const zoom = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 5])
       .on("zoom", (e) => {
         g.attr("transform", e.transform.toString())
@@ -555,11 +577,11 @@ export default function GenreMap({
 
     if (nodes.length === 0) return
 
-    const maxCount = d3.max(nodes, (d) => d.count) ?? 1
-    const maxWeight = d3.max(edges, (d) => d.weight) ?? 1
-    const rScale = d3.scaleSqrt().domain([1, maxCount]).range([6 * debouncedNodeScale, 28 * debouncedNodeScale])
-    const wScale = d3.scaleLinear().domain([0, maxWeight]).range([0.5, 6])
-    const fontScale = d3.scaleLinear().domain([1, maxCount]).range([6.5, 10.5])
+    const maxCount = max(nodes, (d) => d.count) ?? 1
+    const maxWeight = max(edges, (d) => d.weight) ?? 1
+    const rScale = scaleSqrt().domain([1, maxCount]).range([6 * debouncedNodeScale, 28 * debouncedNodeScale])
+    const wScale = scaleLinear().domain([0, maxWeight]).range([0.5, 6])
+    const fontScale = scaleLinear().domain([1, maxCount]).range([6.5, 10.5])
 
     const hullG = g.append("g").attr("class", "hulls")
 
@@ -611,7 +633,7 @@ export default function GenreMap({
               .style("pointer-events", "stroke")
               .style("cursor", "pointer")
               .on("mouseenter", function (e: MouseEvent, d) {
-                d3.select(this).attr("opacity", 0.95).attr("stroke-width", wScale(d.weight) + 2)
+                select(this).attr("opacity", 0.95).attr("stroke-width", wScale(d.weight) + 2)
                 const s = d.source as Node
                 const t = d.target as Node
                 setHover({ kind: "edge", a: s.id, b: t.id, inter: d.inter, weight: d.weight })
@@ -619,7 +641,7 @@ export default function GenreMap({
               })
               .on("mousemove", (e: MouseEvent) => positionTooltip(e.clientX, e.clientY))
               .on("mouseleave", function (_e, d) {
-                d3.select(this)
+                select(this)
                   .attr("opacity", baseEdgeOpacity(d))
                   .attr("stroke-width", wScale(d.weight))
                 setHover(null)
@@ -651,8 +673,7 @@ export default function GenreMap({
       .classed("node-g", true)
       .style("cursor", "pointer")
       .call(
-        d3
-          .drag<SVGGElement, Node>()
+        d3Drag<SVGGElement, Node>()
           .on("start", (e, d) => {
             if (!e.active) sim.alphaTarget(0.3).restart()
             d.fx = d.x
@@ -780,7 +801,7 @@ export default function GenreMap({
       }
     }
 
-    const clusterGroups = d3.group(nodes, (n) => n.cluster)
+    const clusterGroups = group(nodes, (n) => n.cluster)
     const clusterIds = Array.from(clusterGroups.keys())
     const hullSel = hullG
       .selectAll<SVGPathElement, number>("path")
@@ -797,10 +818,10 @@ export default function GenreMap({
         const members = clusterGroups.get(cid)
         if (!members || members.length < 3) return null
         const points = members.map((n) => [n.x ?? 0, n.y ?? 0] as [number, number])
-        const hull = d3.polygonHull(points)
+        const hull = polygonHull(points)
         if (!hull) return null
-        const cx = d3.mean(hull, (p) => p[0])!
-        const cy = d3.mean(hull, (p) => p[1])!
+        const cx = mean(hull, (p) => p[0])!
+        const cy = mean(hull, (p) => p[1])!
         const expanded = hull.map(([x, y]) => {
           const dx = x - cx
           const dy = y - cy
@@ -816,12 +837,10 @@ export default function GenreMap({
     let frameSkip = 0
 
     simRef.current?.stop()
-    const sim = d3
-      .forceSimulation<Node>(nodes)
+    const sim = forceSimulation<Node>(nodes)
       .force(
         "link",
-        d3
-          .forceLink<Node, Edge>(edges)
+        forceLink<Node, Edge>(edges)
           .id((d) => d.id)
           .distance((d) => {
             const s = d.source as Node
@@ -837,9 +856,9 @@ export default function GenreMap({
             return same ? 0.5 + 0.4 * wn : 0.05 + 0.1 * wn
           }),
       )
-      .force("charge", d3.forceManyBody().strength(-debouncedRepulsion).distanceMax(300))
-      .force("center", d3.forceCenter(w / 2, h / 2).strength(0.05))
-      .force("collision", d3.forceCollide<Node>().radius((d) => rScale(d.count) + 6).strength(0.7))
+      .force("charge", forceManyBody().strength(-debouncedRepulsion).distanceMax(300))
+      .force("center", forceCenter(w / 2, h / 2).strength(0.05))
+      .force("collision", forceCollide<Node>().radius((d) => rScale(d.count) + 6).strength(0.7))
       .force("cluster", clusterForce)
       .alphaDecay(0.02)
       .stop()
@@ -882,7 +901,7 @@ export default function GenreMap({
         const cy = (minY + maxY) / 2
         const tx = w / 2 - k * cx
         const ty = h / 2 - k * cy
-        svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+        svg.transition().duration(400).call(zoom.transform, zoomIdentity.translate(tx, ty).scale(k))
       })
 
     recomputeLabels()
@@ -897,7 +916,7 @@ export default function GenreMap({
   // Live-update node opacity without rebuilding the simulation.
   useEffect(() => {
     if (!svgRef.current) return
-    d3.select(svgRef.current).selectAll<SVGCircleElement, Node>("circle").attr("fill-opacity", nodeOpacity)
+    select(svgRef.current).selectAll<SVGCircleElement, Node>("circle").attr("fill-opacity", nodeOpacity)
   }, [nodeOpacity, nodes])
 
   // Live-update label size without rebuilding the simulation. The sim's tick
@@ -905,9 +924,9 @@ export default function GenreMap({
   useEffect(() => {
     labelSizeRef.current = labelSize
     if (!svgRef.current || nodes.length === 0) return
-    const maxCount = d3.max(nodes, (d) => d.count) ?? 1
-    const fs = d3.scaleLinear().domain([1, maxCount]).range([6.5, 10.5])
-    d3.select(svgRef.current)
+    const maxCount = max(nodes, (d) => d.count) ?? 1
+    const fs = scaleLinear().domain([1, maxCount]).range([6.5, 10.5])
+    select(svgRef.current)
       .selectAll<SVGTextElement, Node>("text")
       .attr("font-size", (d) => `${fs(d.count) * labelSize}px`)
   }, [labelSize, nodes])
@@ -930,15 +949,15 @@ export default function GenreMap({
   useEffect(() => {
     labelPosRef.current = labelPos
     if (!svgRef.current || nodes.length === 0) return
-    const maxCount = d3.max(nodes, (d) => d.count) ?? 1
-    const rS = d3.scaleSqrt().domain([1, maxCount]).range([6 * debouncedNodeScale, 28 * debouncedNodeScale])
-    const svg = d3.select(svgRef.current)
+    const maxCount = max(nodes, (d) => d.count) ?? 1
+    const rS = scaleSqrt().domain([1, maxCount]).range([6 * debouncedNodeScale, 28 * debouncedNodeScale])
+    const svg = select(svgRef.current)
     svg.selectAll<SVGCircleElement, Node>("circle").attr("r", (d) => rS(d.count))
     const geom = (d: Node) => computeLabelGeom(rS(d.count), labelPos)
     svg.selectAll<SVGTextElement, Node>("text")
       .attr("dy", (d) => geom(d).dy)
       .attr("dominant-baseline", (d) => geom(d).baseline)
-    const coll = simRef.current?.force("collision") as d3.ForceCollide<Node> | undefined
+    const coll = simRef.current?.force("collision") as ForceCollide<Node> | undefined
     if (coll) coll.radius((d) => rS(d.count) + 6)
     recomputeLabelsRef.current()
   }, [labelPos, nodes, debouncedNodeScale])
@@ -951,7 +970,7 @@ export default function GenreMap({
     hiNeighborsRef.current = hiNeighbors
     if (!svgRef.current) return
     const anyHi = hiTags.size > 0
-    const svg = d3.select(svgRef.current)
+    const svg = select(svgRef.current)
     if (prevVisibleEdgesRef.current !== visibleEdges) {
       rebuildLinksRef.current(visibleEdges)
       prevVisibleEdgesRef.current = visibleEdges
@@ -982,7 +1001,7 @@ export default function GenreMap({
   }
 
   useEffect(() => {
-    const link = simRef.current?.force("link") as d3.ForceLink<Node, Edge> | undefined
+    const link = simRef.current?.force("link") as ForceLink<Node, Edge> | undefined
     if (!link) return
     link.distance((d) => {
       const s = d.source as Node
@@ -994,7 +1013,7 @@ export default function GenreMap({
   }, [debouncedLinkScale])
 
   useEffect(() => {
-    const charge = simRef.current?.force("charge") as d3.ForceManyBody<Node> | undefined
+    const charge = simRef.current?.force("charge") as ForceManyBody<Node> | undefined
     if (charge) charge.strength(-debouncedRepulsion)
     bumpSim()
   }, [debouncedRepulsion])
@@ -1005,7 +1024,7 @@ export default function GenreMap({
   }, [cohesion])
 
   const setZoomFromSlider = (k: number) => {
-    const svg = d3.select(svgRef.current!)
+    const svg = select(svgRef.current!)
     const zoom = zoomBehaviorRef.current
     const container = containerRef.current
     if (!zoom || !container) return
@@ -1177,7 +1196,17 @@ export default function GenreMap({
               <p>
                 Colors mark <span className="text-text">groups</span> of genres that link
                 densely to one another — found automatically from the data, not labeled
-                by hand. Shaded hulls trace each group.
+                by hand (
+                <a
+                  href="https://en.wikipedia.org/wiki/Louvain_method"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-text-dim hover:text-accent underline decoration-dotted underline-offset-2"
+                  aria-label="Wikipedia article for the Louvain community-detection method"
+                >
+                  Louvain method ↗
+                </a>
+                ). Shaded hulls trace each group.
               </p>
               <div>
                 <div className="font-display text-[10px] tracking-[0.15em] uppercase text-accent/80 mb-1">
@@ -1199,9 +1228,20 @@ export default function GenreMap({
                     return (
                       <div key={m.value} className={active ? "" : "opacity-60"}>
                         <div className="flex items-baseline justify-between gap-3">
-                          <span className="font-display text-[10px] tracking-[0.15em] uppercase text-accent">
-                            {m.label}
-                            {active && <span className="text-text-dim normal-case tracking-normal"> · current</span>}
+                          <span className="font-display text-[10px] text-accent">
+                            <span className="tracking-[0.15em] uppercase">{m.label}</span>
+                            {m.wiki && (
+                              <a
+                                href={m.wiki}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-1 text-text-dim hover:text-accent"
+                                aria-label={`Wikipedia article for ${m.label}`}
+                              >
+                                ↗
+                              </a>
+                            )}
+                            {active && <span className="text-text-dim"> · current</span>}
                           </span>
                           <span className="text-sm text-text">
                             <Tex tex={m.tex} />
