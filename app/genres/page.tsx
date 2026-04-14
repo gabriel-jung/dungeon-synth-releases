@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { supabase, paginateAll } from "@/lib/supabase"
 import GenreMap, { GenreCount, GenrePair } from "@/components/GenreMap"
 
@@ -30,7 +31,9 @@ export default async function GenresPage() {
 
   return (
     <div className="h-full w-full">
-      <GenreMap counts={counts} pairs={pairs} />
+      <Suspense>
+        <GenreMap counts={counts} pairs={pairs} />
+      </Suspense>
     </div>
   )
 }
