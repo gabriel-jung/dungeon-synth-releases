@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { parseTagParams } from "@/lib/types"
 import HostRow from "@/components/HostRow"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
 import Histogram, { HistBin } from "@/components/Histogram"
@@ -9,13 +10,21 @@ type HostCount = { host_id: string; name: string; image_id: string | null; url: 
 type DailyCount = { date: string; n: number }
 type HistRow = { bucket: string; bucket_order: number; bucket_width: number; n: number | string }
 
-export default async function StatsPage() {
-  const year = new Date().getFullYear()
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const sp = await searchParams
+  const { includeTags, excludeTags } = parseTagParams(sp)
+
+  const year = new Date().getUTCFullYear()
+  const rpcArgs = { p_year: year, p_include_tags: includeTags, p_exclude_tags: excludeTags }
   const [hostRes, dailyRes, tracksHistRes, durationHistRes] = await Promise.all([
-    supabase.rpc("host_counts", { p_year: year }),
-    supabase.rpc("daily_counts", { p_year: year }),
-    supabase.rpc("tracks_per_album_hist", { p_year: year }),
-    supabase.rpc("album_duration_hist", { p_year: year }),
+    supabase.rpc("host_counts", rpcArgs),
+    supabase.rpc("daily_counts", rpcArgs),
+    supabase.rpc("tracks_per_album_hist", rpcArgs),
+    supabase.rpc("album_duration_hist", rpcArgs),
   ])
 
   const rows: HostCount[] = (hostRes.data ?? []).slice(0, 50).map(

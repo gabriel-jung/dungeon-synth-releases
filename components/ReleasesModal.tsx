@@ -27,7 +27,7 @@ export default function ReleasesModal({
   onClose: () => void
 }) {
   const [albums, setAlbums] = useState<AlbumListItem[] | null>(null)
-  const [view, setView] = useState<ViewMode>("grid")
+  const [view, setView] = useState<ViewMode>(expectedCount > 20 ? "list" : "grid")
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const dialogRef = useRef<HTMLDivElement>(null)

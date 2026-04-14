@@ -1,15 +1,24 @@
+// UTC-based to keep server and client agreeing on "today" across day
+// rollovers — previously this used runtime-local time, so a page rendered
+// at 23:30 UTC would stamp the wrong date for a client already past midnight.
 export function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  return d.toISOString().slice(0, 10)
 }
 
 export function releaseCount(n: number): string {
-  return `${n} release${n === 1 ? "" : "s"}`
+  return `${n.toLocaleString()} release${n === 1 ? "" : "s"}`
+}
+
+type TagParamsInput = { tag?: string | string[]; xtag?: string | string[] }
+export function parseTagParams(sp: TagParamsInput): { includeTags: string[]; excludeTags: string[] } {
+  const norm = (v?: string | string[]) => (Array.isArray(v) ? v : v ? [v] : [])
+  return { includeTags: norm(sp.tag), excludeTags: norm(sp.xtag) }
 }
 
 export function dateRange(from: string, to: string): string[] {
   const dates: string[] = []
-  const start = new Date(from + "T00:00:00")
-  const end = new Date(to + "T00:00:00")
+  const start = new Date(from + "T00:00:00Z")
+  const end = new Date(to + "T00:00:00Z")
   const step = start <= end ? 1 : -1
   for (let d = start; step > 0 ? d <= end : d >= end; d = new Date(d.getTime() + step * 86400000)) {
     dates.push(localDateStr(d))
@@ -57,7 +66,11 @@ export function searchFor(value: string) {
   if (value) params.set("q", value)
   else params.delete("q")
   const qs = params.toString()
-  window.history.replaceState(null, "", qs ? `/?${qs}` : "/")
+  // On the genres page, keep the reader in the visualization so the query
+  // can drive node highlighting instead of sending them to the release list.
+  const stayHere = window.location.pathname.startsWith("/genres")
+  const path = stayHere ? window.location.pathname : "/"
+  window.history.replaceState(null, "", qs ? `${path}?${qs}` : path)
   window.dispatchEvent(new CustomEvent("search-change", { detail: value }))
 }
 

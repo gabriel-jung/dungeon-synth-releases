@@ -196,9 +196,11 @@ export default function ReleaseList({
     <>
       {grouped.map(([date, dayAlbums], gi) => {
         const sectionCls = gi === 0 ? "" : "pt-4 sm:pt-6"
-        const heading: React.ReactNode = date === "Unknown"
-          ? "Unknown date"
-          : <DateHeading date={date} includeYear={includeYear} />
+        const heading: React.ReactNode = listOnly
+          ? null
+          : date === "Unknown"
+            ? "Unknown date"
+            : <DateHeading date={date} includeYear={includeYear} />
         return (
           <section
             key={date}
@@ -206,7 +208,11 @@ export default function ReleaseList({
             className={`${sectionCls} animate-fade-slide-in`}
             style={{ animationDelay: `${Math.min(gi * 50, 300)}ms` }}
           >
-            {!listOnly && recentDates.has(date) ? (
+            {listOnly ? (
+              dayAlbums.map((album) => (
+                <ReleaseCard key={album.id} album={album} hideHost showDate />
+              ))
+            ) : recentDates.has(date) ? (
               <DaySection
                 label={heading}
                 albums={dayAlbums}
@@ -214,16 +220,8 @@ export default function ReleaseList({
               />
             ) : (
               <>
-                <div className="ornamental-divider">
-                  {heading}
-                </div>
-                {listOnly ? (
-                  dayAlbums.map((album) => (
-                    <ReleaseCard key={album.id} album={album} />
-                  ))
-                ) : (
-                  <AlbumGrid albums={dayAlbums} />
-                )}
+                <div className="ornamental-divider">{heading}</div>
+                <AlbumGrid albums={dayAlbums} />
               </>
             )}
           </section>

@@ -1,5 +1,5 @@
-import { supabase, ALBUM_LIST_SELECT, toAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, localDateStr, dateRange } from "@/lib/types"
+import { supabase, ALBUM_LIST_SELECT, paginateAll, toAlbumListItem } from "@/lib/supabase"
+import { localDateStr, dateRange } from "@/lib/types"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
@@ -10,26 +10,18 @@ export default async function UpcomingPage() {
   const today = localDateStr(new Date())
   const tomorrow = localDateStr(new Date(Date.now() + 86400000))
 
-  // Fetch upcoming albums (next 7 days initially)
   const cutoff = localDateStr(new Date(Date.now() + 7 * 86400000))
-  const allRows: AlbumListItem[] = []
-  const PAGE = 1000
-  let from = 0
-
-  while (true) {
+  const rawRows = await paginateAll(async (from, to) => {
     const { data } = await supabase
       .from("albums")
       .select(ALBUM_LIST_SELECT)
       .gt("date", today)
       .lte("date", cutoff)
       .order("date", { ascending: true })
-      .range(from, from + PAGE - 1)
-
-    if (!data || data.length === 0) break
-    for (const r of data) allRows.push(toAlbumListItem(r))
-    if (data.length < PAGE) break
-    from += PAGE
-  }
+      .range(from, to)
+    return data
+  })
+  const allRows = rawRows.map(toAlbumListItem)
 
   // Find the furthest upcoming album date
   const { data: maxRow } = await supabase
@@ -40,7 +32,7 @@ export default async function UpcomingPage() {
     .limit(1)
     .single()
 
-  const yearEnd = `${new Date().getFullYear()}-12-31`
+  const yearEnd = `${new Date().getUTCFullYear()}-12-31`
   const lastAlbumDate = maxRow?.date && maxRow.date <= yearEnd ? maxRow.date : yearEnd
   const allDates = dateRange(tomorrow, lastAlbumDate)
 
