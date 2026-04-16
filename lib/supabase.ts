@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js"
-import { AlbumListItem } from "./types"
+import { AlbumListItem, HostRow } from "./types"
 
 const url = process.env.SUPABASE_URL!
 const key = process.env.SUPABASE_SECRET_KEY!
 
 export const supabase = createClient(url, key)
 
-export const ALBUM_LIST_SELECT = "id, date, artist, title, url, art_id, hosts!inner(name)"
+export const ALBUM_LIST_SELECT = "id, date, artist, title, url, art_id, hosts!inner(id, name, image_id, url)"
 
 export function yearCountQuery(year: number, upTo: string) {
   return supabase
@@ -43,6 +43,7 @@ export async function fetchGenreTags(): Promise<string[]> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toAlbumListItem(r: any): AlbumListItem {
+  const hosts = r.hosts as unknown as HostRow | null
   return {
     id: r.id,
     artist: r.artist,
@@ -50,6 +51,9 @@ export function toAlbumListItem(r: any): AlbumListItem {
     url: r.url,
     date: r.date,
     art_id: r.art_id,
-    host_name: (r.hosts as unknown as { name: string } | null)?.name ?? null,
+    host_id: hosts?.id ?? null,
+    host_name: hosts?.name ?? null,
+    host_image_id: hosts?.image_id ?? null,
+    host_url: hosts?.url ?? null,
   }
 }

@@ -33,6 +33,9 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 - **Adjustable paper texture** — desaturated fractal noise overlay with opacity slider
 - **Stats dashboard** — calendar heatmap, host ranking, track-count & duration histograms ([docs](docs/stats.md))
 - **Genre graph** — D3 force-directed co-occurrence map with community clustering and tunable similarity metrics ([docs](docs/genres.md))
+- **Artist/host modals** — clicking an artist or label name opens a modal with all their releases (grid or list); self-released artists resolve by UUID, label artists by name search
+- **Tag modals** — clicking a tag on an album detail opens a genre modal showing all releases with that tag
+- **Paginated grid view** — cover art grids load 20 at a time with a "load more" button
 
 ## Setup
 

@@ -74,6 +74,17 @@ export function searchFor(value: string) {
   window.dispatchEvent(new CustomEvent("search-change", { detail: value }))
 }
 
+export interface HostRow {
+  id: string
+  name: string
+  image_id: string | null
+  url: string | null
+}
+
+export function isLabelRelease(album: Pick<AlbumListItem, "artist" | "host_name">): boolean {
+  return !!album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
+}
+
 export interface AlbumListItem {
   id: string
   artist: string
@@ -81,13 +92,18 @@ export interface AlbumListItem {
   url: string
   date: string | null
   art_id?: string | null
+  host_id?: string | null
   host_name?: string | null
+  host_image_id?: string | null
+  host_url?: string | null
 }
 
 export interface Album extends AlbumListItem {
   art_id: string | null
   host_id: string | null
   host_name: string | null
+  host_image_id: string | null
+  host_url: string | null
   tags: string[]
   num_tracks: number
   duration_sec: number

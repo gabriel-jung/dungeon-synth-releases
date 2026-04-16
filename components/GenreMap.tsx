@@ -19,7 +19,6 @@ import {
   type ForceCollide,
 } from "d3-force"
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom"
-import { drag as d3Drag } from "d3-drag"
 import { select, type Selection } from "d3-selection"
 import "d3-transition"
 import katex from "katex"
@@ -351,7 +350,13 @@ export default function GenreMap({
   const [aboutOpen, setAboutOpen] = useState(false)
   const [captionVisible, setCaptionVisible] = useState(true)
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  const [modalInfo, setModalInfo] = useState<{ tags: string[]; count: number } | null>(null)
+  const [modalInfo, setModalInfo] = useState<{
+    tags: string[]
+    count: number
+    pairs?: GenrePair[]
+    allActivePairs?: GenrePair[]
+    nodeCounts?: Map<string, number>
+  } | null>(null)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [simReady, setSimReady] = useState(false)
   const [settling, setSettling] = useState(false)
@@ -553,8 +558,16 @@ export default function GenreMap({
       const apply = () => {
         const el = tooltipRef.current
         if (!el) return
-        el.style.left = `${clientX + 14}px`
-        el.style.top = `${clientY - 10}px`
+        let x = clientX + 14
+        let y = clientY - 10
+        const rect = el.getBoundingClientRect()
+        if (rect.width > 0) {
+          if (x + rect.width > window.innerWidth - 8) x = clientX - rect.width - 14
+          if (y + rect.height > window.innerHeight - 8) y = window.innerHeight - rect.height - 8
+          if (y < 8) y = 8
+        }
+        el.style.left = `${x}px`
+        el.style.top = `${y}px`
       }
       if (tooltipRef.current) apply()
       else requestAnimationFrame(apply)
@@ -565,6 +578,7 @@ export default function GenreMap({
     setSimReady(false)
     setSettling(true)
     let tickedOnce = false
+    let initialFitDone = false
 
     const zoom = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 5])
@@ -576,6 +590,10 @@ export default function GenreMap({
     zoomBehaviorRef.current = zoom
 
     if (nodes.length === 0) return
+
+    const activeIds = new Set(nodes.map((n) => n.id))
+    const allActivePairs = pairs.filter((p) => activeIds.has(p.a) && activeIds.has(p.b))
+    const nodeCounts = new Map(nodes.map((n) => [n.id, n.count]))
 
     const maxCount = max(nodes, (d) => d.count) ?? 1
     const maxWeight = max(edges, (d) => d.weight) ?? 1
@@ -589,8 +607,7 @@ export default function GenreMap({
     const edgesForNode = new Map<string, Edge[]>()
     for (const n of nodes) edgesForNode.set(n.id, [])
     for (const edge of edges) {
-      const s = (edge.source as Node).id
-      const t = (edge.target as Node).id
+      const [s, t] = edgeEndpoints(edge)
       edgesForNode.get(s)?.push(edge)
       edgesForNode.get(t)?.push(edge)
     }
@@ -649,7 +666,7 @@ export default function GenreMap({
               .on("click", (_e, d) => {
                 const s = (d.source as Node).id
                 const t = (d.target as Node).id
-                setModalInfo({ tags: [s, t], count: d.inter })
+                setModalInfo({ tags: [s, t], count: d.inter, allActivePairs, nodeCounts })
               }),
           (update) => update,
           (exit) => exit.remove(),
@@ -672,23 +689,6 @@ export default function GenreMap({
       .join("g")
       .classed("node-g", true)
       .style("cursor", "pointer")
-      .call(
-        d3Drag<SVGGElement, Node>()
-          .on("start", (e, d) => {
-            if (!e.active) sim.alphaTarget(0.3).restart()
-            d.fx = d.x
-            d.fy = d.y
-          })
-          .on("drag", (e, d) => {
-            d.fx = e.x
-            d.fy = e.y
-          })
-          .on("end", (e, d) => {
-            if (!e.active) sim.alphaTarget(0)
-            d.fx = null
-            d.fy = null
-          }),
-      )
 
     nodeSel
       .append("circle")
@@ -776,7 +776,10 @@ export default function GenreMap({
         setHover(null)
       })
       .on("click", (_e, d) => {
-        setModalInfo({ tags: [d.id], count: d.count })
+        const nodePairs = allActivePairs
+          .filter((p) => p.a === d.id || p.b === d.id)
+          .sort((a, b) => b.n - a.n)
+        setModalInfo({ tags: [d.id], count: d.count, pairs: nodePairs, allActivePairs, nodeCounts })
       })
 
     function clusterForce(alpha: number) {
@@ -885,6 +888,8 @@ export default function GenreMap({
         updateHulls()
         setSettling(false)
         if (nodes.length === 0) return
+        if (initialFitDone) return
+        initialFitDone = true
         const pad = 60
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
         for (const n of nodes) {
@@ -1154,7 +1159,7 @@ export default function GenreMap({
                 onClick={() => setAboutOpen((v) => !v)}
                 aria-label="About this map"
                 aria-expanded={aboutOpen}
-                className={`shrink-0 w-5 h-5 mt-0.5 rounded-full border flex items-center justify-center text-[10px] font-serif italic transition-colors ${
+                className={`shrink-0 w-5 h-5 mt-0.5 border flex items-center justify-center text-[10px] font-serif italic transition-colors ${
                   aboutOpen
                     ? "border-accent bg-accent/10 text-accent"
                     : "border-accent/40 text-accent/70 hover:text-accent hover:border-accent hover:bg-accent/5"
@@ -1215,7 +1220,7 @@ export default function GenreMap({
                 <ul className="list-disc list-inside space-y-0.5">
                   <li>Hover a circle or line for details</li>
                   <li>Click a circle to filter releases by that genre</li>
-                  <li>Drag circles; scroll or use the zoom slider to pan in</li>
+                  <li>Scroll or use the zoom slider to pan in</li>
                 </ul>
               </div>
               <div>
@@ -1580,6 +1585,9 @@ export default function GenreMap({
         <GenreModal
           tags={modalInfo.tags}
           expectedCount={modalInfo.count}
+          pairs={modalInfo.pairs}
+          allActivePairs={modalInfo.allActivePairs}
+          nodeCounts={modalInfo.nodeCounts}
           onClose={() => setModalInfo(null)}
         />
       )}

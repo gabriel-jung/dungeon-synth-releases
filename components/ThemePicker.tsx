@@ -17,7 +17,10 @@ const themes = [
 
 export default function ThemePicker() {
   const [theme, setTheme] = useState("catacombs")
-  const [textureOpacity, setTextureOpacity] = useState(0)
+  const [textureOpacity, setTextureOpacity] = useState(() => {
+    if (typeof window === "undefined") return 0.075
+    return parseFloat(localStorage.getItem("texture-opacity") ?? "0.075")
+  })
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -28,7 +31,6 @@ export default function ThemePicker() {
       document.documentElement.setAttribute("data-theme", saved)
     }
     const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0.075")
-    setTextureOpacity(savedOpacity)
     applyTexture(savedOpacity)
   }, [])
 
@@ -75,7 +77,7 @@ export default function ThemePicker() {
       />
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-lg shadow-lg flex flex-col gap-3" style={{ zIndex: 10000 }}>
+        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-sm shadow-lg flex flex-col gap-3" style={{ zIndex: 10000 }}>
           {[themes.slice(0, 5), themes.slice(5, 10)].map((row, i) => (
             <div key={i} className="flex gap-3">
               {row.map((t) => (
@@ -97,7 +99,7 @@ export default function ThemePicker() {
             </div>
           ))}
           <div className="flex items-center gap-2">
-            <span className={`text-xs ${textureOpacity > 0 ? "text-accent" : "text-text-dim"}`}>Texture</span>
+            <span className={`font-display text-[10px] tracking-[0.15em] uppercase ${textureOpacity > 0 ? "text-accent" : "text-text-dim"}`}>Texture</span>
             <input
               type="range"
               min="0"

@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Album, AlbumListItem, coverUrl, formatDateShort, searchFor } from "@/lib/types"
+import { Album, AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
 import { useModal } from "@/lib/useModal"
+import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
+import GenreModal from "./GenreModal"
+import ArtistModal from "./ArtistModal"
+import HostModal from "./HostModal"
 
 export function AlbumGrid({
   albums,
@@ -16,8 +20,8 @@ export function AlbumGrid({
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4">
-      {albums.map((album, i) => (
-        <ReleaseCard key={`${album.id}-${i}`} album={album} hideHost={hideHost} showDate={showDate} />
+      {albums.map((album) => (
+        <ReleaseCard key={album.id} album={album} hideHost={hideHost} showDate={showDate} />
       ))}
     </div>
   )
@@ -33,8 +37,8 @@ export function ReleaseCard({
   showDate?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const showHostInline =
-    !hideHost && album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
+  const { artistModal, setArtistModal, hostModal, setHostModal, showHostInline, onArtistClick } =
+    useAlbumCardModals(album, { hideHost })
 
   return (
     <>
@@ -44,8 +48,8 @@ export function ReleaseCard({
       >
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); searchFor(album.artist) }}
-          className="font-display text-sm tracking-[0.05em] text-accent group-hover:text-accent-hover transition-colors text-left cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); onArtistClick() }}
+          className="font-display text-sm tracking-[0.05em] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
         >
           {album.artist}
         </button>
@@ -56,8 +60,8 @@ export function ReleaseCard({
             <span className="text-text-dim"> · </span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); searchFor(album.host_name!) }}
-              className="text-text-dim hover:text-accent transition-colors text-xs tracking-wide uppercase cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); setHostModal(true) }}
+              className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
             >
               {album.host_name}
             </button>
@@ -73,6 +77,16 @@ export function ReleaseCard({
         )}
       </div>
       {open && <AlbumDetail albumStub={album} onClose={() => setOpen(false)} />}
+      {artistModal && <ArtistModal artist={album.artist} onClose={() => setArtistModal(false)} />}
+      {hostModal && album.host_id && (
+        <HostModal
+          hostId={album.host_id}
+          hostName={album.host_name!}
+          imageId={album.host_image_id ?? null}
+          url={album.host_url ?? null}
+          onClose={() => setHostModal(false)}
+        />
+      )}
     </>
   )
 }
@@ -94,6 +108,9 @@ export default function AlbumDetail({
   const [album, setAlbum] = useState<Album | null>(null)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [tagModal, setTagModal] = useState<string | null>(null)
+  const { artistModal, setArtistModal, hostModal, setHostModal, onArtistClick } =
+    useAlbumCardModals(albumStub)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = `album-modal-title-${albumStub.id}`
 
@@ -115,7 +132,7 @@ export default function AlbumDetail({
   const img = album ? coverUrl(album.art_id) : null
   const showHost = album?.host_name && album.host_name.toLowerCase() !== albumStub.artist.toLowerCase()
 
-  return createPortal(
+  const portal = createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center animate-backdrop-in backdrop-blur-xs"
       style={{ zIndex: 10000, background: "rgba(0,0,0,0.55)" }}
@@ -127,7 +144,7 @@ export default function AlbumDetail({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
+        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto sm:overflow-visible animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -151,14 +168,14 @@ export default function AlbumDetail({
         </div>
 
         {/* Info — right side on desktop, below on mobile */}
-        <div className="flex-1 px-6 py-5 flex flex-col gap-3 sm:border-l border-t sm:border-t-0 border-border">
+        <div className="flex-1 px-6 py-5 flex flex-col gap-3 sm:border-l border-t sm:border-t-0 border-border sm:max-h-72 sm:overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           <div>
             <h2 id={titleId} className="font-display text-lg text-text-bright font-bold leading-tight">
               {albumStub.title}
             </h2>
             <button
-              onClick={() => { onClose(); searchFor(albumStub.artist) }}
-              className="font-display text-sm text-accent hover:text-accent-hover transition-colors cursor-pointer text-left tracking-wide mt-0.5"
+              onClick={onArtistClick}
+              className="font-display text-sm text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left tracking-wide mt-0.5"
             >
               {albumStub.artist}
             </button>
@@ -192,12 +209,14 @@ export default function AlbumDetail({
               {album.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {album.tags.map((tag) => (
-                    <span
+                    <button
                       key={tag}
-                      className="text-[10px] tracking-wide uppercase px-2 py-0.5 text-text-dim border-b border-border/60"
+                      type="button"
+                      onClick={() => setTagModal(tag)}
+                      className="text-[10px] tracking-wide uppercase px-2 py-0.5 text-text-dim border-b border-border/60 hover:text-accent hover:border-accent/60 transition-colors cursor-pointer"
                     >
                       {tag}
-                    </span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -206,8 +225,8 @@ export default function AlbumDetail({
               <div className="flex items-center justify-between">
                 {showHost && (
                   <button
-                    onClick={() => { onClose(); searchFor(album.host_name!) }}
-                    className="text-text-dim text-xs hover:text-accent transition-colors cursor-pointer text-left italic"
+                    onClick={() => setHostModal(true)}
+                    className="text-text-dim text-xs hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left italic"
                   >
                     on {album.host_name}
                   </button>
@@ -223,7 +242,7 @@ export default function AlbumDetail({
               </div>
             </>
           ) : (
-            <div className="py-8 flex flex-col items-center gap-2">
+            <div className="py-8 flex flex-col items-center gap-2 animate-pulse">
               <span className="text-text-dim text-sm italic font-display tracking-wide">Retrieving...</span>
             </div>
           )}
@@ -232,12 +251,38 @@ export default function AlbumDetail({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/80 border border-border/50 transition-colors cursor-pointer text-lg"
+          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/80 border border-border/50 transition-colors cursor-pointer text-base leading-none"
         >
           ×
         </button>
       </div>
     </div>,
     document.body,
+  )
+
+  return (
+    <>
+      {portal}
+      {tagModal && (
+        <GenreModal
+          tags={[tagModal]}
+          expectedCount={0}
+          pairs={[]}
+          onClose={() => setTagModal(null)}
+        />
+      )}
+      {artistModal && (
+        <ArtistModal artist={albumStub.artist} onClose={() => setArtistModal(false)} />
+      )}
+      {hostModal && albumStub.host_id && (
+        <HostModal
+          hostId={albumStub.host_id}
+          hostName={albumStub.host_name ?? albumStub.artist}
+          imageId={album?.host_image_id ?? albumStub.host_image_id ?? null}
+          url={album?.host_url ?? albumStub.host_url ?? null}
+          onClose={() => setHostModal(false)}
+        />
+      )}
+    </>
   )
 }
