@@ -21,5 +21,8 @@ export async function GET(request: NextRequest) {
     0,
   )
 
-  return Response.json({ count: total })
+  return Response.json(
+    { count: total },
+    { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+  )
 }

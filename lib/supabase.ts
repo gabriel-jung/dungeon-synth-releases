@@ -57,3 +57,31 @@ export function toAlbumListItem(r: any): AlbumListItem {
     host_url: hosts?.url ?? null,
   }
 }
+
+type FilteredAlbumRow = {
+  id: string
+  artist: string
+  title: string
+  url: string
+  date: string | null
+  art_id: string | null
+  host_id: string | null
+  host_name: string | null
+  host_image_id: string | null
+  host_url: string | null
+}
+
+export function rpcRowToAlbumListItem(r: FilteredAlbumRow): AlbumListItem {
+  return {
+    id: r.id,
+    artist: r.artist,
+    title: r.title,
+    url: r.url,
+    date: r.date,
+    art_id: r.art_id,
+    host_id: r.host_id,
+    host_name: r.host_name,
+    host_image_id: r.host_image_id,
+    host_url: r.host_url,
+  }
+}

@@ -42,40 +42,44 @@ export function ReleaseCard({
 
   return (
     <>
-      <div
-        onClick={() => setOpen(true)}
-        className="w-full text-left py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors cursor-pointer group"
-      >
+      <article className="relative py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors group">
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onArtistClick() }}
-          className="font-display text-sm tracking-[0.05em] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
+          aria-label={`Open ${album.artist} — ${album.title}`}
+          onClick={() => setOpen(true)}
+          className="absolute inset-0 cursor-pointer"
+        />
+        <button
+          type="button"
+          onClick={onArtistClick}
+          className="relative font-display text-sm tracking-[0.05em] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
         >
           {album.artist}
         </button>
-        <br />
-        <span className="text-text-bright italic text-sm">{album.title}</span>
-        {showHostInline && (
-          <>
-            <span className="text-text-dim"> · </span>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setHostModal(true) }}
-              className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
-            >
-              {album.host_name}
-            </button>
-          </>
-        )}
-        {showDate && album.date && (
-          <>
-            <span className="text-text-dim"> · </span>
-            <span className="text-text-dim text-xs tracking-wide tabular-nums">
-              {formatDateShort(album.date, true)}
-            </span>
-          </>
-        )}
-      </div>
+        <div className="relative">
+          <span className="text-text-bright italic text-sm">{album.title}</span>
+          {showHostInline && (
+            <>
+              <span className="text-text-dim"> · </span>
+              <button
+                type="button"
+                onClick={() => setHostModal(true)}
+                className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
+              >
+                {album.host_name}
+              </button>
+            </>
+          )}
+          {showDate && album.date && (
+            <>
+              <span className="text-text-dim"> · </span>
+              <span className="text-text-dim text-xs tracking-wide tabular-nums">
+                {formatDateShort(album.date, true)}
+              </span>
+            </>
+          )}
+        </div>
+      </article>
       {open && <AlbumDetail albumStub={album} onClose={() => setOpen(false)} />}
       {artistModal && <ArtistModal artist={album.artist} onClose={() => setArtistModal(false)} />}
       {hostModal && album.host_id && (

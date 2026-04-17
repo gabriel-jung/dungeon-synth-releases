@@ -12,7 +12,7 @@ import { localDateStr } from "@/lib/types"
 import { Suspense } from "react"
 import "./globals.css"
 
-export const revalidate = 300
+export const revalidate = 3600
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",

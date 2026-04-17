@@ -48,7 +48,10 @@ Create `.env.local` with your Supabase credentials:
 ```
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=your-service-key
+CRON_SECRET=any-random-string
 ```
+
+`CRON_SECRET` gates `/api/revalidate`. Vercel injects it as `Authorization: Bearer $CRON_SECRET` on the daily midnight cron (see `vercel.json`) that busts the layout cache for the "Today"/"Yesterday" labels. Set the same value in Vercel project env vars.
 
 ```bash
 npm run dev

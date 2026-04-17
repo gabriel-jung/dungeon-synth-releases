@@ -1,5 +1,7 @@
 import { type NextRequest } from "next/server"
-import { supabase, ALBUM_LIST_SELECT, toAlbumListItem } from "@/lib/supabase"
+import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
+
+const CACHE = "public, s-maxage=3600, stale-while-revalidate=86400"
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
@@ -9,7 +11,28 @@ export async function GET(request: NextRequest) {
   const artist = params.get("artist")
   const year = params.get("year")
   const date = params.get("date")
+  const tags = params.getAll("tag")
+  const xtags = params.getAll("xtag")
   const limit = Math.min(Number(params.get("limit") ?? 500), 1000)
+
+  // Tag-filtered pagination: route to RPC (same function used by home page).
+  if ((tags.length > 0 || xtags.length > 0) && (before || after)) {
+    const { data, error } = await supabase.rpc("list_filtered_albums", {
+      p_include_tags: tags,
+      p_exclude_tags: xtags,
+      p_before: before ?? null,
+      p_after: after ?? null,
+      p_limit: limit,
+    })
+    if (error) {
+      console.error("[api/albums] list_filtered_albums RPC failed:", error.message)
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+    return Response.json(
+      { albums: (data ?? []).map(rpcRowToAlbumListItem) },
+      { headers: { "Cache-Control": CACHE } },
+    )
+  }
 
   if (!before && !after && !hostId && !date && !artist) {
     return Response.json({ error: "Missing 'before', 'after', 'host_id', 'artist', or 'date' param" }, { status: 400 })
@@ -38,11 +61,12 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
+    console.error("[api/albums] query failed:", error.message)
     return Response.json({ error: error.message }, { status: 500 })
   }
 
   return Response.json(
     { albums: (data ?? []).map(toAlbumListItem) },
-    { headers: { "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=3600" } },
+    { headers: { "Cache-Control": CACHE } },
   )
 }

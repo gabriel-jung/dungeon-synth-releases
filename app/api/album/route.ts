@@ -24,19 +24,22 @@ export async function GET(request: NextRequest) {
 
   const r = albumRes.data
   const hosts = r.hosts as unknown as Omit<HostRow, "id"> | null
-  return Response.json({
-    id: r.id,
-    artist: r.artist,
-    title: r.title,
-    url: r.url,
-    art_id: r.art_id,
-    date: r.date,
-    host_id: r.host_id,
-    host_name: hosts?.name ?? null,
-    host_image_id: hosts?.image_id ?? null,
-    host_url: hosts?.url ?? null,
-    tags: ((tagsRes.data ?? []) as unknown as { tags: { name: string } }[]).map((t) => t.tags.name),
-    num_tracks: r.num_tracks ?? 0,
-    duration_sec: r.duration_sec ?? 0,
-  })
+  return Response.json(
+    {
+      id: r.id,
+      artist: r.artist,
+      title: r.title,
+      url: r.url,
+      art_id: r.art_id,
+      date: r.date,
+      host_id: r.host_id,
+      host_name: hosts?.name ?? null,
+      host_image_id: hosts?.image_id ?? null,
+      host_url: hosts?.url ?? null,
+      tags: ((tagsRes.data ?? []) as unknown as { tags: { name: string } }[]).map((t) => t.tags.name),
+      num_tracks: r.num_tracks ?? 0,
+      duration_sec: r.duration_sec ?? 0,
+    },
+    { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+  )
 }

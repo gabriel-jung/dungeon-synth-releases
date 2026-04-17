@@ -21,6 +21,9 @@
   --color-plot-bar-min: color-mix(in srgb, var(--color-accent) 35%, var(--color-bg));
   --color-plot-bar-max: var(--color-accent);
   --color-plot-bar-hover: var(--color-accent-hover);
+  --z-scroll-descent: 9997;
+  --z-vignette: 9998;
+  --z-texture: 9999;
 }
 
 /* 1. Catacombs — warm dark (default) */
@@ -295,7 +298,7 @@ body::after {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9998;
+  z-index: var(--z-vignette);
   background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.12) 100%);
 }
 
@@ -304,7 +307,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--z-texture);
   opacity: var(--texture-opacity, 0.075);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;

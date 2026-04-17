@@ -85,11 +85,26 @@ export default function ReleaseList({
     }, null)
   }, [albums, direction])
 
+  const tagQs = useMemo(() => {
+    const parts: string[] = []
+    for (const t of searchParams.getAll("tag")) parts.push(`tag=${encodeURIComponent(t)}`)
+    for (const t of searchParams.getAll("xtag")) parts.push(`xtag=${encodeURIComponent(t)}`)
+    return parts.join("&")
+  }, [searchParams])
+
+  // Reset accumulated pages when the tag filter changes — initialAlbums arrive
+  // anew from the server, stale extras would bleed across filters.
+  useEffect(() => {
+    setExtraAlbums([])
+    setExhausted(false)
+  }, [tagQs])
+
   const fetchMore = useCallback(async (fromDate: string) => {
     setLoading(true)
     try {
-      const param = direction === "past" ? `before=${fromDate}` : `after=${fromDate}`
-      const res = await fetch(`/api/albums?${param}&limit=500`)
+      const cursor = direction === "past" ? `before=${fromDate}` : `after=${fromDate}`
+      const extra = tagQs ? `&${tagQs}` : ""
+      const res = await fetch(`/api/albums?${cursor}&limit=500${extra}`)
       const { albums: more } = await res.json() as { albums: AlbumListItem[] }
       if (!more || more.length === 0) {
         setExhausted(true)
@@ -100,7 +115,7 @@ export default function ReleaseList({
     } finally {
       setLoading(false)
     }
-  }, [direction])
+  }, [direction, tagQs])
 
   const loadMore = useCallback(async () => {
     if (loading || exhausted || !edgeDate) return

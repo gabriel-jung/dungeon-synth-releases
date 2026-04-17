@@ -1,12 +1,10 @@
-import { supabase, ALBUM_LIST_SELECT, toAlbumListItem } from "@/lib/supabase"
+import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
 import { AlbumListItem, localDateStr, dateRange, parseTagParams } from "@/lib/types"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
 
-// Short revalidate: pages stamped with today's date would otherwise outlive
-// the day rollover, leaving "Today" labels pointing at what's now yesterday.
-export const revalidate = 300
+export const revalidate = 3600
 
 export default async function Page({
   searchParams,
@@ -21,72 +19,43 @@ export default async function Page({
   const allDates = dateRange(today, yearStart)
 
   const allRows: AlbumListItem[] = []
-  const PAGE = 1000
-  let from = 0
+  const hasTagFilters = includeTags.length > 0 || excludeTags.length > 0
 
-  // Batch all include/exclude tags into one join: single query returns every
-  // (album_id, tag_name) pair, grouped client-side into per-tag sets.
-  let tagFilterIds: Set<string> | null = null
-  if (includeTags.length > 0 || excludeTags.length > 0) {
-    const allTags = [...includeTags, ...excludeTags]
-    const { data } = await supabase
-      .from("album_tags")
-      .select("album_id, tags!inner(name)")
-      .in("tags.name", allTags)
-      .limit(20000)
-    const perTag = new Map<string, Set<string>>()
-    for (const name of allTags) perTag.set(name, new Set<string>())
-    const rows = (data ?? []) as unknown as { album_id: string; tags: { name: string } | { name: string }[] }[]
-    for (const r of rows) {
-      const name = Array.isArray(r.tags) ? r.tags[0]?.name : r.tags?.name
-      if (name) perTag.get(name)?.add(r.album_id)
+  if (hasTagFilters) {
+    // Filtered path: first page via RPC. Infinite scroll paginates further
+    // through /api/albums with tag params (cursor = edge date).
+    const tomorrow = localDateStr(new Date(Date.now() + 86400000))
+    const { data, error } = await supabase.rpc("list_filtered_albums", {
+      p_include_tags: includeTags,
+      p_exclude_tags: excludeTags,
+      p_before: tomorrow,
+      p_after: null,
+      p_limit: 500,
+    })
+    if (error) console.error("[page] list_filtered_albums RPC failed:", error.message)
+    for (const r of data ?? []) allRows.push(rpcRowToAlbumListItem(r))
+  } else {
+    // Unfiltered path: only fetch last 7 days for fast initial load.
+    const cutoff = allDates[6]
+    const PAGE = 1000
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from("albums")
+        .select(ALBUM_LIST_SELECT)
+        .lte("date", today)
+        .gte("date", cutoff)
+        .order("date", { ascending: false })
+        .range(from, from + PAGE - 1)
+      if (error) {
+        console.error("[page] albums query failed:", error.message)
+        break
+      }
+      if (!data || data.length === 0) break
+      for (const r of data) allRows.push(toAlbumListItem(r))
+      if (data.length < PAGE) break
+      from += PAGE
     }
-
-    let matchIds: Set<string> | null = null
-    for (const tag of includeTags) {
-      const ids = perTag.get(tag) ?? new Set<string>()
-      if (!matchIds) { matchIds = ids; continue }
-      const next = new Set<string>()
-      for (const id of matchIds) if (ids.has(id)) next.add(id)
-      matchIds = next
-    }
-    const excludeIds = new Set<string>()
-    for (const tag of excludeTags) for (const id of perTag.get(tag) ?? []) excludeIds.add(id)
-
-    if (matchIds) {
-      for (const id of excludeIds) matchIds.delete(id)
-      tagFilterIds = matchIds
-    } else {
-      tagFilterIds = excludeIds.size > 0 ? excludeIds : null
-    }
-  }
-
-  const hasTagFilters = tagFilterIds !== null
-
-  // Without tag filters, only fetch last 7 days for fast initial load (covers only for latest day)
-  const cutoff = !hasTagFilters ? allDates[6] : null
-
-  while (true) {
-    let query = supabase
-      .from("albums")
-      .select(ALBUM_LIST_SELECT)
-      .lte("date", today)
-      .order("date", { ascending: false })
-      .range(from, from + PAGE - 1)
-
-    if (cutoff) query = query.gte("date", cutoff)
-    if (includeTags.length > 0 && tagFilterIds) query = query.in("id", [...tagFilterIds])
-
-    const { data } = await query
-    if (!data || data.length === 0) break
-
-    for (const r of data) {
-      if (excludeTags.length > 0 && tagFilterIds && tagFilterIds.has(r.id)) continue
-      allRows.push(toAlbumListItem(r))
-    }
-
-    if (data.length < PAGE) break
-    from += PAGE
   }
 
   // Deduplicate albums (same ID can appear if data has dupes)
@@ -117,7 +86,7 @@ export default async function Page({
 
           <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
             <Suspense>
-              <ReleaseList albums={deduped} recentDates={recentArray} expandDate={expandDate} hasMore={!hasTagFilters} />
+              <ReleaseList albums={deduped} recentDates={recentArray} expandDate={expandDate} hasMore />
             </Suspense>
           </div>
 

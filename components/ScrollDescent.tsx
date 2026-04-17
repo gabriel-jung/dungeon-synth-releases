@@ -27,7 +27,7 @@ export default function ScrollDescent() {
     <div
       ref={overlayRef}
       className="fixed inset-0 pointer-events-none bg-black"
-      style={{ zIndex: 9997, opacity: 0 }}
+      style={{ zIndex: "var(--z-scroll-descent)", opacity: 0 }}
     />
   )
 }

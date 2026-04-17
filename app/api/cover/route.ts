@@ -19,17 +19,22 @@ export async function GET(request: NextRequest) {
 
   const upstream = await fetch(url)
 
-  if (!upstream.ok) {
+  if (!upstream.ok || !upstream.body) {
     return new Response("Failed to fetch image", { status: upstream.status })
   }
 
   const contentType = upstream.headers.get("content-type") ?? "image/jpeg"
-  const body = await upstream.arrayBuffer()
+  const contentLength = upstream.headers.get("content-length")
+  const MAX_BYTES = 5 * 1024 * 1024
+  if (contentLength && Number(contentLength) > MAX_BYTES) {
+    return new Response("Image too large", { status: 413 })
+  }
 
-  return new Response(body, {
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
-    },
-  })
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+  }
+  if (contentLength) headers["Content-Length"] = contentLength
+
+  return new Response(upstream.body, { headers })
 }

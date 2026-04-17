@@ -4,7 +4,7 @@ import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
 
-export const revalidate = 86400 // once per day
+export const revalidate = 3600
 
 export default async function UpcomingPage() {
   const today = localDateStr(new Date())
