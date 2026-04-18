@@ -1,6 +1,11 @@
 import { type NextRequest } from "next/server"
+import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
+  const rl = checkRateLimit(`cover:${ipFromRequest(request)}`, 300, 60_000)
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter)
+
   const url = request.nextUrl.searchParams.get("url")
 
   if (!url) {
@@ -33,7 +38,15 @@ export async function GET(request: NextRequest) {
     return new Response("Invalid URL", { status: 400 })
   }
 
-  const upstream = await fetch(url)
+  let upstream: Response
+  try {
+    upstream = await fetch(url, { signal: AbortSignal.timeout(8000) })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const timeout = err instanceof Error && err.name === "TimeoutError"
+    logger.error({ route: "api/cover", url, err: msg, timeout }, "upstream fetch failed")
+    return new Response(timeout ? "Upstream timeout" : "Upstream fetch failed", { status: timeout ? 504 : 502 })
+  }
 
   if (!upstream.ok || !upstream.body) {
     return new Response("Failed to fetch image", { status: upstream.status })

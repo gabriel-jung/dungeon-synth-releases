@@ -11,6 +11,7 @@ function HorizontalSlider({
   pos,
   onStartDrag,
   onClick,
+  onKeyDown,
 }: {
   trackRef: RefObject<HTMLDivElement | null>
   index: number
@@ -19,6 +20,7 @@ function HorizontalSlider({
   pos: string
   onStartDrag: (e: React.MouseEvent | React.TouchEvent) => void
   onClick: (e: React.MouseEvent) => void
+  onKeyDown: (e: React.KeyboardEvent) => void
 }) {
   return (
     <div className="flex items-center gap-2 w-full px-3 py-1">
@@ -30,7 +32,16 @@ function HorizontalSlider({
         onMouseDown={onStartDrag}
         onTouchStart={onStartDrag}
         onClick={onClick}
-        className="relative flex-1 cursor-pointer select-none"
+        onKeyDown={onKeyDown}
+        role="slider"
+        tabIndex={0}
+        aria-label="Jump to date"
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, dates.length - 1)}
+        aria-valuenow={index}
+        aria-valuetext={dates[index] ?? ""}
+        aria-orientation="horizontal"
+        className="relative flex-1 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         style={{ height: "20px" }}
       >
         {/* Track line */}
@@ -201,6 +212,32 @@ export default function DateSlider({
     if (dates[idx]) scrollToDate(dates[idx])
   }
 
+  function handleKey(e: React.KeyboardEvent) {
+    if (count <= 1) return
+    let next = index
+    switch (e.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        next = Math.max(0, index - 1); break
+      case "ArrowRight":
+      case "ArrowDown":
+        next = Math.min(count - 1, index + 1); break
+      case "PageUp":
+        next = Math.max(0, index - 7); break
+      case "PageDown":
+        next = Math.min(count - 1, index + 7); break
+      case "Home":
+        next = 0; break
+      case "End":
+        next = count - 1; break
+      default: return
+    }
+    e.preventDefault()
+    setIndex(next)
+    emitDateChange(next)
+    if (dates[next]) scrollToDate(dates[next])
+  }
+
   if (!mounted || count === 0) {
     return horiz ? <div style={{ height: "44px" }} /> : <div style={{ width: "70px" }} />
   }
@@ -245,6 +282,7 @@ export default function DateSlider({
       pos={pos}
       onStartDrag={startDrag}
       onClick={handleClick}
+      onKeyDown={handleKey}
     />
   }
 
@@ -262,7 +300,16 @@ export default function DateSlider({
         onMouseDown={startDrag}
         onTouchStart={startDrag}
         onClick={handleClick}
-        className="relative flex-1 cursor-pointer select-none"
+        onKeyDown={handleKey}
+        role="slider"
+        tabIndex={0}
+        aria-label="Jump to date"
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, count - 1)}
+        aria-valuenow={index}
+        aria-valuetext={dates[index] ?? ""}
+        aria-orientation="vertical"
+        className="relative flex-1 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         style={{ width: "70px" }}
       >
         {/* Track line */}

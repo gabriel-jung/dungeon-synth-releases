@@ -107,7 +107,7 @@ export default function ReleasesModal({
             ) : null}
             {!error && (
               <div className="flex-1 flex items-end justify-center pt-8 pb-4 pointer-events-none">
-                <span className="font-display text-xl text-border opacity-30 select-none">⟡</span>
+                <span aria-hidden="true" className="font-display text-xl text-border opacity-30 select-none">⟡</span>
               </div>
             )}
           </div>
@@ -124,20 +124,22 @@ export function ViewToggle({ view, setView }: { view: ViewMode; setView: (v: Vie
       <button
         onClick={() => setView("grid")}
         aria-label="Grid view"
+        aria-pressed={view === "grid"}
         className={`px-2 py-1 text-xs transition-colors cursor-pointer ${
           view === "grid" ? "bg-accent/20 text-text-bright" : "text-text-dim hover:text-text"
         }`}
       >
-        ▦
+        <span aria-hidden="true">▦</span>
       </button>
       <button
         onClick={() => setView("list")}
         aria-label="List view"
+        aria-pressed={view === "list"}
         className={`px-2 py-1 text-xs transition-colors cursor-pointer border-l border-border ${
           view === "list" ? "bg-accent/20 text-text-bright" : "text-text-dim hover:text-text"
         }`}
       >
-        ☰
+        <span aria-hidden="true">☰</span>
       </button>
     </div>
   )

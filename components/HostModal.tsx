@@ -63,7 +63,7 @@ export default function HostModal({
               />
             ) : (
               <div className="w-10 h-10 flex items-center justify-center border border-border bg-bg-card shrink-0">
-                <span className="text-xl text-border select-none">♜</span>
+                <span aria-hidden="true" className="text-xl text-border select-none">♜</span>
               </div>
             )}
             <div className="min-w-0">

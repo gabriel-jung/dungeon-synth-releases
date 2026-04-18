@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { supabase, paginateAll } from "@/lib/supabase"
 import GenreMap, { GenreCount, GenrePair } from "@/components/GenreMap"
 
-export const revalidate = 3600
+export const revalidate = 21600
 
 export const metadata = {
   title: "Genres",
@@ -13,12 +13,13 @@ export const metadata = {
 async function fetchAllPairs(): Promise<GenrePair[]> {
   const rows = await paginateAll<{ tag_a: string; tag_b: string; n: number | string }>(
     async (from, to) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .rpc("genre_pairs")
         .order("n", { ascending: false })
         .order("tag_a", { ascending: true })
         .order("tag_b", { ascending: true })
         .range(from, to)
+      if (error) throw new Error(`genre_pairs RPC failed: ${error.message}`)
       return data
     },
   )
@@ -30,6 +31,7 @@ export default async function GenresPage() {
     supabase.rpc("genre_counts").order("n", { ascending: false }),
     fetchAllPairs(),
   ])
+  if (countsRes.error) throw new Error(`genre_counts RPC failed: ${countsRes.error.message}`)
 
   const counts: GenreCount[] = (countsRes.data ?? []).map(
     (r: { name: string; n: number | string }) => ({ name: r.name, n: Number(r.n) }),

@@ -190,11 +190,11 @@ export default function AlbumDetail({
             />
           ) : album ? (
             <div className="py-16 sm:py-0 sm:w-full sm:aspect-square flex items-center justify-center">
-              <span className="text-5xl text-border select-none">♜</span>
+              <span aria-hidden="true" className="text-5xl text-border select-none">♜</span>
             </div>
           ) : (
             <div className="w-full aspect-square bg-bg-hover flex items-center justify-center">
-              <span className="text-3xl text-border select-none animate-pulse">♜</span>
+              <span aria-hidden="true" className="text-3xl text-border select-none animate-pulse">♜</span>
             </div>
           )}
         </div>

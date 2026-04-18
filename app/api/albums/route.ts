@@ -1,9 +1,14 @@
 import { type NextRequest } from "next/server"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 const CACHE = "public, s-maxage=3600, stale-while-revalidate=86400"
 
 export async function GET(request: NextRequest) {
+  const rl = checkRateLimit(`albums:${ipFromRequest(request)}`, 120, 60_000)
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter)
+
   const params = request.nextUrl.searchParams
   const before = params.get("before")
   const after = params.get("after")
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
       p_limit: limit,
     })
     if (error) {
-      console.error("[api/albums] list_filtered_albums RPC failed:", error.message)
+      logger.error({ route: "api/albums", rpc: "list_filtered_albums", err: error.message }, "RPC failed")
       return Response.json({ error: error.message }, { status: 500 })
     }
     return Response.json(
@@ -61,7 +66,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
-    console.error("[api/albums] query failed:", error.message)
+    logger.error({ route: "api/albums", err: error.message }, "query failed")
     return Response.json({ error: error.message }, { status: 500 })
   }
 

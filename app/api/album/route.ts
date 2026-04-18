@@ -1,8 +1,12 @@
 import { type NextRequest } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { HostRow } from "@/lib/types"
+import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
 
 export async function GET(request: NextRequest) {
+  const rl = checkRateLimit(`album:${ipFromRequest(request)}`, 60, 60_000)
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter)
+
   const id = request.nextUrl.searchParams.get("id")
 
   if (!id) {

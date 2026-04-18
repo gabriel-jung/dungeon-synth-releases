@@ -4,7 +4,7 @@ import HostRow from "@/components/HostRow"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
 import Histogram, { HistBin } from "@/components/Histogram"
 
-export const revalidate = 3600
+export const revalidate = 21600
 
 export const metadata = {
   title: "Stats",
@@ -32,6 +32,10 @@ export default async function StatsPage({
     supabase.rpc("tracks_per_album_hist", rpcArgs),
     supabase.rpc("album_duration_hist", rpcArgs),
   ])
+  if (hostRes.error) throw new Error(`host_counts RPC failed: ${hostRes.error.message}`)
+  if (dailyRes.error) throw new Error(`daily_counts RPC failed: ${dailyRes.error.message}`)
+  if (tracksHistRes.error) throw new Error(`tracks_per_album_hist RPC failed: ${tracksHistRes.error.message}`)
+  if (durationHistRes.error) throw new Error(`album_duration_hist RPC failed: ${durationHistRes.error.message}`)
 
   const rows: HostCount[] = (hostRes.data ?? []).slice(0, 50).map(
     (r: { host_id: string; name: string; image_id: string | null; url: string | null; n: number | string }) => ({

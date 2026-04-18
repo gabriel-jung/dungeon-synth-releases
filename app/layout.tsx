@@ -73,7 +73,7 @@ export default async function RootLayout({
       lang="en"
       className={`${cinzel.variable} ${crimsonText.variable} antialiased`}
     >
-      <body className="h-screen flex flex-col font-sans overflow-hidden">
+      <body className="h-dvh flex flex-col font-sans overflow-hidden">
         <ScrollDescent />
         <header className="px-4 sm:px-6 pt-6 sm:pt-8 pb-3 sm:pb-4">
           <div className="flex items-start justify-between gap-4">

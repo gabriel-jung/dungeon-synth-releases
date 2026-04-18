@@ -32,7 +32,7 @@ function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDat
               decoding="async"
             />
           ) : (
-            <span className="text-3xl text-border select-none">♜</span>
+            <span aria-hidden="true" className="text-3xl text-border select-none">♜</span>
           )}
         </button>
         <div className="flex flex-col min-w-0 px-0.5">

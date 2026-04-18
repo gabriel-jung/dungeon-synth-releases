@@ -20,6 +20,7 @@ export default function TabBar() {
           <a
             key={tab.href}
             href={tab.href}
+            aria-current={active ? "page" : undefined}
             className={`font-display text-xs tracking-[0.1em] uppercase transition-colors py-2 ${
               active
                 ? "text-accent border-b border-accent"

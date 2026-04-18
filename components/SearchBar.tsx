@@ -39,21 +39,23 @@ export default function SearchBar() {
 
   return (
     <form onSubmit={handleSubmit} className="flex items-center w-full sm:w-56">
-      <span className="font-display text-text-dim text-xs tracking-wide mr-2 hidden sm:inline select-none">⌕</span>
+      <span aria-hidden="true" className="font-display text-text-dim text-xs tracking-wide mr-2 hidden sm:inline select-none">⌕</span>
       <input
         type="text"
         value={query}
         onChange={handleChange}
         placeholder={onGenres ? "Search genres..." : "Search releases..."}
+        aria-label={onGenres ? "Search genres" : "Search releases"}
         className="flex-1 min-w-0 bg-transparent border-b border-border px-1 py-1.5 text-base sm:text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors font-sans"
       />
       {query && (
         <button
           type="button"
           onClick={clear}
+          aria-label="Clear search"
           className="ml-1 w-6 h-6 flex items-center justify-center text-text-dim hover:text-text transition-colors cursor-pointer text-sm shrink-0"
         >
-          ×
+          <span aria-hidden="true">×</span>
         </button>
       )}
     </form>

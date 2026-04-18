@@ -28,9 +28,10 @@ function TagButton({
   return createPortal(
     <button
       onClick={() => setOpen(!open)}
+      aria-expanded={open}
       className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
     >
-      {open ? "▾" : "▸"} Genres
+      <span aria-hidden="true">{open ? "▾" : "▸"}</span> Genres
       {activeCount > 0 && (
         <span className="bg-accent/20 text-accent text-[10px] px-1.5 rounded-full">
           {activeCount}
@@ -141,9 +142,10 @@ export default function TagFilter({ tags }: { tags: string[] }) {
             {tags.length > TOP_COUNT && (
               <button
                 onClick={() => setShowAll(!showAll)}
+                aria-expanded={showAll}
                 className="font-display text-[11px] tracking-wide text-text-dim hover:text-text transition-colors cursor-pointer px-1"
               >
-                {showAll ? "▾ top genres" : `▸ all ${tags.length} genres`}
+                <span aria-hidden="true">{showAll ? "▾" : "▸"}</span> {showAll ? "top genres" : `all ${tags.length} genres`}
               </button>
             )}
           </div>

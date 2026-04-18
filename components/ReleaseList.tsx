@@ -243,19 +243,19 @@ export default function ReleaseList({
         )
       })}
       {isSearching && searching && (
-        <div className="py-6 flex items-center justify-center text-text-dim">
+        <div role="status" aria-live="polite" className="py-6 flex items-center justify-center text-text-dim">
           <span className="font-display text-xs tracking-[0.1em] animate-pulse">Searching the archives...</span>
         </div>
       )}
       {isSearching && !searching && displayAlbums.length === 0 && (
-        <div className="py-8 text-center text-text-dim">
-          <span className="text-2xl block mb-2 select-none">♜</span>
+        <div role="status" className="py-8 text-center text-text-dim">
+          <span aria-hidden="true" className="text-2xl block mb-2 select-none">♜</span>
           <span className="font-display text-xs tracking-[0.1em]">No releases found</span>
         </div>
       )}
       {!isSearching && !loading && displayAlbums.length === 0 && (
         <div className="py-8 text-center text-text-dim">
-          <span className="text-2xl block mb-2 select-none">♜</span>
+          <span aria-hidden="true" className="text-2xl block mb-2 select-none">♜</span>
           <span className="font-display text-xs tracking-[0.1em]">
             {tagQs
               ? "No releases match this filter"

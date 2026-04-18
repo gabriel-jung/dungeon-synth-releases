@@ -1,6 +1,8 @@
 import { type NextRequest } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { AlbumListItem } from "@/lib/types"
+import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 const CACHE = "public, s-maxage=3600, stale-while-revalidate=86400"
 
@@ -46,6 +48,9 @@ function extractTagNames(row: AlbumWithTags): Set<string> {
 }
 
 export async function GET(request: NextRequest) {
+  const rl = checkRateLimit(`split:${ipFromRequest(request)}`, 60, 60_000)
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter)
+
   const params = request.nextUrl.searchParams
   const artist = params.get("artist")
   const hostId = params.get("host_id")
@@ -74,7 +79,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query
   if (error) {
-    console.error("[api/albums/split] query failed:", error.message)
+    logger.error({ route: "api/albums/split", err: error.message }, "query failed")
     return Response.json({ error: error.message }, { status: 500 })
   }
 

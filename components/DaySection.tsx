@@ -23,9 +23,10 @@ export default function DaySection({
       <div className="ornamental-divider">{label}</div>
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="font-display text-[10px] tracking-[0.1em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer mb-3"
       >
-        {expanded ? "▾ hide covers" : "▸ show covers"}
+        <span aria-hidden="true">{expanded ? "▾" : "▸"}</span> {expanded ? "hide covers" : "show covers"}
       </button>
 
       {expanded ? (

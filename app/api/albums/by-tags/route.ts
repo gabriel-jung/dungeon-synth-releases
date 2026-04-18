@@ -1,7 +1,12 @@
 import { type NextRequest } from "next/server"
 import { supabase, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
+  const rl = checkRateLimit(`by-tags:${ipFromRequest(request)}`, 60, 60_000)
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter)
+
   const sp = request.nextUrl.searchParams
   const tags = sp.getAll("tag")
   const limit = Math.min(Number(sp.get("limit") ?? 500), 1000)
@@ -19,7 +24,7 @@ export async function GET(request: NextRequest) {
   })
 
   if (error) {
-    console.error("[api/albums/by-tags] RPC failed:", error.message)
+    logger.error({ route: "api/albums/by-tags", err: error.message }, "RPC failed")
     return Response.json({ error: error.message }, { status: 500 })
   }
 
