@@ -15,6 +15,22 @@ export function parseTagParams(sp: TagParamsInput): { includeTags: string[]; exc
   return { includeTags: norm(sp.tag), excludeTags: norm(sp.xtag) }
 }
 
+export function buildSplitUrl(opts: {
+  artist?: string
+  hostId?: string
+  year?: number
+  tags: string[]
+  xtags: string[]
+}): string {
+  const qs = new URLSearchParams()
+  if (opts.artist) qs.set("artist", opts.artist)
+  if (opts.hostId) qs.set("host_id", opts.hostId)
+  if (opts.year) qs.set("year", String(opts.year))
+  for (const t of opts.tags) qs.append("tag", t)
+  for (const t of opts.xtags) qs.append("xtag", t)
+  return `/api/albums/split?${qs.toString()}`
+}
+
 export function dateRange(from: string, to: string): string[] {
   const dates: string[] = []
   const start = new Date(from + "T00:00:00Z")

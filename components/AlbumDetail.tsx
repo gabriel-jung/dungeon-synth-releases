@@ -5,6 +5,8 @@ import { createPortal } from "react-dom"
 import { Album, AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
 import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
+import { register, unregister } from "@/lib/albumRegistry"
+import { SITE_URL } from "@/lib/site"
 import GenreModal from "./GenreModal"
 import ArtistModal from "./ArtistModal"
 import HostModal from "./HostModal"
@@ -113,12 +115,22 @@ export default function AlbumDetail({
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [tagModal, setTagModal] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { artistModal, setArtistModal, hostModal, setHostModal, onArtistClick } =
     useAlbumCardModals(albumStub)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = `album-modal-title-${albumStub.id}`
 
   useModal(onClose, dialogRef)
+
+  useEffect(() => {
+    register(albumStub.id)
+    return () => {
+      unregister(albumStub.id)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [albumStub.id])
 
   useEffect(() => {
     let cancelled = false
@@ -132,6 +144,21 @@ export default function AlbumDetail({
       .catch(() => { if (!cancelled) setError(true) })
     return () => { cancelled = true }
   }, [albumStub.id, reloadKey])
+
+  async function handleShare() {
+    const url = `${SITE_URL}/?album=${albumStub.id}`
+    const title = `${albumStub.artist} — ${albumStub.title}`
+    if (typeof navigator.share === "function") {
+      try { await navigator.share({ title, url }) } catch {}
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1800)
+    } catch {}
+  }
 
   const img = album ? coverUrl(album.art_id) : null
   const showHost = album?.host_name && album.host_name.toLowerCase() !== albumStub.artist.toLowerCase()
@@ -158,6 +185,7 @@ export default function AlbumDetail({
             <img
               src={img}
               alt={`${albumStub.artist} — ${albumStub.title}`}
+              decoding="async"
               className="w-full h-auto"
             />
           ) : album ? (
@@ -226,7 +254,7 @@ export default function AlbumDetail({
               )}
 
               <div className="modal-rule mt-auto" />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 {showHost && (
                   <button
                     onClick={() => setHostModal(true)}
@@ -235,14 +263,23 @@ export default function AlbumDetail({
                     on {album.host_name}
                   </button>
                 )}
-                <a
-                  href={album.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors ml-auto"
-                >
-                  Bandcamp →
-                </a>
+                <div className="flex items-center gap-4 ml-auto">
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent transition-colors cursor-pointer"
+                  >
+                    {copied ? "Copied ✓" : "Share"}
+                  </button>
+                  <a
+                    href={album.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
+                  >
+                    Bandcamp →
+                  </a>
+                </div>
               </div>
             </>
           ) : (

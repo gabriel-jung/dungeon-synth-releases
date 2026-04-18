@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import ReleasesModal, { ViewToggle } from "./ReleasesModal"
-import { coverUrl } from "@/lib/types"
+import { buildSplitUrl, coverUrl } from "@/lib/types"
 
 export default function ArtistModal({
   artist,
@@ -11,16 +12,25 @@ export default function ArtistModal({
   artist: string
   onClose: () => void
 }) {
+  const sp = useSearchParams()
+  const tags = sp.getAll("tag")
+  const xtags = sp.getAll("xtag")
+  const hasFilter = tags.length + xtags.length > 0
   const [coverArtId, setCoverArtId] = useState<string | null>(null)
   const [imgFailed, setImgFailed] = useState(false)
   const [count, setCount] = useState<number | null>(null)
   const titleId = `artist-modal-title-${artist.replace(/\W+/g, "-").toLowerCase()}`
   const imgSrc = coverArtId ? coverUrl(coverArtId, "thumb") : null
 
+  const fetchUrl = useMemo(
+    () => buildSplitUrl({ artist, tags, xtags }),
+    [artist, tags.join("|"), xtags.join("|")], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   return (
     <ReleasesModal
       titleId={titleId}
-      fetchUrl={`/api/albums?artist=${encodeURIComponent(artist)}&limit=500`}
+      fetchUrl={fetchUrl}
       expectedCount={10}
       listShowDate
       onClose={onClose}
@@ -37,6 +47,7 @@ export default function ArtistModal({
                 src={imgSrc}
                 alt=""
                 onError={() => setImgFailed(true)}
+                decoding="async"
                 className="w-10 h-10 object-cover border border-border shrink-0"
               />
             ) : (
@@ -54,7 +65,7 @@ export default function ArtistModal({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <ViewToggle view={view} setView={setView} />
+            {!hasFilter && <ViewToggle view={view} setView={setView} />}
             <button
               onClick={onClose}
               aria-label="Close"

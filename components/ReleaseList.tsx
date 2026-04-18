@@ -253,6 +253,18 @@ export default function ReleaseList({
           <span className="font-display text-xs tracking-[0.1em]">No releases found</span>
         </div>
       )}
+      {!isSearching && !loading && displayAlbums.length === 0 && (
+        <div className="py-8 text-center text-text-dim">
+          <span className="text-2xl block mb-2 select-none">♜</span>
+          <span className="font-display text-xs tracking-[0.1em]">
+            {tagQs
+              ? "No releases match this filter"
+              : direction === "future"
+                ? "No upcoming releases"
+                : "No releases found"}
+          </span>
+        </div>
+      )}
       {!isSearching && hasMore && !exhausted && (
         <LoadTrigger loading={loading} onVisible={loadMore} />
       )}

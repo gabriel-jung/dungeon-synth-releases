@@ -29,6 +29,7 @@ function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDat
               alt={`${album.artist} — ${album.title}`}
               className="w-full h-full object-cover"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <span className="text-3xl text-border select-none">♜</span>

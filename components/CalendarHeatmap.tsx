@@ -34,7 +34,7 @@ const PALETTE_NAMES = Object.keys(PALETTES) as PaletteName[]
 type Day = { date: string; n: number }
 type Cell = { key: string; dateStr: string; count: number; weekIdx: number; dow: number; inRange: boolean; isFuture: boolean; month: number; colorIdx: number }
 
-export default function CalendarHeatmap({ days, year }: { days: Day[]; year: number }) {
+export default function CalendarHeatmap({ days, year, today: todayStr }: { days: Day[]; year: number; today: string }) {
   const [hover, setHover] = useState<Cell | null>(null)
   const [selected, setSelected] = useState<Cell | null>(null)
   const [palette, setPalette] = useState<PaletteName>("theme")
@@ -50,8 +50,7 @@ export default function CalendarHeatmap({ days, year }: { days: Day[]; year: num
 
     const yearStart = new Date(`${year}-01-01T00:00:00`)
     const yearEnd = new Date(`${year}-12-31T00:00:00`)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = new Date(`${todayStr}T00:00:00`)
 
     const startDow = (yearStart.getDay() + 6) % 7
     const firstMonday = new Date(yearStart)
@@ -97,7 +96,7 @@ export default function CalendarHeatmap({ days, year }: { days: Day[]; year: num
     }
 
     return { cells, monthSpans, monthPaths, totalWeeks }
-  }, [days, year])
+  }, [days, year, todayStr])
 
   const delimColor = "color-mix(in srgb, var(--color-text-dim) 38%, transparent)"
   const colorStops = PALETTES[palette]

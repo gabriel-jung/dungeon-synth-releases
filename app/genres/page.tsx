@@ -4,6 +4,12 @@ import GenreMap, { GenreCount, GenrePair } from "@/components/GenreMap"
 
 export const revalidate = 3600
 
+export const metadata = {
+  title: "Genres",
+  description: "Interactive force-directed map of dungeon synth genres and their relationships.",
+  alternates: { canonical: "/genres" },
+}
+
 async function fetchAllPairs(): Promise<GenrePair[]> {
   const rows = await paginateAll<{ tag_a: string; tag_b: string; n: number | string }>(
     async (from, to) => {

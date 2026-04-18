@@ -6,6 +6,12 @@ import { Suspense } from "react"
 
 export const revalidate = 3600
 
+export const metadata = {
+  title: "Upcoming",
+  description: "Upcoming dungeon synth releases scheduled on Bandcamp over the next week.",
+  alternates: { canonical: "/upcoming" },
+}
+
 export default async function UpcomingPage() {
   const today = localDateStr(new Date())
   const tomorrow = localDateStr(new Date(Date.now() + 86400000))

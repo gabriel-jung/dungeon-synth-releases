@@ -1,10 +1,16 @@
 import { supabase } from "@/lib/supabase"
-import { parseTagParams } from "@/lib/types"
+import { parseTagParams, localDateStr } from "@/lib/types"
 import HostRow from "@/components/HostRow"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
 import Histogram, { HistBin } from "@/components/Histogram"
 
 export const revalidate = 3600
+
+export const metadata = {
+  title: "Stats",
+  description: "Release activity, top labels, and calendar heatmap for dungeon synth on Bandcamp.",
+  alternates: { canonical: "/stats" },
+}
 
 type HostCount = { host_id: string; name: string; image_id: string | null; url: string | null; n: number }
 type DailyCount = { date: string; n: number }
@@ -56,7 +62,7 @@ export default async function StatsPage({
         <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright mb-4">
           Daily Release Activity
         </h2>
-        <CalendarHeatmap days={daily} year={year} />
+        <CalendarHeatmap days={daily} year={year} today={localDateStr(new Date())} />
       </section>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         <section>

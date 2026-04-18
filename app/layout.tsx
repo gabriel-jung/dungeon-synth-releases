@@ -7,8 +7,10 @@ import TagFilter from "@/components/TagFilter"
 import FilterChips from "@/components/FilterChips"
 import YearReleaseCount from "@/components/YearReleaseCount"
 import ScrollDescent from "@/components/ScrollDescent"
+import AlbumDeepLink from "@/components/AlbumDeepLink"
 import { fetchGenreTags, yearCountQuery } from "@/lib/supabase"
 import { localDateStr } from "@/lib/types"
+import { SITE_URL } from "@/lib/site"
 import { Suspense } from "react"
 import "./globals.css"
 
@@ -27,9 +29,31 @@ const crimsonText = Crimson_Text({
 })
 
 
+const DESCRIPTION =
+  "A chronicle of dungeon synth releases from Bandcamp. Browse by genre, label, and artist."
+
 export const metadata: Metadata = {
-  title: "Dungeon Synth Releases",
-  description: "Latest dungeon synth releases from Bandcamp",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Dungeon Synth Releases",
+    template: "%s — Dungeon Synth Releases",
+  },
+  description: DESCRIPTION,
+  applicationName: "Dungeon Synth Releases",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Dungeon Synth Releases",
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: "Dungeon Synth Releases",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Dungeon Synth Releases",
+    description: DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 }
 
 export default async function RootLayout({
@@ -93,6 +117,9 @@ export default async function RootLayout({
           <FilterChips />
         </Suspense>
         <main className="flex-1 min-h-0">{children}</main>
+        <Suspense>
+          <AlbumDeepLink />
+        </Suspense>
         <footer className="shrink-0" />
       </body>
     </html>

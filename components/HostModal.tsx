@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { hostImageUrl } from "@/lib/types"
+import { useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { buildSplitUrl, hostImageUrl } from "@/lib/types"
 import ReleasesModal, { ViewToggle } from "./ReleasesModal"
 
 export default function HostModal({
@@ -21,13 +22,19 @@ export default function HostModal({
   expectedCount?: number
   onClose: () => void
 }) {
+  const sp = useSearchParams()
+  const tags = sp.getAll("tag")
+  const xtags = sp.getAll("xtag")
+  const hasFilter = tags.length + xtags.length > 0
   const [imgFailed, setImgFailed] = useState(false)
   const [loadedCount, setLoadedCount] = useState<number | null>(null)
   const imgSrc = hostImageUrl(imageId)
   const titleId = `host-modal-title-${hostId}`
-  const fetchUrl = year
-    ? `/api/albums?host_id=${encodeURIComponent(hostId)}&year=${year}&limit=500`
-    : `/api/albums?host_id=${encodeURIComponent(hostId)}&limit=500`
+
+  const fetchUrl = useMemo(
+    () => buildSplitUrl({ hostId, year, tags, xtags }),
+    [hostId, year, tags.join("|"), xtags.join("|")], // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const displayCount = loadedCount ?? (expectedCount > 0 ? expectedCount : null)
   const subtitle = displayCount !== null
@@ -51,6 +58,7 @@ export default function HostModal({
                 src={imgSrc}
                 alt=""
                 onError={() => setImgFailed(true)}
+                decoding="async"
                 className="w-10 h-10 object-cover border border-border shrink-0"
               />
             ) : (
@@ -78,7 +86,7 @@ export default function HostModal({
                 Bandcamp →
               </a>
             )}
-            <ViewToggle view={view} setView={setView} />
+            {!hasFilter && <ViewToggle view={view} setView={setView} />}
             <button
               onClick={onClose}
               aria-label="Close"

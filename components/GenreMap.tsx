@@ -321,7 +321,7 @@ export default function GenreMap({
   const searchParams = useSearchParams()
   const maxTopN = counts.length
   const topNDigits = String(maxTopN).length
-  const defaultTopN = Math.min(60, maxTopN)
+  const defaultTopN = Math.min(50, maxTopN)
 
   // Initial state reads URL once on mount; later writes flow the other direction.
   const initial = useMemo(() => ({

@@ -1,10 +1,60 @@
+import type { Metadata } from "next"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, localDateStr, dateRange, parseTagParams } from "@/lib/types"
+import { AlbumListItem, coverUrl, localDateStr, dateRange, parseTagParams } from "@/lib/types"
+import { SITE_URL } from "@/lib/site"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
 
 export const revalidate = 3600
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}): Promise<Metadata> {
+  const sp = await searchParams
+  const raw = sp.album
+  const albumId = Array.isArray(raw) ? raw[0] : raw
+  if (!albumId) return {}
+
+  const { data } = await supabase
+    .from("albums")
+    .select("id, artist, title, art_id, date, hosts!inner(name)")
+    .eq("id", albumId)
+    .single()
+  if (!data) return {}
+
+  const hostName = (data.hosts as unknown as { name: string } | null)?.name
+  const title = `${data.artist} — ${data.title}`
+  const descParts = [
+    `Dungeon synth release by ${data.artist}`,
+    hostName && hostName.toLowerCase() !== data.artist.toLowerCase() ? `on ${hostName}` : null,
+    data.date ? `(${data.date})` : null,
+  ].filter(Boolean)
+  const description = descParts.join(" ") + "."
+  const image = coverUrl(data.art_id, "full")
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/?album=${albumId}` },
+    openGraph: {
+      title,
+      description,
+      url: `${SITE_URL}/?album=${albumId}`,
+      siteName: "Dungeon Synth Releases",
+      type: "music.album",
+      ...(image ? { images: [{ url: image, width: 350, height: 350, alt: title }] } : {}),
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  }
+}
 
 export default async function Page({
   searchParams,
