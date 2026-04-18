@@ -82,7 +82,7 @@ export default async function Page({
       p_after: null,
       p_limit: 500,
     })
-    if (error) console.error("[page] list_filtered_albums RPC failed:", error.message)
+    if (error) throw new Error(`list_filtered_albums RPC failed: ${error.message}`)
     for (const r of data ?? []) allRows.push(rpcRowToAlbumListItem(r))
   } else {
     // Unfiltered path: only fetch last 7 days for fast initial load.
@@ -97,10 +97,7 @@ export default async function Page({
         .gte("date", cutoff)
         .order("date", { ascending: false })
         .range(from, from + PAGE - 1)
-      if (error) {
-        console.error("[page] albums query failed:", error.message)
-        break
-      }
+      if (error) throw new Error(`albums query failed: ${error.message}`)
       if (!data || data.length === 0) break
       for (const r of data) allRows.push(toAlbumListItem(r))
       if (data.length < PAGE) break

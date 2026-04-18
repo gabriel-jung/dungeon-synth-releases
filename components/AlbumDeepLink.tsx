@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import type { AlbumListItem } from "@/lib/types"
-import { rpcRowToAlbumListItem } from "@/lib/supabase"
+import { AlbumListItem, rpcRowToAlbumListItem } from "@/lib/types"
 import { has } from "@/lib/albumRegistry"
 import AlbumDetail from "./AlbumDetail"
 
