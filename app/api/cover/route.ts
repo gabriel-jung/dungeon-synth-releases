@@ -7,6 +7,22 @@ export async function GET(request: NextRequest) {
     return new Response("Missing url parameter", { status: 400 })
   }
 
+  // Reject cross-origin hotlinking — if a Referer is present and doesn't
+  // match our host, it's not a legitimate page load from this site.
+  // Missing Referer is tolerated (some clients strip it).
+  const referer = request.headers.get("referer")
+  if (referer) {
+    try {
+      const refererHost = new URL(referer).hostname
+      const ownHost = request.nextUrl.hostname
+      if (refererHost !== ownHost && refererHost !== "localhost") {
+        return new Response("Forbidden", { status: 403 })
+      }
+    } catch {
+      return new Response("Forbidden", { status: 403 })
+    }
+  }
+
   // Only allow Bandcamp image URLs
   try {
     const parsed = new URL(url)
