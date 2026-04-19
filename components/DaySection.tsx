@@ -37,7 +37,7 @@ export default function DaySection({
           </span>
         </span>
       </button>
-      {expanded ? <RecentGrid albums={albums} /> : <AlbumGrid albums={albums} />}
+      {expanded ? <RecentGrid albums={albums} pageSize={50} /> : <AlbumGrid albums={albums} />}
     </section>
   )
 }

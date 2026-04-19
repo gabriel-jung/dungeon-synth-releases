@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 
-const PAGE_SIZE = 10
+const DEFAULT_PAGE_SIZE = 10
 
 function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDate: boolean; hideHost: boolean }) {
   const { showHostInline, onArtistClick, openHost, push } = useAlbumCardModals(album, { hideHost })
@@ -63,10 +63,20 @@ function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDat
   )
 }
 
-export default function RecentGrid({ albums, showDate = false, hideHost = false }: { albums: AlbumListItem[]; showDate?: boolean; hideHost?: boolean }) {
-  const [visible, setVisible] = useState(PAGE_SIZE)
+export default function RecentGrid({
+  albums,
+  showDate = false,
+  hideHost = false,
+  pageSize = DEFAULT_PAGE_SIZE,
+}: {
+  albums: AlbumListItem[]
+  showDate?: boolean
+  hideHost?: boolean
+  pageSize?: number
+}) {
+  const [visible, setVisible] = useState(pageSize)
 
-  useEffect(() => { setVisible(PAGE_SIZE) }, [albums])
+  useEffect(() => { setVisible(pageSize) }, [albums, pageSize])
 
   const shown = albums.slice(0, visible)
   const hasMore = visible < albums.length
@@ -82,7 +92,7 @@ export default function RecentGrid({ albums, showDate = false, hideHost = false 
       {hasMore && (
         <div className="mt-4 flex justify-center">
           <button
-            onClick={() => setVisible((v) => v + PAGE_SIZE)}
+            onClick={() => setVisible((v) => v + pageSize)}
             className="font-display text-[10px] tracking-[0.2em] uppercase text-text-dim hover:text-accent border border-border/50 hover:border-accent/50 px-4 py-1.5 transition-colors cursor-pointer"
           >
             Load more · {albums.length - visible} remaining
