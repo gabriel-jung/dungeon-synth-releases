@@ -1,5 +1,7 @@
 # Site structure
 
+> **Status: reflects the shipped site as of 2026-04.**
+
 ## What this site is
 
 A **chronicle** of dungeon synth releases, not an encyclopedia. The unit of meaning is the *release event* — what came out, when, tagged — not the artist's body of work. There are no artist bios, no lineups, no discographies. Data is not curated: releases are whatever Bandcamp/Discogs said they were on that date.
@@ -20,26 +22,36 @@ This framing is load-bearing. It means:
 ## Routes
 
 ```
-/                 → default year (latest, e.g. current year)
-/[year]           → year archive
+/                 → Recent: current year, newest first
+/past             → grid of past years (index)
+/past/[year]      → year archive (list mode, per-day toggle)
+/upcoming         → upcoming releases across all future years
 /genres           → all-time genre map
-/stats            → all-time stats dashboard
-/upcoming         → existing upcoming-releases page
+/stats            → all-time stats dashboard (per-year where meaningful)
 ```
 
-Header: logo · year switcher · Genres · Stats.
+Header: logo · search · theme picker · TabBar (Recent / Past / Upcoming / Stats / Genres) · per-year release count.
+
+The "Past" tab opens the `/past` index on click; hovering reveals a multi-column year grid for direct jumps to any `/past/[year]`.
 
 ## Page roles
 
-### `/[year]` — year archive
+### `/` — Recent (current year)
 
-The main page of the site. Contains:
+Main page. The release list scopes to the current year with hard stops at Jan 1 and today. Every day is a collapsible `DaySection`; the newest day with releases starts expanded (cover grid), older days collapse to compact rows with a per-day show/hide covers toggle.
 
-- A lightweight visual header for the year's shape (month-grouped list with counts, or a quiet density ribbon — *not* a GitHub-style heatmap grid, which reads too "data dashboard").
-- The release list, grouped by month.
-- Filter chips (tags) applied **in place** on the current year. URL reflects filter state so it's shareable; no one reads the URLs, the chips are the interface.
+- Filter chips (tags) apply in place. URL reflects filter state.
+- Clicking a tag on a release toggles it as a filter on the current year.
+- Clicking an artist or host name opens a modal overlay with their releases.
+- Clicking a tag inside an album detail opens a genre modal.
 
-Clicking a tag on a release toggles it as a filter on the current year's view. Clicking an artist or host name opens a modal overlay with their releases. Clicking a tag inside an album detail modal opens a genre modal.
+### `/past/[year]` — year archive
+
+Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound={yearStart}` caps the scroll at Jan 1 of that year; the release list loads the first 500 rows descending from yearEnd to stay responsive on sparse pre-Bandcamp years.
+
+### `/past` — year index
+
+Grid of tiles, one per year with releases (excluding the current year, which lives at `/`). Built from the `distinct_years` RPC.
 
 ### `/genres` — genre map
 
@@ -54,6 +66,12 @@ Global, with per-plot year scoping where meaningful:
 ### `/upcoming`
 
 Unchanged. Existing page.
+
+## Search
+
+Search lives in the header as a dropdown lookup, not a list filter. Typing ≥2 chars queries the `search_all` Supabase RPC (pg_trgm indexes, 50-row cap) across albums, artists, and labels in one shot. Results open the album detail modal on click. Hitting Enter commits `?q=` as a current-year filter on the visible release list; `clear all filters` wipes `q`, `tag`, and `xtag` in one sweep.
+
+On `/genres`, the dropdown is suppressed — typing drives node highlighting directly via the `?q=` param.
 
 ## What's not here
 
@@ -83,6 +101,5 @@ Artwork is hotlinked directly from Bandcamp — no egress cost to us, no storage
 ## Deferred decisions
 
 - **Artist/label entity pages**: only once identity is stable.
-- **Search**: single full-text index on artist/title if/when list filtering proves insufficient.
 - **Hosting upgrade**: revisit if DB size crosses ~300MB or egress trends above ~3GB/month.
 - **Artwork fallback strategy**: defer until Bandcamp hotlinking actually breaks.

@@ -57,7 +57,7 @@ export default async function UpcomingPage() {
 
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
           <Suspense>
-            <ReleaseList albums={allRows} recentDates={[]} expandDate={expandDate} hasMore direction="future" listOnly includeYear />
+            <ReleaseList albums={allRows} expandDate={expandDate} hasMore direction="future" listOnly includeYear />
           </Suspense>
         </div>
 

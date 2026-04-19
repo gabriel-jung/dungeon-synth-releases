@@ -1,6 +1,6 @@
 # /stats — Release Statistics
 
-A dashboard of aggregate views over the current year's releases. Server-rendered with `revalidate = 3600` (1 hour cache).
+A dashboard of aggregate views over the current year's releases. Server-rendered with `revalidate = 21600` (6 hour cache).
 
 ## Sections
 
@@ -16,13 +16,13 @@ A GitHub-style grid: one cell per day of the current year, coloured by number of
 - **Hover** — shows date + release count in a caption.
 - **Click** — opens `DayModal` listing that day's releases.
 
-### 2. Most Active Pages — top Bandcamp hosts
+### 2. Most Active Labels — top Bandcamp hosts
 
-Ranked list of the top 50 Bandcamp host pages by year-to-date release count.
+Ranked list of the top 50 Bandcamp hosts by year-to-date release count (labels and self-published artists).
 
 - `HostRow` displays image thumbnail, name, count, and a proportional bar (width relative to the top host's count).
 - Scrollable with a soft bottom mask (mask-image fade) so the list cuts off gracefully at ~12 rows without a visible scrollbar.
-- Clicking a row links out to the Bandcamp page.
+- Clicking a row opens a `HostModal` with that host's releases.
 
 ### 3. Tracks per Release — histogram
 

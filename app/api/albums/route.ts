@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const before = params.get("before")
   const after = params.get("after")
+  const since = params.get("since")
+  const until = params.get("until")
   const hostId = params.get("host_id")
   const artist = params.get("artist")
   const year = params.get("year")
@@ -59,8 +61,10 @@ export async function GET(request: NextRequest) {
     }
   } else if (before) {
     query = query.lt("date", before).order("date", { ascending: false })
+    if (since) query = query.gte("date", since)
   } else {
     query = query.gt("date", after!).order("date", { ascending: true })
+    if (until) query = query.lte("date", until)
   }
 
   const { data, error } = await query

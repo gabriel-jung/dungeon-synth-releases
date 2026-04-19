@@ -31,10 +31,12 @@ export default function ReleasesModal({
   onClose: () => void
   onAlbumsLoaded?: (albums: AlbumListItem[]) => void
 }) {
+  const PAGE = 10
   const [data, setData] = useState<SplitResponse | null>(null)
   const [view, setView] = useState<ViewMode>(expectedCount > 20 ? "list" : "grid")
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [limit, setLimit] = useState(PAGE)
   const dialogRef = useRef<HTMLDivElement>(null)
   const onAlbumsLoadedRef = useRef(onAlbumsLoaded)
   useLayoutEffect(() => { onAlbumsLoadedRef.current = onAlbumsLoaded })
@@ -45,6 +47,7 @@ export default function ReleasesModal({
     let cancelled = false
     setError(false)
     setData(null)
+    setLimit(PAGE)
     fetch(fetchUrl)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -62,6 +65,10 @@ export default function ReleasesModal({
   const isLoading = !error && data === null
   const showSplit = data !== null && data.matching.length > 0
   const singleList = data !== null && data.matching.length === 0 ? data.other : null
+  const visibleOther = data ? data.other.slice(0, limit) : []
+  const hiddenOther = data ? Math.max(0, data.other.length - limit) : 0
+  const visibleSingle = singleList ? singleList.slice(0, limit) : null
+  const hiddenSingle = singleList ? Math.max(0, singleList.length - limit) : 0
 
   return createPortal(
     <div
@@ -92,18 +99,31 @@ export default function ReleasesModal({
                 {data.other.length > 0 && (
                   <>
                     <div className="ornamental-divider mt-6">Other releases</div>
-                    <AlbumGrid albums={data.other} hideHost={listHideHost} showDate={listShowDate} />
+                    <AlbumGrid albums={visibleOther} hideHost={listHideHost} showDate={listShowDate} />
+                    {hiddenOther > 0 && (
+                      <LoadMore onClick={() => setLimit((l) => l + PAGE)} remaining={hiddenOther} />
+                    )}
                   </>
                 )}
               </>
-            ) : singleList && singleList.length === 0 ? (
+            ) : visibleSingle && visibleSingle.length === 0 ? (
               <div className="py-8 text-center text-text-dim font-display text-xs tracking-wide">
                 No releases found
               </div>
-            ) : singleList && view === "grid" ? (
-              <RecentGrid albums={singleList} showDate={listShowDate} hideHost={listHideHost} />
-            ) : singleList ? (
-              <AlbumGrid albums={singleList} hideHost={listHideHost} showDate={listShowDate} />
+            ) : visibleSingle && view === "grid" ? (
+              <>
+                <RecentGrid albums={visibleSingle} showDate={listShowDate} hideHost={listHideHost} />
+                {hiddenSingle > 0 && (
+                  <LoadMore onClick={() => setLimit((l) => l + PAGE)} remaining={hiddenSingle} />
+                )}
+              </>
+            ) : visibleSingle ? (
+              <>
+                <AlbumGrid albums={visibleSingle} hideHost={listHideHost} showDate={listShowDate} />
+                {hiddenSingle > 0 && (
+                  <LoadMore onClick={() => setLimit((l) => l + PAGE)} remaining={hiddenSingle} />
+                )}
+              </>
             ) : null}
             {!error && (
               <div className="flex-1 flex items-end justify-center pt-8 pb-4 pointer-events-none">
@@ -115,6 +135,20 @@ export default function ReleasesModal({
       </div>
     </div>,
     document.body,
+  )
+}
+
+function LoadMore({ onClick, remaining }: { onClick: () => void; remaining: number }) {
+  return (
+    <div className="pt-4 flex justify-center">
+      <button
+        type="button"
+        onClick={onClick}
+        className="font-display text-[11px] italic tracking-[0.15em] text-accent hover:text-accent-hover transition-colors cursor-pointer"
+      >
+        Show more ({remaining})
+      </button>
+    </div>
   )
 }
 

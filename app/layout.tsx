@@ -8,7 +8,7 @@ import FilterChips from "@/components/FilterChips"
 import YearReleaseCount from "@/components/YearReleaseCount"
 import ScrollDescent from "@/components/ScrollDescent"
 import AlbumDeepLink from "@/components/AlbumDeepLink"
-import { fetchGenreTags, yearCountQuery } from "@/lib/supabase"
+import { fetchGenreTags, fetchPastYears, yearCountQuery } from "@/lib/supabase"
 import { localDateStr } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import { Suspense } from "react"
@@ -63,9 +63,10 @@ export default async function RootLayout({
 }>) {
   const year = new Date().getUTCFullYear()
   const today = localDateStr(new Date())
-  const [{ count: yearCount }, allTags] = await Promise.all([
+  const [{ count: yearCount }, allTags, pastYears] = await Promise.all([
     yearCountQuery(year, today),
     fetchGenreTags(),
+    fetchPastYears(),
   ])
 
   return (
@@ -102,7 +103,7 @@ export default async function RootLayout({
           </div>
           <div className="masthead-rule mt-4 sm:mt-6"></div>
           <div className="flex items-end justify-between gap-4">
-            <TabBar />
+            <TabBar pastYears={pastYears} />
             {yearCount !== null && (
               <Suspense>
                 <YearReleaseCount initialCount={yearCount} year={year} />

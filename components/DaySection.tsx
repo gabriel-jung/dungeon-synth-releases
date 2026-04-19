@@ -20,20 +20,24 @@ export default function DaySection({
 
   return (
     <section>
-      <div className="ornamental-divider">{label}</div>
       <button
-        onClick={() => setExpanded(!expanded)}
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
-        className="font-display text-[10px] tracking-[0.1em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer mb-3"
+        aria-label={expanded ? "Hide covers" : "Show covers"}
+        className="ornamental-divider w-full cursor-pointer hover:text-accent transition-colors group"
       >
-        <span aria-hidden="true">{expanded ? "▾" : "▸"}</span> {expanded ? "hide covers" : "show covers"}
+        <span className="flex items-center gap-2">
+          {label}
+          <span
+            aria-hidden="true"
+            className="text-[10px] text-border group-hover:text-accent transition-colors"
+          >
+            {expanded ? "▾" : "▸"}
+          </span>
+        </span>
       </button>
-
-      {expanded ? (
-        <RecentGrid albums={albums} />
-      ) : (
-        <AlbumGrid albums={albums} />
-      )}
+      {expanded ? <RecentGrid albums={albums} /> : <AlbumGrid albums={albums} />}
     </section>
   )
 }

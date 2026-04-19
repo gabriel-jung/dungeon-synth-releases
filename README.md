@@ -4,9 +4,11 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 
 ## Pages
 
-- **/** — Recent releases, newest first. Shows last 7 days initially, older releases load on scroll.
-- **/upcoming** — Upcoming releases, sorted by date ascending. Next 7 days initially, further dates load on scroll.
-- **/stats** — Aggregate stats for the current year: calendar heatmap of daily activity, top Bandcamp hosts, track-count and duration histograms. See [docs/stats.md](docs/stats.md).
+- **/** — Recent releases for the current year, newest first. Last 7 days load first; older dates in the year load on scroll.
+- **/past** — Grid of past years. Each tile links to its archive.
+- **/past/[year]** — Year archive, list view of every day with per-day show/hide covers toggle. Same `ReleaseList` as `/` but all days start collapsed.
+- **/upcoming** — Upcoming releases, sorted ascending. Flat list mode with date on each row.
+- **/stats** — Aggregate stats for the current year: calendar heatmap of daily activity, top labels, track-count and duration histograms. See [docs/stats.md](docs/stats.md).
 - **/genres** — Interactive force-directed graph of genre co-occurrence, with Louvain clustering and four selectable similarity metrics (Jaccard, PMI, cosine, raw). See [docs/genres.md](docs/genres.md).
 
 ## Tech Stack
@@ -23,19 +25,21 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 
 ## Features
 
-- **ISR** — pages cached for 1 hour, API responses for older albums cached 24h at the edge
-- **Instant + server search** — local filtering on loaded albums, then server search across all ~3000 albums
+- **ISR** — home/upcoming/past pages revalidate every 1h, /stats, /genres, /past index every 6h, with a daily Vercel cron that busts the layout for date-label rollover. API responses set `s-maxage=3600, stale-while-revalidate=86400` (search route 5min/1h); cover proxy sets `max-age=1 week`.
+- **Neutral search** — dropdown search across albums, artists, and labels backed by a `search_all` RPC with pg_trgm indexes (scales to 40k+ rows). Enter commits `?q=` as a current-year filter; hits in the dropdown open the album modal directly.
+- **Clear-all-filters button** — one-tap wipe of `q`, `tag`, `xtag` (extensible to future facet keys).
 - **Tag filtering** — three-state toggles (include/exclude/neutral), URL-driven
+- **Past-year navigation** — "Past" tab hover reveals a multi-column year grid for single-click jumps to any archived year.
+- **Per-day cover toggle** — every day section has a show/hide covers toggle; Recent starts the newest day expanded, past years start all days collapsed.
 - **Date slider** — scrub through dates, auto-loads albums when navigating to unloaded dates
 - **10 color themes** — dark and light options, persisted in localStorage
 - **Cover image proxy** — Bandcamp images cached 1 week via Vercel edge
 - **Scroll descent** — page gradually darkens as you browse older releases
 - **Adjustable paper texture** — desaturated fractal noise overlay with opacity slider
-- **Stats dashboard** — calendar heatmap, host ranking, track-count & duration histograms ([docs](docs/stats.md))
+- **Stats dashboard** — calendar heatmap, label ranking, track-count & duration histograms ([docs](docs/stats.md))
 - **Genre graph** — D3 force-directed co-occurrence map with community clustering and tunable similarity metrics ([docs](docs/genres.md))
-- **Artist/host modals** — clicking an artist or label name opens a modal with all their releases (grid or list); self-released artists resolve by UUID, label artists by name search
+- **Artist/label modals** — clicking an artist or label name opens a modal with all their releases (grid or list), paginated 10 at a time with a "Show more" button. Self-released artists resolve by UUID, label artists by name search.
 - **Tag modals** — clicking a tag on an album detail opens a genre modal showing all releases with that tag
-- **Paginated grid view** — cover art grids load 20 at a time with a "load more" button
 
 ## Setup
 

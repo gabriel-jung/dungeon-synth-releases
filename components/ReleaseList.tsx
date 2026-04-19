@@ -48,24 +48,27 @@ function LoadTrigger({ loading, onVisible }: { loading: boolean; onVisible: () =
 
 export default function ReleaseList({
   albums: initialAlbums,
-  recentDates: recentDatesArray,
   expandDate,
   hasMore = false,
   direction = "past",
   listOnly = false,
   includeYear = false,
+  lowerBound,
+  upperBound,
 }: {
   albums: AlbumListItem[]
-  recentDates: string[]
   expandDate: string | null
   hasMore?: boolean
   direction?: "past" | "future"
   listOnly?: boolean
   includeYear?: boolean
+  // Year-scoped pages pass these so scroll stops at year boundary instead
+  // of spilling into the previous/next year.
+  lowerBound?: string
+  upperBound?: string
 }) {
   const searchParams = useSearchParams()
   const [q, setQ] = useState(searchParams.get("q") ?? "")
-  const recentDates = useMemo(() => new Set(recentDatesArray), [recentDatesArray])
   const [extraAlbums, setExtraAlbums] = useState<AlbumListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [exhausted, setExhausted] = useState(false)
@@ -92,8 +95,7 @@ export default function ReleaseList({
     return parts.join("&")
   }, [searchParams])
 
-  // Reset accumulated pages when the tag filter changes — initialAlbums arrive
-  // anew from the server, stale extras would bleed across filters.
+  // Stale extras would bleed across filter changes.
   useEffect(() => {
     setExtraAlbums([])
     setExhausted(false)
@@ -104,7 +106,10 @@ export default function ReleaseList({
     try {
       const cursor = direction === "past" ? `before=${fromDate}` : `after=${fromDate}`
       const extra = tagQs ? `&${tagQs}` : ""
-      const res = await fetch(`/api/albums?${cursor}&limit=500${extra}`)
+      const bound = direction === "past"
+        ? (lowerBound ? `&since=${lowerBound}` : "")
+        : (upperBound ? `&until=${upperBound}` : "")
+      const res = await fetch(`/api/albums?${cursor}&limit=500${extra}${bound}`)
       const { albums: more } = await res.json() as { albums: AlbumListItem[] }
       if (!more || more.length === 0) {
         setExhausted(true)
@@ -115,7 +120,7 @@ export default function ReleaseList({
     } finally {
       setLoading(false)
     }
-  }, [direction, tagQs])
+  }, [direction, tagQs, lowerBound, upperBound])
 
   const loadMore = useCallback(async () => {
     if (loading || exhausted || !edgeDate) return
@@ -167,7 +172,6 @@ export default function ReleaseList({
     return () => window.removeEventListener("search-change", handler)
   }, [])
 
-  // Local filter (instant)
   const localFiltered = useMemo(() => {
     if (!isSearching) return null
     return albums.filter(
@@ -178,7 +182,6 @@ export default function ReleaseList({
     )
   }, [albums, trimmedQ, isSearching])
 
-  // Server-side search with debounce
   useEffect(() => {
     if (!isSearching) {
       setSearchResults(null)
@@ -197,7 +200,6 @@ export default function ReleaseList({
     return () => { clearTimeout(timeout); setSearching(false) }
   }, [trimmedQ, isSearching])
 
-  // Merge local + server results, deduped
   const displayAlbums = useMemo(() => {
     if (!isSearching) return albums
     const localIds = new Set((localFiltered ?? []).map((a) => a.id))
@@ -227,17 +229,12 @@ export default function ReleaseList({
               dayAlbums.map((album) => (
                 <ReleaseCard key={album.id} album={album} hideHost showDate />
               ))
-            ) : recentDates.has(date) ? (
+            ) : (
               <DaySection
                 label={heading}
                 albums={dayAlbums}
                 defaultExpanded={date === expandDate}
               />
-            ) : (
-              <>
-                <div className="ornamental-divider">{heading}</div>
-                <AlbumGrid albums={dayAlbums} />
-              </>
             )}
           </section>
         )

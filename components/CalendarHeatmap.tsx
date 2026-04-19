@@ -48,13 +48,15 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
     const qPoints = [0.12, 0.25, 0.4, 0.55, 0.7, 0.82, 0.9, 0.95]
     const thresholds = nonZero.length ? qPoints.map(qAt) : qPoints.map((_, i) => i + 1)
 
-    const yearStart = new Date(`${year}-01-01T00:00:00`)
-    const yearEnd = new Date(`${year}-12-31T00:00:00`)
-    const today = new Date(`${todayStr}T00:00:00`)
+    // UTC throughout — local tz caused SSR/CSR hydration mismatches when
+    // Node (UTC) and browser disagreed on which day a cell belonged to.
+    const yearStart = new Date(Date.UTC(year, 0, 1))
+    const yearEnd = new Date(Date.UTC(year, 11, 31))
+    const today = new Date(`${todayStr}T00:00:00Z`)
 
-    const startDow = (yearStart.getDay() + 6) % 7
+    const startDow = (yearStart.getUTCDay() + 6) % 7
     const firstMonday = new Date(yearStart)
-    firstMonday.setDate(yearStart.getDate() - startDow)
+    firstMonday.setUTCDate(yearStart.getUTCDate() - startDow)
 
     const cells: Cell[] = []
     const monthSpans = new Map<number, { start: number; end: number }>()
@@ -65,7 +67,7 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
         const dateStr = localDateStr(cur)
         const inRange = cur >= yearStart && cur <= yearEnd
         const isFuture = inRange && cur > today
-        const month = cur.getMonth()
+        const month = cur.getUTCMonth()
         const count = counts.get(dateStr) ?? 0
         if (inRange) {
           const s = monthSpans.get(month)
@@ -75,7 +77,7 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
         let colorIdx = 0
         for (const t of thresholds) if (count > t) colorIdx++
         cells.push({ key: dateStr, dateStr, count, weekIdx, dow, inRange, isFuture, month, colorIdx })
-        cur.setDate(cur.getDate() + 1)
+        cur.setUTCDate(cur.getUTCDate() + 1)
       }
       if (cur > yearEnd) break
       weekIdx++
@@ -84,7 +86,7 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
 
     const monthPaths: string[] = []
     for (let m = 1; m <= 11; m++) {
-      const firstDay = new Date(`${year}-${String(m + 1).padStart(2, "0")}-01T00:00:00`)
+      const firstDay = new Date(Date.UTC(year, m, 1))
       const daysSince = Math.round((firstDay.getTime() - firstMonday.getTime()) / 86400000)
       const w = Math.floor(daysSince / 7)
       const d = daysSince % 7

@@ -97,8 +97,15 @@ export interface HostRow {
   url: string | null
 }
 
-export function isLabelRelease(album: Pick<AlbumListItem, "artist" | "host_name">): boolean {
+export function isHostedRelease(album: Pick<AlbumListItem, "artist" | "host_name">): boolean {
   return !!album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
+}
+
+export function pickLatestDate(rows: Pick<AlbumListItem, "date">[]): string | null {
+  return rows.reduce<string | null>((best, a) => {
+    if (!a.date || a.date === "Unknown") return best
+    return !best || a.date > best ? a.date : best
+  }, null)
 }
 
 export interface AlbumListItem {

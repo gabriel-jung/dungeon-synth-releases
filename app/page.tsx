@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, coverUrl, localDateStr, dateRange, parseTagParams } from "@/lib/types"
+import { AlbumListItem, coverUrl, localDateStr, dateRange, parseTagParams, pickLatestDate } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
@@ -105,19 +105,9 @@ export default async function Page({
     }
   }
 
-  // Deduplicate albums (same ID can appear if data has dupes)
   const seen = new Set<string>()
   const deduped = allRows.filter((a) => { if (seen.has(a.id)) return false; seen.add(a.id); return true })
-
-  // Only the most recent day with releases gets cover art
-  const latestDate = allDates.find((d) => deduped.some((a) => a.date === d)) ?? null
-  const recentArray = latestDate ? [latestDate] : []
-  const expandDate = latestDate
-
-  // Strip art_id for all days except the latest to avoid unnecessary cover fetches
-  for (const item of deduped) {
-    if (item.date !== latestDate) item.art_id = undefined
-  }
+  const expandDate = pickLatestDate(deduped)
 
   return (
     <>
@@ -133,7 +123,7 @@ export default async function Page({
 
           <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
             <Suspense>
-              <ReleaseList albums={deduped} recentDates={recentArray} expandDate={expandDate} hasMore />
+              <ReleaseList albums={deduped} expandDate={expandDate} hasMore lowerBound={yearStart} />
             </Suspense>
           </div>
 

@@ -40,4 +40,13 @@ export async function fetchGenreTags(): Promise<string[]> {
   return (data ?? []).map((r: { name: string }) => r.name)
 }
 
+export async function fetchPastYears(): Promise<number[]> {
+  const { data } = await supabase.rpc("distinct_years")
+  const currentYear = new Date().getUTCFullYear()
+  return ((data ?? []) as { year: number | string }[])
+    .map((r) => Number(r.year))
+    .filter((y) => y < currentYear)
+    .sort((a, b) => b - a)
+}
+
 export { toAlbumListItem, rpcRowToAlbumListItem } from "./types"

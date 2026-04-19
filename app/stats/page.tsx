@@ -71,7 +71,7 @@ export default async function StatsPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         <section>
           <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright mb-4">
-            Most Active Pages
+            Most Active Labels
           </h2>
           <div
             className="relative"
