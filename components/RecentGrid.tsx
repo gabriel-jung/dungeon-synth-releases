@@ -2,80 +2,64 @@
 
 import { useEffect, useState } from "react"
 import { AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
-import AlbumDetail from "./AlbumDetail"
-import ArtistModal from "./ArtistModal"
-import HostModal from "./HostModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDate: boolean; hideHost: boolean }) {
-  const [selected, setSelected] = useState(false)
-  const { artistModal, setArtistModal, hostModal, setHostModal, showHostInline, onArtistClick } =
-    useAlbumCardModals(album, { hideHost })
+  const { showHostInline, onArtistClick, openHost, push } = useAlbumCardModals(album, { hideHost })
+  const openAlbum = (e?: React.SyntheticEvent) => { e?.stopPropagation(); push("album", album.id) }
 
   const img = coverUrl(album.art_id, "full")
 
   return (
-    <>
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={openAlbum}
+        className="aspect-square bg-bg-card border border-border overflow-hidden flex items-center justify-center hover-candlelight cursor-pointer"
+      >
+        {img ? (
+          <img
+            src={img}
+            alt={`${album.artist} — ${album.title}`}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span aria-hidden="true" className="text-3xl text-border select-none">♜</span>
+        )}
+      </button>
+      <div className="flex flex-col min-w-0 px-0.5">
         <button
-          onClick={() => setSelected(true)}
-          className="aspect-square bg-bg-card border border-border overflow-hidden flex items-center justify-center hover-candlelight cursor-pointer"
+          type="button"
+          onClick={openAlbum}
+          className="text-[0.8rem] leading-snug font-medium truncate text-left text-text-bright hover:text-accent transition-colors cursor-pointer"
         >
-          {img ? (
-            <img
-              src={img}
-              alt={`${album.artist} — ${album.title}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <span aria-hidden="true" className="text-3xl text-border select-none">♜</span>
-          )}
+          {album.title}
         </button>
-        <div className="flex flex-col min-w-0 px-0.5">
+        <button
+          onClick={(e) => { e.stopPropagation(); onArtistClick() }}
+          className="text-xs text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate"
+        >
+          {album.artist}
+        </button>
+        {showHostInline && (
           <button
-            onClick={() => setSelected(true)}
-            className="text-[0.8rem] leading-snug font-medium truncate text-left text-text-bright hover:text-accent transition-colors cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); openHost() }}
+            className="text-[10px] text-text-dim/60 hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate font-display tracking-wide uppercase"
           >
-            {album.title}
+            {album.host_name}
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onArtistClick() }}
-            className="text-xs text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate"
-          >
-            {album.artist}
-          </button>
-          {showHostInline && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setHostModal(true) }}
-              className="text-[10px] text-text-dim/60 hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate font-display tracking-wide uppercase"
-            >
-              {album.host_name}
-            </button>
-          )}
-          {showDate && album.date && (
-            <span className="text-[10px] tracking-wide tabular-nums text-text-dim/80 truncate mt-0.5">
-              {formatDateShort(album.date, true)}
-            </span>
-          )}
-        </div>
+        )}
+        {showDate && album.date && (
+          <span className="text-[10px] tracking-wide tabular-nums text-text-dim/80 truncate mt-0.5">
+            {formatDateShort(album.date, true)}
+          </span>
+        )}
       </div>
-
-      {selected && <AlbumDetail albumStub={album} onClose={() => setSelected(false)} />}
-      {artistModal && <ArtistModal artist={album.artist} onClose={() => setArtistModal(false)} />}
-      {hostModal && album.host_id && (
-        <HostModal
-          hostId={album.host_id}
-          hostName={album.host_name!}
-          imageId={album.host_image_id ?? null}
-          url={album.host_url ?? null}
-          onClose={() => setHostModal(false)}
-        />
-      )}
-    </>
+    </div>
   )
 }
 

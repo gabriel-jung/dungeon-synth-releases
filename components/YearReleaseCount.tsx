@@ -14,12 +14,12 @@ export default function YearReleaseCount({
   const searchParams = useSearchParams()
   const pathname = usePathname()
 
-  const pastMatch = pathname?.match(/^\/past\/(\d{4})$/)
+  const pastMatch = pathname?.match(/^\/releases\/(\d{4})$/)
   const pastYear = pastMatch ? Number(pastMatch[1]) : null
   const displayYear = pastYear ?? year
 
   const filtered = searchParams.has("tag") || searchParams.has("xtag")
-  const hidden = pathname === "/genres" || pathname === "/past"
+  const hidden = pathname === "/genres"
   const spKey = searchParams.toString()
 
   const [count, setCount] = useState<number | null>(pastYear ? null : initialCount)
@@ -48,9 +48,9 @@ export default function YearReleaseCount({
   if (hidden) return null
 
   return (
-    <span className="font-display text-[10px] sm:text-xs tracking-[0.2em] uppercase text-text-dim pb-1">
+    <span className="text-xs italic text-text-dim">
       {count === null ? "…" : releaseCount(count)} in {displayYear}
-      {filtered && <span className="text-accent"> · filtered</span>}
+      {filtered && <span className="text-accent not-italic"> · filtered</span>}
     </span>
   )
 }

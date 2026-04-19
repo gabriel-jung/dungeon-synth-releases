@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation"
+import { connection } from "next/server"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
 import { AlbumListItem, dateRange, parseTagParams } from "@/lib/types"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
-
-export const revalidate = 3600
 
 export async function generateMetadata({
   params,
@@ -16,21 +15,22 @@ export async function generateMetadata({
   return {
     title: `${year}`,
     description: `Dungeon synth releases from ${year}.`,
-    alternates: { canonical: `/past/${year}` },
+    alternates: { canonical: `/releases/${year}` },
   }
 }
 
-export default async function PastYearPage({
+export default async function YearReleasesPage({
   params,
   searchParams,
 }: {
   params: Promise<{ year: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  await connection()
   const { year: yearParam } = await params
   const year = Number(yearParam)
   const currentYear = new Date().getUTCFullYear()
-  if (!Number.isInteger(year) || year < 1900 || year >= currentYear) notFound()
+  if (!Number.isInteger(year) || year < 1900 || year > currentYear) notFound()
 
   const sp = await searchParams
   const { includeTags, excludeTags } = parseTagParams(sp)
@@ -51,7 +51,6 @@ export default async function PastYearPage({
       p_limit: 500,
     })
     if (error) throw new Error(`list_filtered_albums RPC failed: ${error.message}`)
-    // RPC can return the same album twice if multiple tags match.
     const seen = new Set<string>()
     rows = (data ?? []).map(rpcRowToAlbumListItem).filter((a: AlbumListItem) => {
       if (seen.has(a.id)) return false
@@ -59,9 +58,6 @@ export default async function PastYearPage({
       return true
     })
   } else {
-    // Past years are stable and cacheable — load the first 500 rows from
-    // yearEnd descending. Avoids the "empty last 7 days" trap on sparse
-    // pre-Bandcamp-era years where releases cluster earlier.
     const { data, error } = await supabase
       .from("albums")
       .select(ALBUM_LIST_SELECT)
@@ -90,6 +86,7 @@ export default async function PastYearPage({
               expandDate={null}
               hasMore
               lowerBound={yearStart}
+              upperBound={yearEnd}
               includeYear
             />
           </Suspense>

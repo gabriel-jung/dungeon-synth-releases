@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { AlbumListItem } from "@/lib/types"
+import { AlbumListItem, parseWeekKey, weekKeyOf } from "@/lib/types"
 import DaySection from "./DaySection"
 import DateHeading from "./DateHeading"
-import { AlbumGrid, ReleaseCard } from "./AlbumDetail"
+
+// Move a week key forward or backward by N weeks. Null on parse failure.
+function shiftWeek(weekKey: string, delta: number): string | null {
+  const range = parseWeekKey(weekKey)
+  if (!range) return null
+  const d = new Date(range.start + "T00:00:00Z")
+  d.setUTCDate(d.getUTCDate() + delta * 7)
+  return weekKeyOf(d.toISOString().slice(0, 10))
+}
 
 function groupByDate(albums: AlbumListItem[]): [string, AlbumListItem[]][] {
   const groups = new Map<string, AlbumListItem[]>()
@@ -50,8 +58,6 @@ export default function ReleaseList({
   albums: initialAlbums,
   expandDate,
   hasMore = false,
-  direction = "past",
-  listOnly = false,
   includeYear = false,
   lowerBound,
   upperBound,
@@ -59,8 +65,6 @@ export default function ReleaseList({
   albums: AlbumListItem[]
   expandDate: string | null
   hasMore?: boolean
-  direction?: "past" | "future"
-  listOnly?: boolean
   includeYear?: boolean
   // Year-scoped pages pass these so scroll stops at year boundary instead
   // of spilling into the previous/next year.
@@ -68,25 +72,25 @@ export default function ReleaseList({
   upperBound?: string
 }) {
   const searchParams = useSearchParams()
-  const [q, setQ] = useState(searchParams.get("q") ?? "")
   const [extraAlbums, setExtraAlbums] = useState<AlbumListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [exhausted, setExhausted] = useState(false)
-  const [searchResults, setSearchResults] = useState<AlbumListItem[] | null>(null)
-  const [searching, setSearching] = useState(false)
+  // Weeks already fetched — includes the weeks covered by the SSR initial
+  // rows so the infinite-scroll loader doesn't re-request them. Reset below
+  // whenever the filter or initial rows change.
+  const loadedWeeksRef = useRef<Set<string>>(new Set())
 
   const albums = useMemo(() => [...initialAlbums, ...extraAlbums], [initialAlbums, extraAlbums])
-  const trimmedQ = q.trim().toLowerCase()
-  const isSearching = trimmedQ.length >= 2
 
-  // The "edge" date: oldest for past, newest for future
+  // The "edge" date: oldest date in the loaded set (we always scroll toward
+  // the past after the initial today-first window).
   const edgeDate = useMemo(() => {
     return albums.reduce<string | null>((edge, a) => {
       if (!a.date || a.date === "Unknown") return edge
       if (!edge) return a.date
-      return direction === "past" ? (a.date < edge ? a.date : edge) : (a.date > edge ? a.date : edge)
+      return a.date < edge ? a.date : edge
     }, null)
-  }, [albums, direction])
+  }, [albums])
 
   const tagQs = useMemo(() => {
     const parts: string[] = []
@@ -99,123 +103,96 @@ export default function ReleaseList({
   useEffect(() => {
     setExtraAlbums([])
     setExhausted(false)
-  }, [tagQs])
+    loadedWeeksRef.current = new Set()
+    for (const a of initialAlbums) {
+      if (a.date && a.date !== "Unknown") loadedWeeksRef.current.add(weekKeyOf(a.date))
+    }
+  }, [tagQs, initialAlbums])
 
-  const fetchMore = useCallback(async (fromDate: string) => {
+  // Fetch a single ISO week bucket. Weeks are cache-stable; client never
+  // requests arbitrary date ranges — slider drags and scroll both resolve
+  // to bucket keys so CDN hits are bounded.
+  const fetchWeek = useCallback(async (weekKey: string): Promise<number> => {
+    if (loadedWeeksRef.current.has(weekKey)) return 0
+    loadedWeeksRef.current.add(weekKey)
+    const extra = tagQs ? `&${tagQs}` : ""
+    const clamps =
+      (lowerBound ? `&clamp_start=${lowerBound}` : "") +
+      (upperBound ? `&clamp_end=${upperBound}` : "")
+    const res = await fetch(`/api/albums?week=${weekKey}&limit=500${extra}${clamps}`)
+    const { albums: more } = await res.json() as { albums: AlbumListItem[] }
+    if (more && more.length > 0) {
+      setExtraAlbums((prev) => {
+        const seen = new Set(prev.map((a) => a.id))
+        for (const a of initialAlbums) seen.add(a.id)
+        const fresh = more.filter((a) => !seen.has(a.id))
+        return [...prev, ...fresh]
+      })
+    }
+    return more?.length ?? 0
+  }, [tagQs, lowerBound, upperBound, initialAlbums])
+
+  // Advance one week beyond the edge date (older for past, newer for future)
+  // and stop when a boundary is reached or many empty weeks pile up.
+  const EMPTY_WEEK_CAP = 8
+  const loadMore = useCallback(async () => {
+    if (loading || exhausted || !edgeDate) return
     setLoading(true)
     try {
-      const cursor = direction === "past" ? `before=${fromDate}` : `after=${fromDate}`
-      const extra = tagQs ? `&${tagQs}` : ""
-      const bound = direction === "past"
-        ? (lowerBound ? `&since=${lowerBound}` : "")
-        : (upperBound ? `&until=${upperBound}` : "")
-      const res = await fetch(`/api/albums?${cursor}&limit=500${extra}${bound}`)
-      const { albums: more } = await res.json() as { albums: AlbumListItem[] }
-      if (!more || more.length === 0) {
-        setExhausted(true)
-      } else {
-        setExtraAlbums((prev) => [...prev, ...more])
-        if (more.length < 500) setExhausted(true)
+      let cursorWeek = shiftWeek(weekKeyOf(edgeDate), -1)
+      let consecutiveEmpty = 0
+      for (let i = 0; i < EMPTY_WEEK_CAP; i++) {
+        if (!cursorWeek) break
+        const range = parseWeekKey(cursorWeek)
+        if (!range) break
+        if (lowerBound && range.end < lowerBound) { setExhausted(true); break }
+        if (upperBound && range.start > upperBound) { setExhausted(true); break }
+        const n = await fetchWeek(cursorWeek)
+        if (n > 0) return
+        consecutiveEmpty++
+        if (consecutiveEmpty >= EMPTY_WEEK_CAP) { setExhausted(true); break }
+        cursorWeek = shiftWeek(cursorWeek, -1)
       }
     } finally {
       setLoading(false)
     }
-  }, [direction, tagQs, lowerBound, upperBound])
+  }, [loading, exhausted, edgeDate, fetchWeek, lowerBound, upperBound])
 
-  const loadMore = useCallback(async () => {
-    if (loading || exhausted || !edgeDate) return
-    fetchMore(edgeDate)
-  }, [loading, exhausted, edgeDate, fetchMore])
-
-  // Listen for slider requesting a specific date
-  const pendingDateRef = useRef<string | null>(null)
-
+  // Slider click / key = navigate to a date. Fetch the target week plus ±1
+  // neighbour so the user always lands on a populated section.
   useEffect(() => {
-    const handler = (e: Event) => {
+    const handler = async (e: Event) => {
       const targetDate = (e as CustomEvent).detail as string
-      const needsLoad = edgeDate && !loading && !exhausted && (
-        direction === "past" ? targetDate < edgeDate : targetDate > edgeDate
-      )
-      if (needsLoad) {
-        pendingDateRef.current = targetDate
-        fetchMore(edgeDate)
+      if (!targetDate) return
+      const targetWeek = weekKeyOf(targetDate)
+      setLoading(true)
+      try {
+        await Promise.all([
+          fetchWeek(targetWeek),
+          shiftWeek(targetWeek, -1) ? fetchWeek(shiftWeek(targetWeek, -1)!) : Promise.resolve(0),
+          shiftWeek(targetWeek, 1) ? fetchWeek(shiftWeek(targetWeek, 1)!) : Promise.resolve(0),
+        ])
+      } finally {
+        setLoading(false)
       }
+      setTimeout(() => {
+        const el = document.getElementById(`date-${targetDate}`)
+        const list = document.getElementById("release-list")
+        if (el && list) list.scrollTo({ top: el.offsetTop - list.offsetTop, behavior: "instant" })
+      }, 50)
     }
     window.addEventListener("load-until-date", handler)
     return () => window.removeEventListener("load-until-date", handler)
-  }, [edgeDate, loading, exhausted, fetchMore, direction])
+  }, [fetchWeek])
 
-  // When new albums load and we have a pending date, keep loading or scroll to it
-  useEffect(() => {
-    const target = pendingDateRef.current
-    if (!target || loading) return
-    const needsMore = edgeDate && !exhausted && (
-      direction === "past" ? target < edgeDate : target > edgeDate
-    )
-    if (needsMore) {
-      fetchMore(edgeDate)
-    } else {
-      pendingDateRef.current = null
-      setTimeout(() => {
-        const el = document.getElementById(`date-${target}`)
-        const list = document.getElementById("release-list")
-        if (el && list) {
-          list.scrollTo({ top: el.offsetTop - list.offsetTop, behavior: "instant" })
-        }
-      }, 50)
-    }
-  }, [edgeDate, loading, exhausted, fetchMore, direction])
-
-  useEffect(() => {
-    const handler = (e: Event) => setQ((e as CustomEvent).detail ?? "")
-    window.addEventListener("search-change", handler)
-    return () => window.removeEventListener("search-change", handler)
-  }, [])
-
-  const localFiltered = useMemo(() => {
-    if (!isSearching) return null
-    return albums.filter(
-      (a) =>
-        a.artist.toLowerCase().includes(trimmedQ) ||
-        a.title.toLowerCase().includes(trimmedQ) ||
-        (a.host_name && a.host_name.toLowerCase().includes(trimmedQ)),
-    )
-  }, [albums, trimmedQ, isSearching])
-
-  useEffect(() => {
-    if (!isSearching) {
-      setSearchResults(null)
-      return
-    }
-    setSearching(true)
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/albums/search?q=${encodeURIComponent(trimmedQ)}`)
-        const { albums: results } = await res.json() as { albums: AlbumListItem[] }
-        setSearchResults(results ?? [])
-      } finally {
-        setSearching(false)
-      }
-    }, 300)
-    return () => { clearTimeout(timeout); setSearching(false) }
-  }, [trimmedQ, isSearching])
-
-  const displayAlbums = useMemo(() => {
-    if (!isSearching) return albums
-    const localIds = new Set((localFiltered ?? []).map((a) => a.id))
-    const extra = (searchResults ?? []).filter((a) => !localIds.has(a.id))
-    return [...(localFiltered ?? []), ...extra]
-  }, [albums, isSearching, localFiltered, searchResults])
-
-  const grouped = groupByDate(displayAlbums)
+  const grouped = groupByDate(albums)
 
   return (
     <>
       {grouped.map(([date, dayAlbums], gi) => {
         const sectionCls = gi === 0 ? "" : "pt-4 sm:pt-6"
-        const heading: React.ReactNode = listOnly
-          ? null
-          : date === "Unknown"
+        const heading: React.ReactNode =
+          date === "Unknown"
             ? "Unknown date"
             : <DateHeading date={date} includeYear={includeYear} />
         return (
@@ -225,44 +202,23 @@ export default function ReleaseList({
             className={`${sectionCls} animate-fade-slide-in`}
             style={{ animationDelay: `${Math.min(gi * 50, 300)}ms` }}
           >
-            {listOnly ? (
-              dayAlbums.map((album) => (
-                <ReleaseCard key={album.id} album={album} hideHost showDate />
-              ))
-            ) : (
-              <DaySection
-                label={heading}
-                albums={dayAlbums}
-                defaultExpanded={date === expandDate}
-              />
-            )}
+            <DaySection
+              label={heading}
+              albums={dayAlbums}
+              defaultExpanded={date === expandDate}
+            />
           </section>
         )
       })}
-      {isSearching && searching && (
-        <div role="status" aria-live="polite" className="py-6 flex items-center justify-center text-text-dim">
-          <span className="font-display text-xs tracking-[0.1em] animate-pulse">Searching the archives...</span>
-        </div>
-      )}
-      {isSearching && !searching && displayAlbums.length === 0 && (
-        <div role="status" className="py-8 text-center text-text-dim">
-          <span aria-hidden="true" className="text-2xl block mb-2 select-none">♜</span>
-          <span className="font-display text-xs tracking-[0.1em]">No releases found</span>
-        </div>
-      )}
-      {!isSearching && !loading && displayAlbums.length === 0 && (
+      {!loading && albums.length === 0 && (
         <div className="py-8 text-center text-text-dim">
           <span aria-hidden="true" className="text-2xl block mb-2 select-none">♜</span>
           <span className="font-display text-xs tracking-[0.1em]">
-            {tagQs
-              ? "No releases match this filter"
-              : direction === "future"
-                ? "No upcoming releases"
-                : "No releases found"}
+            {tagQs ? "No releases match this filter" : "No releases found"}
           </span>
         </div>
       )}
-      {!isSearching && hasMore && !exhausted && (
+      {hasMore && !exhausted && (
         <LoadTrigger loading={loading} onVisible={loadMore} />
       )}
       <div className="shrink-0" style={{ height: "40vh" }} />

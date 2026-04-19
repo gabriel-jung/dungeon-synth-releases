@@ -1,12 +1,11 @@
 import type { Metadata } from "next"
+import { connection } from "next/server"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, coverUrl, localDateStr, dateRange, parseTagParams, pickLatestDate } from "@/lib/types"
+import { AlbumListItem, coverUrl, localDateStr, dateRange, dedupeById, parseTagParams, pickLatestDate } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
-
-export const revalidate = 3600
 
 export async function generateMetadata({
   searchParams,
@@ -61,6 +60,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  await connection()
   const sp = await searchParams
   const { includeTags, excludeTags } = parseTagParams(sp)
 
@@ -105,8 +105,7 @@ export default async function Page({
     }
   }
 
-  const seen = new Set<string>()
-  const deduped = allRows.filter((a) => { if (seen.has(a.id)) return false; seen.add(a.id); return true })
+  const deduped = dedupeById(allRows)
   const expandDate = pickLatestDate(deduped)
 
   return (

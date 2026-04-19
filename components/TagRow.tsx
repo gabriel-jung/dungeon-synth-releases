@@ -3,13 +3,11 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { hrefWithModal } from "@/lib/modalUrl"
 
-export default function HostRow({
-  hostId,
+export default function TagRow({
   name,
   count,
   widthPct,
 }: {
-  hostId: string
   name: string
   count: number
   widthPct: number
@@ -19,7 +17,7 @@ export default function HostRow({
   const searchParams = useSearchParams()
 
   const open = () => {
-    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "host", hostId, pathname))
+    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "genre", name, pathname))
   }
 
   return (

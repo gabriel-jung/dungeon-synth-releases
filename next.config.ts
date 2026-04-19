@@ -6,7 +6,7 @@ const csp = [
   // in production bundles. Tighten with nonces later if/when we audit inline JS.
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://*.bcbits.com https://*.bandcamp.com",
   "font-src 'self' data:",
   "connect-src 'self'",
   "frame-ancestors 'none'",
@@ -27,8 +27,16 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.31"],
+  cacheComponents: true,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }]
+  },
+  async redirects() {
+    return [
+      { source: "/past", destination: "/", permanent: true },
+      { source: "/past/:year", destination: "/releases/:year", permanent: true },
+      { source: "/upcoming", destination: "/?upcoming=1", permanent: true },
+    ]
   },
 }
 

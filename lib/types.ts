@@ -15,20 +15,40 @@ export function parseTagParams(sp: TagParamsInput): { includeTags: string[]; exc
   return { includeTags: norm(sp.tag), excludeTags: norm(sp.xtag) }
 }
 
-export function buildSplitUrl(opts: {
-  artist?: string
-  hostId?: string
-  year?: number
-  tags: string[]
-  xtags: string[]
-}): string {
-  const qs = new URLSearchParams()
-  if (opts.artist) qs.set("artist", opts.artist)
-  if (opts.hostId) qs.set("host_id", opts.hostId)
-  if (opts.year) qs.set("year", String(opts.year))
-  for (const t of opts.tags) qs.append("tag", t)
-  for (const t of opts.xtags) qs.append("xtag", t)
-  return `/api/albums/split?${qs.toString()}`
+// Parse an ISO week key (e.g. "2024-W05") into [mondayDate, sundayDate],
+// both as YYYY-MM-DD strings (UTC-based). Returns null on invalid input.
+export function parseWeekKey(week: string): { start: string; end: string } | null {
+  const m = week.match(/^(\d{4})-W(\d{2})$/)
+  if (!m) return null
+  const year = Number(m[1])
+  const w = Number(m[2])
+  if (!Number.isInteger(year) || !Number.isInteger(w) || w < 1 || w > 53) return null
+  // ISO week 1 contains the first Thursday of the year.
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Dow = (jan4.getUTCDay() + 6) % 7 // Mon=0..Sun=6
+  const week1Monday = new Date(jan4)
+  week1Monday.setUTCDate(jan4.getUTCDate() - jan4Dow)
+  const weekStart = new Date(week1Monday)
+  weekStart.setUTCDate(week1Monday.getUTCDate() + (w - 1) * 7)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6)
+  return { start: localDateStr(weekStart), end: localDateStr(weekEnd) }
+}
+
+// Inverse of parseWeekKey — format an ISO-8601 date string to "YYYY-Www".
+export function weekKeyOf(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z")
+  const dow = (d.getUTCDay() + 6) % 7 // Mon=0..Sun=6
+  // Thursday of current week determines the year and week.
+  const thursday = new Date(d)
+  thursday.setUTCDate(d.getUTCDate() - dow + 3)
+  const year = thursday.getUTCFullYear()
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Dow = (jan4.getUTCDay() + 6) % 7
+  const week1Monday = new Date(jan4)
+  week1Monday.setUTCDate(jan4.getUTCDate() - jan4Dow)
+  const week = Math.floor((thursday.getTime() - week1Monday.getTime()) / (7 * 86400000)) + 1
+  return `${year}-W${String(week).padStart(2, "0")}`
 }
 
 export function dateRange(from: string, to: string): string[] {
@@ -69,25 +89,12 @@ export function coverUrl(artId: string | null | undefined, size: "thumb" | "full
   if (!artId) return null
   // _7 = 150px thumb (grid), _2 = 350px (detail)
   const suffix = size === "thumb" ? "_7.jpg" : "_2.jpg"
-  return `/api/cover?url=${encodeURIComponent(`https://f4.bcbits.com/img/a${artId}${suffix}`)}`
+  return `https://f4.bcbits.com/img/a${artId}${suffix}`
 }
 
 export function hostImageUrl(imageId: string | null | undefined): string | null {
   if (!imageId) return null
-  return `/api/cover?url=${encodeURIComponent(`https://f4.bcbits.com/img/${imageId}_10.jpg`)}`
-}
-
-export function searchFor(value: string) {
-  const params = new URLSearchParams(window.location.search)
-  if (value) params.set("q", value)
-  else params.delete("q")
-  const qs = params.toString()
-  // On the genres page, keep the reader in the visualization so the query
-  // can drive node highlighting instead of sending them to the release list.
-  const stayHere = window.location.pathname.startsWith("/genres")
-  const path = stayHere ? window.location.pathname : "/"
-  window.history.replaceState(null, "", qs ? `${path}?${qs}` : path)
-  window.dispatchEvent(new CustomEvent("search-change", { detail: value }))
+  return `https://f4.bcbits.com/img/${imageId}_10.jpg`
 }
 
 export interface HostRow {
@@ -99,6 +106,17 @@ export interface HostRow {
 
 export function isHostedRelease(album: Pick<AlbumListItem, "artist" | "host_name">): boolean {
   return !!album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
+}
+
+export function dedupeById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const r of rows) {
+    if (seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
 }
 
 export function pickLatestDate(rows: Pick<AlbumListItem, "date">[]): string | null {
@@ -138,7 +156,7 @@ export type FilteredAlbumRow = {
 export function toAlbumListItem(r: any): AlbumListItem {
   const hosts = r.hosts as unknown as HostRow | null
   return {
-    id: r.id,
+    id: String(r.id),
     artist: r.artist,
     title: r.title,
     url: r.url,
@@ -153,7 +171,7 @@ export function toAlbumListItem(r: any): AlbumListItem {
 
 export function rpcRowToAlbumListItem(r: FilteredAlbumRow): AlbumListItem {
   return {
-    id: r.id,
+    id: String(r.id),
     artist: r.artist,
     title: r.title,
     url: r.url,

@@ -1,81 +1,91 @@
 import { type NextRequest } from "next/server"
-import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { supabase, ALBUM_LIST_SELECT, HTTP_CACHE_1H, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { parseWeekKey } from "@/lib/types"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
 import { logger } from "@/lib/logger"
 
-const CACHE = "public, s-maxage=3600, stale-while-revalidate=86400"
-
+// Two access modes:
+//   - `?week=YYYY-Www` — bounded ISO week bucket. Cache-friendly. Powers the
+//     infinite-scroll release list and slider-jump loading. Optional
+//     `clamp_start`/`clamp_end` restrict the window for year-view pages.
+//   - `?date=YYYY-MM-DD` — single-day list for the calendar heatmap modal.
+// Both accept `tag=`/`xtag=` page-level filters which route through the
+// `list_filtered_albums` RPC.
 export async function GET(request: NextRequest) {
   const rl = checkRateLimit(`albums:${ipFromRequest(request)}`, 120, 60_000)
   if (!rl.ok) return rateLimitResponse(rl.retryAfter)
 
   const params = request.nextUrl.searchParams
-  const before = params.get("before")
-  const after = params.get("after")
-  const since = params.get("since")
-  const until = params.get("until")
-  const hostId = params.get("host_id")
-  const artist = params.get("artist")
-  const year = params.get("year")
+  const week = params.get("week")
   const date = params.get("date")
   const tags = params.getAll("tag")
   const xtags = params.getAll("xtag")
+  const clampStart = params.get("clamp_start")
+  const clampEnd = params.get("clamp_end")
   const limit = Math.min(Number(params.get("limit") ?? 500), 1000)
 
-  // Tag-filtered pagination: route to RPC (same function used by home page).
-  if ((tags.length > 0 || xtags.length > 0) && (before || after)) {
-    const { data, error } = await supabase.rpc("list_filtered_albums", {
-      p_include_tags: tags,
-      p_exclude_tags: xtags,
-      p_before: before ?? null,
-      p_after: after ?? null,
-      p_limit: limit,
-    })
+  if (week) {
+    const range = parseWeekKey(week)
+    if (!range) return Response.json({ error: "Invalid week key" }, { status: 400 })
+    const start = clampStart && clampStart > range.start ? clampStart : range.start
+    const end = clampEnd && clampEnd < range.end ? clampEnd : range.end
+    if (tags.length > 0 || xtags.length > 0) {
+      const { data, error } = await supabase.rpc("list_filtered_albums", {
+        p_include_tags: tags,
+        p_exclude_tags: xtags,
+        // RPC takes exclusive `before` + inclusive `after`. Emulate [start..end].
+        p_before: addOneDay(end),
+        p_after: addOneDay(start, -1),
+        p_limit: limit,
+      })
+      if (error) {
+        logger.error({ route: "api/albums", rpc: "list_filtered_albums", week, err: error.message }, "RPC failed")
+        return Response.json({ error: error.message }, { status: 500 })
+      }
+      return Response.json(
+        { albums: (data ?? []).map(rpcRowToAlbumListItem) },
+        { headers: { "Cache-Control": HTTP_CACHE_1H } },
+      )
+    }
+    const { data, error } = await supabase
+      .from("albums")
+      .select(ALBUM_LIST_SELECT)
+      .gte("date", start)
+      .lte("date", end)
+      .order("date", { ascending: false })
+      .limit(limit)
     if (error) {
-      logger.error({ route: "api/albums", rpc: "list_filtered_albums", err: error.message }, "RPC failed")
+      logger.error({ route: "api/albums", week, err: error.message }, "week query failed")
       return Response.json({ error: error.message }, { status: 500 })
     }
     return Response.json(
-      { albums: (data ?? []).map(rpcRowToAlbumListItem) },
-      { headers: { "Cache-Control": CACHE } },
+      { albums: (data ?? []).map(toAlbumListItem) },
+      { headers: { "Cache-Control": HTTP_CACHE_1H } },
     )
   }
 
-  if (!before && !after && !hostId && !date && !artist) {
-    return Response.json({ error: "Missing 'before', 'after', 'host_id', 'artist', or 'date' param" }, { status: 400 })
-  }
-
-  let query = supabase
-    .from("albums")
-    .select(ALBUM_LIST_SELECT)
-    .limit(limit)
-
-  if (artist) {
-    query = query.eq("artist", artist).order("date", { ascending: false })
-  } else if (date) {
-    query = query.eq("date", date).order("artist", { ascending: true })
-  } else if (hostId) {
-    query = query.eq("host_id", hostId).order("date", { ascending: false })
-    if (year) {
-      query = query.gte("date", `${year}-01-01`).lte("date", `${year}-12-31`)
+  if (date) {
+    const { data, error } = await supabase
+      .from("albums")
+      .select(ALBUM_LIST_SELECT)
+      .eq("date", date)
+      .order("artist", { ascending: true })
+      .limit(limit)
+    if (error) {
+      logger.error({ route: "api/albums", date, err: error.message }, "date query failed")
+      return Response.json({ error: error.message }, { status: 500 })
     }
-  } else if (before) {
-    query = query.lt("date", before).order("date", { ascending: false })
-    if (since) query = query.gte("date", since)
-  } else {
-    query = query.gt("date", after!).order("date", { ascending: true })
-    if (until) query = query.lte("date", until)
+    return Response.json(
+      { albums: (data ?? []).map(toAlbumListItem) },
+      { headers: { "Cache-Control": HTTP_CACHE_1H } },
+    )
   }
 
-  const { data, error } = await query
+  return Response.json({ error: "Missing 'week' or 'date' param" }, { status: 400 })
+}
 
-  if (error) {
-    logger.error({ route: "api/albums", err: error.message }, "query failed")
-    return Response.json({ error: error.message }, { status: 500 })
-  }
-
-  return Response.json(
-    { albums: (data ?? []).map(toAlbumListItem) },
-    { headers: { "Cache-Control": CACHE } },
-  )
+function addOneDay(dateStr: string, sign = 1): string {
+  const d = new Date(dateStr + "T00:00:00Z")
+  d.setUTCDate(d.getUTCDate() + sign)
+  return d.toISOString().slice(0, 10)
 }

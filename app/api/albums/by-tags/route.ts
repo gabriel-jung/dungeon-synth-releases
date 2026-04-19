@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server"
-import { supabase, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { supabase, HTTP_CACHE_1H, rpcRowToAlbumListItem } from "@/lib/supabase"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
 import { logger } from "@/lib/logger"
 
@@ -30,6 +30,6 @@ export async function GET(request: NextRequest) {
 
   return Response.json(
     { albums: (data ?? []).map(rpcRowToAlbumListItem) },
-    { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+    { headers: { "Cache-Control": HTTP_CACHE_1H } },
   )
 }

@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabase, HTTP_CACHE_1H } from "@/lib/supabase"
 import { HostRow } from "@/lib/types"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
 
@@ -44,6 +44,6 @@ export async function GET(request: NextRequest) {
       num_tracks: r.num_tracks ?? 0,
       duration_sec: r.duration_sec ?? 0,
     },
-    { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+    { headers: { "Cache-Control": HTTP_CACHE_1H } },
   )
 }

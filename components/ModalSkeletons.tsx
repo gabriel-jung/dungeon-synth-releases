@@ -1,4 +1,4 @@
-// Shared skeletons and error state for ReleasesModal and GenreModal
+// Shared loading and error placeholders used across modals.
 
 export function GridSkeleton({ count }: { count: number }) {
   return (

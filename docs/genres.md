@@ -16,8 +16,8 @@ Raw tags mix many kinds of concepts — sonic genres, themes, instruments, locat
 
 Two RPCs aggregate from the filtered genre set:
 
-- **`genre_counts`** — `(name, n)` per genre, where `n` is how many albums carry that tag.
-- **`genre_pairs`** — `(tag_a, tag_b, n)` for each unordered pair of genres that co-occur on at least one album, with `n` the count of shared albums.
+- **`tag_counts(p_category default 'genre')`** — `(name, n)` per tag, where `n` is how many albums carry that tag.
+- **`tag_pairs(p_category default 'genre')`** — `(tag_a, tag_b, n)` for each unordered pair of tags in the category that co-occur on at least one album, with `n` the count of shared albums.
 
 These are paginated to completion in `fetchAllPairs` (1000 rows per RPC call).
 
@@ -48,7 +48,7 @@ Inside `GenreMap`:
 
 - **Hover** a node → tooltip with genre name, album count, connection count.
 - **Hover** an edge → tooltip with the two genres, shared album count, and similarity weight.
-- **Click** a node → opens `GenreModal` with top albums tagged with that genre.
+- **Click** a node → pushes `?genre=<name>` which opens the shared `ScopeModal` with albums tagged with that genre.
 - **Search** (top bar) → substring match against visible genre names, highlighting matches in place. On this page the search stays on `/genres` rather than jumping to the release list — the URL is updated via `history.replaceState` and a `"search-change"` CustomEvent keeps components in sync. Neighbor expansion is reserved for explicitly clicked tags, so searching "punk" tends to highlight just the genre names containing "punk" (Egg Punk, Post-Punk, etc.) rather than everything connected to them.
 
 ## Controls panel
@@ -74,13 +74,13 @@ State is URL-driven (`?metric=…&n=…&d=…&ml=…&lp=…`) so a given view ca
 
 | Path | Role |
 |------|------|
-| `app/genres/page.tsx` | Server component: fetches `genre_counts` and all `genre_pairs`, hands them to `<GenreMap>` inside `<Suspense>` |
+| `app/genres/page.tsx` | Server component: fetches `tag_counts` and all `tag_pairs`, hands them to `<GenreMap>` inside `<Suspense>` |
 | `components/GenreMap.tsx` | Graph construction, physics, interaction, controls, rendering |
-| `components/GenreModal.tsx` | Dialog with top albums for a clicked genre |
+| `components/ScopeModal.tsx` | Shared scope modal that renders when `?genre=<name>` is set |
 
 ## Supabase RPCs
 
 | Function | Returns |
 |----------|---------|
-| `genre_counts()` | `name, n` — one row per genre-category tag |
-| `genre_pairs()` | `tag_a, tag_b, n` — unordered pairs of genres that co-occur, with shared album count |
+| `tag_counts(p_category text default 'genre')` | `name, n` — one row per tag in the given category |
+| `tag_pairs(p_category text default 'genre')` | `tag_a, tag_b, n` — unordered pairs of tags in that category that co-occur, with shared album count |

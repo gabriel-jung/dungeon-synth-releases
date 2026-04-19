@@ -23,8 +23,8 @@ import { select, type Selection } from "d3-selection"
 import "d3-transition"
 import katex from "katex"
 import "katex/dist/katex.min.css"
-import { usePathname, useSearchParams } from "next/navigation"
-import GenreModal from "./GenreModal"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { openModal, toQueryString } from "@/lib/modalUrl"
 
 export type GenreCount = { name: string; n: number }
 export type GenrePair = { a: string; b: string; n: number }
@@ -318,7 +318,18 @@ export default function GenreMap({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
+
+  // Push genre(s) to URL so ModalRouter opens the ScopeModal. Single tag =
+  // node click; two tags = edge click (intersection inside the modal).
+  const openGenreModal = (tags: string[]) => {
+    let next = new URLSearchParams(searchParams.toString())
+    // Strip any previous genre params so we don't accidentally accumulate.
+    next.delete("genre")
+    for (const t of tags) next = openModal(next, "genre", t)
+    router.push(`${pathname}${toQueryString(next)}`)
+  }
   const maxTopN = counts.length
   const topNDigits = String(maxTopN).length
   const defaultTopN = Math.min(50, maxTopN)
@@ -348,15 +359,7 @@ export default function GenreMap({
   const [cohesion, setCohesion] = useState(0.08)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [captionVisible, setCaptionVisible] = useState(true)
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  const [modalInfo, setModalInfo] = useState<{
-    tags: string[]
-    count: number
-    pairs?: GenrePair[]
-    allActivePairs?: GenrePair[]
-    nodeCounts?: Map<string, number>
-  } | null>(null)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [simReady, setSimReady] = useState(false)
   const [settling, setSettling] = useState(false)
@@ -490,36 +493,27 @@ export default function GenreMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric, topN, showTopPct, minLinks, labelPos])
 
-  // Escape closes overlays. Modal handles its own Escape via useModal.
+  // Escape closes overlays. ScopeModal (opened via URL) handles its own
+  // Escape via useModal, so we only need to close panels here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return
-      if (modalInfo) return
+      if (searchParams.get("genre") || searchParams.get("album")) return
       if (aboutOpen) setAboutOpen(false)
       else if (showAdvanced) setShowAdvanced(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [aboutOpen, showAdvanced, modalInfo])
+  }, [aboutOpen, showAdvanced, searchParams])
 
   const banTags = useMemo(
     () => new Set(searchParams.getAll("xtag")),
     [searchParams],
   )
-  // "Highlight" is the union of explicit tag chips (?tag=...) and substring
-  // matches on the search bar (?q=...). Search on this page highlights nodes
-  // in place instead of navigating to the release list. SearchBar mutates the
-  // URL via history.replaceState (no router event), so we sync via the
-  // "search-change" custom event it dispatches.
-  const [searchQuery, setSearchQuery] = useState(
-    () => (searchParams.get("q") ?? "").trim().toLowerCase(),
-  )
-  useEffect(() => {
-    const onChange = (e: Event) =>
-      setSearchQuery(((e as CustomEvent).detail ?? "").trim().toLowerCase())
-    window.addEventListener("search-change", onChange)
-    return () => window.removeEventListener("search-change", onChange)
-  }, [])
+  // Highlight = union of explicit tag chips (?tag=...) and substring matches
+  // from the in-canvas search input. Search lives local to this map — it
+  // highlights nodes in place rather than navigating to the release list.
+  const [searchQuery, setSearchQuery] = useState("")
   const clickedTags = useMemo(() => new Set(searchParams.getAll("tag")), [searchParams])
   // Precomputed once per counts — keystrokes re-iterate but don't re-lowercase.
   const lowerNames = useMemo(
@@ -590,10 +584,6 @@ export default function GenreMap({
     zoomBehaviorRef.current = zoom
 
     if (nodes.length === 0) return
-
-    const activeIds = new Set(nodes.map((n) => n.id))
-    const allActivePairs = pairs.filter((p) => activeIds.has(p.a) && activeIds.has(p.b))
-    const nodeCounts = new Map(nodes.map((n) => [n.id, n.count]))
 
     const maxCount = max(nodes, (d) => d.count) ?? 1
     const maxWeight = max(edges, (d) => d.weight) ?? 1
@@ -666,7 +656,7 @@ export default function GenreMap({
               .on("click", (_e, d) => {
                 const s = (d.source as Node).id
                 const t = (d.target as Node).id
-                setModalInfo({ tags: [s, t], count: d.inter, allActivePairs, nodeCounts })
+                openGenreModal([s, t])
               }),
           (update) => update,
           (exit) => exit.remove(),
@@ -776,10 +766,7 @@ export default function GenreMap({
         setHover(null)
       })
       .on("click", (_e, d) => {
-        const nodePairs = allActivePairs
-          .filter((p) => p.a === d.id || p.b === d.id)
-          .sort((a, b) => b.n - a.n)
-        setModalInfo({ tags: [d.id], count: d.count, pairs: nodePairs, allActivePairs, nodeCounts })
+        openGenreModal([d.id])
       })
 
     function clusterForce(alpha: number) {
@@ -1143,55 +1130,292 @@ export default function GenreMap({
           computing
         </div>
       )}
-      {/* Orientation — a single sentence telling readers what they're looking
-          at, with a ? that opens a full explainer. Collapsible: once dismissed,
-          a small pill lets the reader bring it back. */}
-      <div className="absolute top-3 left-3 right-3 sm:right-auto z-20 max-w-[min(34rem,calc(100vw-1.5rem))]">
-        {captionVisible ? (
-          <>
-            <div className="flex items-start gap-2 bg-bg/75 backdrop-blur-sm border border-border/60 rounded-sm px-3 py-2">
-              <span aria-hidden className="font-display text-accent/70 text-sm leading-[1.4] shrink-0">❧</span>
-              <p className="font-serif italic text-xs sm:text-[13px] text-text leading-snug flex-1">
-                A cartography of genre affinities, drawn from shared Bandcamp tags.
-              </p>
-              <button
-                type="button"
-                onClick={() => setAboutOpen((v) => !v)}
-                aria-label="About this map"
-                aria-expanded={aboutOpen}
-                className={`shrink-0 w-5 h-5 mt-0.5 border flex items-center justify-center text-[10px] font-serif italic transition-colors ${
-                  aboutOpen
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-accent/40 text-accent/70 hover:text-accent hover:border-accent hover:bg-accent/5"
-                }`}
-              >
-                ?
-              </button>
-              <button
-                type="button"
-                onClick={() => { setCaptionVisible(false); setAboutOpen(false) }}
-                aria-label="Hide description"
-                className="shrink-0 w-5 h-5 mt-0.5 flex items-center justify-center text-text-dim hover:text-text text-sm leading-none"
-              >
-                ×
-              </button>
+      {/* In-canvas search. Local state only — highlights nodes without
+          navigating or touching the URL. */}
+      <div className={`absolute ${settling ? "top-12" : "top-3"} right-3 z-20 w-[min(16rem,calc(100vw-1.5rem))]`}>
+        <div className="flex items-center gap-2 bg-bg/75 backdrop-blur-sm border border-border/60 rounded-sm px-2 py-1">
+          <span aria-hidden className="font-display text-xs text-text-dim select-none">⌕</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value.trim().toLowerCase())}
+            placeholder="Focus on a genre…"
+            aria-label="Focus map on a genre"
+            className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-dim focus:outline-none font-sans"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              className="text-text-dim hover:text-text text-sm leading-none cursor-pointer"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
+      {/* Configure + About — control chrome stacked at top-left. */}
+      <div className="absolute top-3 left-3 z-20 flex items-start gap-2 text-[10px] tracking-[0.15em] uppercase font-display text-text-dim">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setShowAdvanced((v) => !v); if (aboutOpen) setAboutOpen(false) }}
+            aria-expanded={showAdvanced}
+            className={`flex items-center gap-1.5 backdrop-blur-sm border rounded-sm px-3 py-1.5 transition-colors ${
+              showAdvanced
+                ? "bg-bg/90 border-accent/40 text-accent"
+                : "bg-bg/75 border-border/60 text-text-dim hover:text-text"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`inline-block transition-transform duration-300 ease-out ${
+                showAdvanced ? "rotate-45 text-accent" : "text-accent/60"
+              }`}
+            >
+              ❖
+            </span>
+            <span>Settings</span>
+          </button>
+          {showAdvanced && (
+            <div className="absolute top-full left-0 mt-2 bg-bg/90 backdrop-blur-sm border border-border/60 rounded-sm px-3 py-3 flex flex-col gap-3 w-[min(44rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-6rem))] overflow-y-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              {/* Data group */}
+              <div className="flex flex-row items-start gap-4">
+                <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
+                  <span className="text-accent/60">❖</span>
+                  <span>Data</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
+                  <label className="flex items-center gap-2" title="How genre similarity is measured. See About for formulas.">
+                    <span>Metric</span>
+                    <select
+                      value={metric}
+                      onChange={(e) => setMetric(e.target.value as Metric)}
+                      className="bg-bg-card border border-border rounded-sm px-2 py-1 text-text"
+                    >
+                      {METRICS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2" title="How many of the most-tagged genres to include in the map. Rebuilds clusters.">
+                    <span>Keep top N</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={maxTopN}
+                      step={1}
+                      value={topN}
+                      onChange={(e) => setTopN(Number(e.target.value))}
+                      className="w-56 accent-accent"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={topNDigits}
+                      value={topNDraft ?? String(topN)}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, "")
+                        setTopNDraft(raw)
+                        if (raw === "") return
+                        const v = Number(raw)
+                        if (Number.isFinite(v)) setTopN(Math.max(10, Math.min(maxTopN, Math.round(v))))
+                      }}
+                      onBlur={() => setTopNDraft(null)}
+                      style={{ width: `${topNDigits + 1}ch` }}
+                      className="min-w-0 bg-bg-card border border-border rounded-sm px-1 py-0 text-center tabular-nums text-text normal-case tracking-normal leading-tight"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Layout group */}
+              <div className="flex flex-row items-start gap-4">
+                <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
+                  <span className="text-accent/60">❖</span>
+                  <span>Layout</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
+                  <label className="flex items-center gap-2" title="Visual radius multiplier for circles">
+                    <span>Node size</span>
+                    <input
+                      type="range"
+                      min={0.3}
+                      max={4}
+                      step={0.05}
+                      value={nodeScale}
+                      onChange={(e) => setNodeScale(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">{nodeScale.toFixed(2)}×</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="Preferred distance between linked genres. Larger values spread the map out.">
+                    <span>Link length</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={6}
+                      step={0.05}
+                      value={linkScale}
+                      onChange={(e) => setLinkScale(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">{linkScale.toFixed(2)}×</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="How strongly nodes push each other apart. Higher values spread the map.">
+                    <span>Node repulsion</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={300}
+                      step={5}
+                      value={repulsion}
+                      onChange={(e) => setRepulsion(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text">{repulsion}</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="How strongly each node is pulled toward its community centroid. Zero disables clustering force.">
+                    <span>Cluster cohesion</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.3}
+                      step={0.005}
+                      value={cohesion}
+                      onChange={(e) => setCohesion(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">{cohesion.toFixed(3)}</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Style group */}
+              <div className="flex flex-row items-start gap-4">
+                <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
+                  <span className="text-accent/60">❖</span>
+                  <span>Style</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
+                  <label className="flex items-center gap-2" title="Share of strongest links to draw. Hidden links still shape the layout.">
+                    <span>Link density</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={showTopPct}
+                      onChange={(e) => setShowTopPct(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text">{showTopPct}%</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="Always show at least this many strongest links per genre, even if link density would hide them.">
+                    <span>Min links / node</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={8}
+                      value={minLinks}
+                      onChange={(e) => setMinLinks(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text">{minLinks}</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="Fill transparency for genre circles. Lower values let overlapping nodes show through.">
+                    <span>Node opacity</span>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                      value={nodeOpacity}
+                      onChange={(e) => setNodeOpacity(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">{Math.round(nodeOpacity * 100)}%</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="Where genre names sit relative to their circle.">
+                    <span>Label position</span>
+                    <select
+                      value={labelPos}
+                      onChange={(e) => setLabelPos(e.target.value as LabelPos)}
+                      className="bg-bg-card border border-border rounded-sm px-2 py-1 text-text"
+                    >
+                      <option value="below">Below</option>
+                      <option value="above">Above</option>
+                      <option value="inside">Inside</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2" title="Font-size multiplier for genre names.">
+                    <span>Label size</span>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={3}
+                      step={0.05}
+                      value={labelSize}
+                      onChange={(e) => setLabelSize(Number(e.target.value))}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">{labelSize.toFixed(2)}×</span>
+                  </label>
+                  <label className="flex items-center gap-2" title="How many genre names to display. Largest nodes win when limited.">
+                    <span>Labels shown</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={nodes.length}
+                      value={labelLimit ?? nodes.length}
+                      onChange={(e) => {
+                        const v = Number(e.target.value)
+                        setLabelLimit(v >= nodes.length ? null : v)
+                      }}
+                      className="w-32 accent-accent"
+                    />
+                    <span className="tabular-nums text-text normal-case tracking-normal">
+                      {labelLimit === null ? "all" : labelLimit}
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
-        {aboutOpen && (
-          <div className="mt-2 w-full max-h-[min(70vh,calc(100svh-8rem))] overflow-y-auto bg-bg-card border border-border rounded-sm shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-              <span className="font-display text-[10px] tracking-[0.2em] uppercase text-accent">
-                About this map
-              </span>
-              <button
-                type="button"
-                onClick={() => setAboutOpen(false)}
-                aria-label="Close"
-                className="text-text-dim hover:text-text text-sm leading-none"
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-3 space-y-3 text-xs text-text-dim leading-relaxed">
+          )}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setAboutOpen((v) => !v); if (showAdvanced) setShowAdvanced(false) }}
+            aria-expanded={aboutOpen}
+            aria-label="About this map"
+            className={`w-7 h-7 flex items-center justify-center backdrop-blur-sm border rounded-sm font-serif italic text-sm transition-colors ${
+              aboutOpen
+                ? "bg-bg/90 border-accent/40 text-accent"
+                : "bg-bg/75 border-border/60 text-text-dim hover:text-text hover:border-accent/50"
+            }`}
+          >
+            ?
+          </button>
+          {aboutOpen && (
+            <div className="absolute top-full left-0 mt-2 w-[min(34rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-8rem))] overflow-y-auto bg-bg-card border border-border rounded-sm shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+                <span className="font-display text-[10px] tracking-[0.2em] uppercase text-accent">
+                  About this map
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAboutOpen(false)}
+                  aria-label="Close"
+                  className="text-text-dim hover:text-text text-sm leading-none"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-3 space-y-3 text-xs text-text-dim leading-relaxed normal-case tracking-normal">
               <p>
                 Each <span className="text-text">circle</span> is a genre, sized by the
                 number of albums tagged with it. A <span className="text-text">line</span>{" "}
@@ -1263,252 +1487,10 @@ export default function GenreMap({
                   <Tex tex={String.raw`N`} /> = total albums.
                 </p>
               </div>
-            </div>
-          </div>
-        )}
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCaptionVisible(true)}
-            aria-label="Show description"
-            className="flex items-center gap-1.5 bg-bg/75 backdrop-blur-sm border border-border/60 hover:border-accent/50 rounded-sm px-2 py-1 text-[10px] font-display tracking-[0.2em] uppercase text-text-dim hover:text-text transition-colors"
-          >
-            <span aria-hidden className="text-accent/70">❧</span>
-            about
-          </button>
-        )}
-      </div>
-
-      {/* Configure — controls that change what the map shows. */}
-      <div className="absolute bottom-3 left-3 z-20 text-[10px] tracking-[0.15em] uppercase font-display text-text-dim">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
-          aria-expanded={showAdvanced}
-          className={`flex items-center gap-1.5 backdrop-blur-sm border rounded-sm px-3 py-1.5 transition-colors ${
-            showAdvanced
-              ? "bg-bg/90 border-accent/40 text-accent"
-              : "bg-bg/75 border-border/60 text-text-dim hover:text-text"
-          }`}
-        >
-          <span
-            aria-hidden
-            className={`inline-block transition-transform duration-300 ease-out ${
-              showAdvanced ? "rotate-45 text-accent" : "text-accent/60"
-            }`}
-          >
-            ❖
-          </span>
-          <span>Settings</span>
-        </button>
-        {showAdvanced && (
-          <div className="absolute bottom-full left-0 mb-2 bg-bg/90 backdrop-blur-sm border border-border/60 rounded-sm px-3 py-3 flex flex-col gap-3 w-[min(44rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-6rem))] overflow-y-auto shadow-[0_-8px_32px_rgba(0,0,0,0.5)]">
-            {/* Data group */}
-            <div className="flex flex-row items-start gap-4">
-              <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
-                <span className="text-accent/60">❖</span>
-                <span>Data</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
-                <label className="flex items-center gap-2" title="How genre similarity is measured. See About for formulas.">
-                  <span>Metric</span>
-                  <select
-                    value={metric}
-                    onChange={(e) => setMetric(e.target.value as Metric)}
-                    className="bg-bg-card border border-border rounded-sm px-2 py-1 text-text"
-                  >
-                    {METRICS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2" title="How many of the most-tagged genres to include in the map. Rebuilds clusters.">
-                  <span>Keep top N</span>
-                  <input
-                    type="range"
-                    min={10}
-                    max={maxTopN}
-                    step={1}
-                    value={topN}
-                    onChange={(e) => setTopN(Number(e.target.value))}
-                    className="w-56 accent-accent"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={topNDigits}
-                    value={topNDraft ?? String(topN)}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/\D/g, "")
-                      setTopNDraft(raw)
-                      if (raw === "") return
-                      const v = Number(raw)
-                      if (Number.isFinite(v)) setTopN(Math.max(10, Math.min(maxTopN, Math.round(v))))
-                    }}
-                    onBlur={() => setTopNDraft(null)}
-                    style={{ width: `${topNDigits + 1}ch` }}
-                    className="min-w-0 bg-bg-card border border-border rounded-sm px-1 py-0 text-center tabular-nums text-text normal-case tracking-normal leading-tight"
-                  />
-                </label>
               </div>
             </div>
-
-            {/* Layout group */}
-            <div className="flex flex-row items-start gap-4">
-              <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
-                <span className="text-accent/60">❖</span>
-                <span>Layout</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
-                <label className="flex items-center gap-2" title="Visual radius multiplier for circles">
-                  <span>Node size</span>
-                  <input
-                    type="range"
-                    min={0.3}
-                    max={4}
-                    step={0.05}
-                    value={nodeScale}
-                    onChange={(e) => setNodeScale(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">{nodeScale.toFixed(2)}×</span>
-                </label>
-                <label className="flex items-center gap-2" title="Preferred distance between linked genres. Larger values spread the map out.">
-                  <span>Link length</span>
-                  <input
-                    type="range"
-                    min={0.2}
-                    max={6}
-                    step={0.05}
-                    value={linkScale}
-                    onChange={(e) => setLinkScale(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">{linkScale.toFixed(2)}×</span>
-                </label>
-                <label className="flex items-center gap-2" title="How strongly nodes push each other apart. Higher values spread the map.">
-                  <span>Node repulsion</span>
-                  <input
-                    type="range"
-                    min={10}
-                    max={300}
-                    step={5}
-                    value={repulsion}
-                    onChange={(e) => setRepulsion(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text">{repulsion}</span>
-                </label>
-                <label className="flex items-center gap-2" title="How strongly each node is pulled toward its community centroid. Zero disables clustering force.">
-                  <span>Cluster cohesion</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={0.3}
-                    step={0.005}
-                    value={cohesion}
-                    onChange={(e) => setCohesion(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">{cohesion.toFixed(3)}</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Style group */}
-            <div className="flex flex-row items-start gap-4">
-              <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
-                <span className="text-accent/60">❖</span>
-                <span>Style</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 flex-1">
-                <label className="flex items-center gap-2" title="Share of strongest links to draw. Hidden links still shape the layout.">
-                  <span>Link density</span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    value={showTopPct}
-                    onChange={(e) => setShowTopPct(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text">{showTopPct}%</span>
-                </label>
-                <label className="flex items-center gap-2" title="Always show at least this many strongest links per genre, even if link density would hide them.">
-                  <span>Min links / node</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={8}
-                    value={minLinks}
-                    onChange={(e) => setMinLinks(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text">{minLinks}</span>
-                </label>
-                <label className="flex items-center gap-2" title="Fill transparency for genre circles. Lower values let overlapping nodes show through.">
-                  <span>Node opacity</span>
-                  <input
-                    type="range"
-                    min={0.1}
-                    max={1}
-                    step={0.05}
-                    value={nodeOpacity}
-                    onChange={(e) => setNodeOpacity(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">{Math.round(nodeOpacity * 100)}%</span>
-                </label>
-                <label className="flex items-center gap-2" title="Where genre names sit relative to their circle.">
-                  <span>Label position</span>
-                  <select
-                    value={labelPos}
-                    onChange={(e) => setLabelPos(e.target.value as LabelPos)}
-                    className="bg-bg-card border border-border rounded-sm px-2 py-1 text-text"
-                  >
-                    <option value="below">Below</option>
-                    <option value="above">Above</option>
-                    <option value="inside">Inside</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2" title="Font-size multiplier for genre names.">
-                  <span>Label size</span>
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={3}
-                    step={0.05}
-                    value={labelSize}
-                    onChange={(e) => setLabelSize(Number(e.target.value))}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">{labelSize.toFixed(2)}×</span>
-                </label>
-                <label className="flex items-center gap-2" title="How many genre names to display. Largest nodes win when limited.">
-                  <span>Labels shown</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={nodes.length}
-                    value={labelLimit ?? nodes.length}
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      setLabelLimit(v >= nodes.length ? null : v)
-                    }}
-                    className="w-32 accent-accent"
-                  />
-                  <span className="tabular-nums text-text normal-case tracking-normal">
-                    {labelLimit === null ? "all" : labelLimit}
-                  </span>
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* View & capture — zoom the current view, save it, share it. */}
@@ -1580,16 +1562,6 @@ export default function GenreMap({
             </div>
           </div>
         </div>
-      )}
-      {modalInfo && (
-        <GenreModal
-          tags={modalInfo.tags}
-          expectedCount={modalInfo.count}
-          pairs={modalInfo.pairs}
-          allActivePairs={modalInfo.allActivePairs}
-          nodeCounts={modalInfo.nodeCounts}
-          onClose={() => setModalInfo(null)}
-        />
       )}
       {hover && (
         <div

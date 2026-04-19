@@ -139,7 +139,8 @@ export default function DateSlider({
       const offset = el.offsetTop - list.offsetTop
       list.scrollTo({ top: offset, behavior: smooth ? "smooth" : "instant" })
     } else {
-      // Date section not loaded yet — request it
+      // Date section not loaded yet — ReleaseList's windowed loader listens
+      // for this and fetches the bucket covering the target date.
       window.dispatchEvent(new CustomEvent("load-until-date", { detail: dateStr }))
     }
   }, [])
@@ -315,14 +316,14 @@ export default function DateSlider({
         {/* Track line */}
         <div
           className="absolute rounded-full bg-border"
-          style={{ left: "12px", width: "3px", top: "8px", bottom: "8px" }}
+          style={{ left: "34px", width: "3px", top: "8px", bottom: "8px" }}
         />
 
         {/* Filled portion */}
         <div
           className="absolute rounded-full bg-accent"
           style={{
-            left: "12px",
+            left: "34px",
             width: "3px",
             top: "8px",
             height: pos,
@@ -334,7 +335,7 @@ export default function DateSlider({
           <div
             key={`tick-${i}`}
             className="absolute bg-border"
-            style={{ top: m.pos, left: "7px", width: "13px", height: "2px" }}
+            style={{ top: m.pos, left: "29px", width: "13px", height: "2px" }}
           />
         ))}
 
@@ -343,7 +344,7 @@ export default function DateSlider({
           <div
             key={`label-${i}`}
             className="absolute"
-            style={{ top: m.pos, left: "22px", transform: "translateY(-50%)" }}
+            style={{ top: m.pos, left: "44px", transform: "translateY(-50%)" }}
           >
             <span className="font-display text-[11px] text-text-dim leading-none whitespace-nowrap tracking-wide">
               {m.label}
@@ -355,18 +356,18 @@ export default function DateSlider({
         {monthDots[0]?.frac !== 0 && (
           <div
             className="absolute bg-border"
-            style={{ top: "8px", left: "7px", width: "13px", height: "2px" }}
+            style={{ top: "8px", left: "29px", width: "13px", height: "2px" }}
           />
         )}
         <div
           className="absolute bg-border"
-          style={{ bottom: "8px", left: "7px", width: "13px", height: "2px" }}
+          style={{ bottom: "8px", left: "29px", width: "13px", height: "2px" }}
         />
 
         {/* Thumb */}
         <div
           className="absolute flex items-center"
-          style={{ top: `calc(${pos} - 7px)`, left: "5px" }}
+          style={{ top: `calc(${pos} - 7px)`, left: "27px" }}
         >
           <div className="w-3.5 h-3.5 rounded-full bg-accent ring-2 ring-bg" style={{ boxShadow: "0 0 8px 1px color-mix(in srgb, var(--color-accent) 50%, transparent)" }} />
         </div>

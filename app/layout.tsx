@@ -1,20 +1,17 @@
 import type { Metadata } from "next"
 import { Cinzel, Crimson_Text } from "next/font/google"
 import ThemePicker from "@/components/ThemePicker"
-import SearchBar from "@/components/SearchBar"
+import SearchTrigger from "@/components/SearchTrigger"
+import SearchPalette from "@/components/SearchPalette"
 import TabBar from "@/components/TabBar"
+import ScrollDescent from "@/components/ScrollDescent"
+import ModalRouter from "@/components/ModalRouter"
 import TagFilter from "@/components/TagFilter"
 import FilterChips from "@/components/FilterChips"
-import YearReleaseCount from "@/components/YearReleaseCount"
-import ScrollDescent from "@/components/ScrollDescent"
-import AlbumDeepLink from "@/components/AlbumDeepLink"
-import { fetchGenreTags, fetchPastYears, yearCountQuery } from "@/lib/supabase"
-import { localDateStr } from "@/lib/types"
+import { fetchGenreTags } from "@/lib/supabase"
 import { SITE_URL } from "@/lib/site"
 import { Suspense } from "react"
 import "./globals.css"
-
-export const revalidate = 3600
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",
@@ -61,14 +58,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const year = new Date().getUTCFullYear()
-  const today = localDateStr(new Date())
-  const [{ count: yearCount }, allTags, pastYears] = await Promise.all([
-    yearCountQuery(year, today),
-    fetchGenreTags(),
-    fetchPastYears(),
-  ])
-
+  const allTags = await fetchGenreTags()
   return (
     <html
       lang="en"
@@ -76,7 +66,7 @@ export default async function RootLayout({
     >
       <body className="h-dvh flex flex-col font-sans overflow-hidden">
         <ScrollDescent />
-        <header className="px-4 sm:px-6 pt-6 sm:pt-8 pb-3 sm:pb-4">
+        <header className="px-4 sm:px-6 pt-6 sm:pt-8">
           <div className="flex items-start justify-between gap-4">
             <a href="/" className="group flex flex-col">
               <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.1em] leading-tight">
@@ -86,40 +76,37 @@ export default async function RootLayout({
                 — Releases from Bandcamp —
               </span>
             </a>
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0 pt-1">
-              <div id="tag-filter-slot" />
-              <div className="hidden sm:block">
-                <Suspense>
-                  <SearchBar />
-                </Suspense>
-              </div>
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0 pt-1">
+              <Suspense>
+                <SearchTrigger />
+              </Suspense>
               <ThemePicker />
             </div>
           </div>
-          <div className="sm:hidden mt-2">
-            <Suspense>
-              <SearchBar />
-            </Suspense>
-          </div>
           <div className="masthead-rule mt-4 sm:mt-6"></div>
           <div className="flex items-end justify-between gap-4">
-            <TabBar pastYears={pastYears} />
-            {yearCount !== null && (
+            <Suspense>
+              <TabBar />
+            </Suspense>
+            <div className="flex flex-col items-end gap-1 min-w-0 pb-2">
+              <div id="tag-filter-slot" />
               <Suspense>
-                <YearReleaseCount initialCount={yearCount} year={year} />
+                <FilterChips />
               </Suspense>
-            )}
+            </div>
           </div>
         </header>
         <Suspense>
           <TagFilter tags={allTags} />
         </Suspense>
+        <main className="flex-1 min-h-0">
+          <Suspense>{children}</Suspense>
+        </main>
         <Suspense>
-          <FilterChips />
+          <ModalRouter />
         </Suspense>
-        <main className="flex-1 min-h-0">{children}</main>
         <Suspense>
-          <AlbumDeepLink />
+          <SearchPalette />
         </Suspense>
         <footer className="shrink-0" />
       </body>

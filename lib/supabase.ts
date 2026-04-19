@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { cacheLife, cacheTag } from "next/cache"
 
 const url = process.env.SUPABASE_URL!
 const key = process.env.SUPABASE_SECRET_KEY!
@@ -6,6 +7,9 @@ const key = process.env.SUPABASE_SECRET_KEY!
 export const supabase = createClient(url, key)
 
 export const ALBUM_LIST_SELECT = "id, date, artist, title, url, art_id, hosts!inner(id, name, image_id, url)"
+
+// Shared Cache-Control header for JSON API routes. 1h CDN cache + 1d SWR.
+export const HTTP_CACHE_1H = "public, s-maxage=3600, stale-while-revalidate=86400"
 
 export function yearCountQuery(year: number, upTo: string) {
   return supabase
@@ -34,13 +38,19 @@ export async function paginateAll<T>(
 }
 
 export async function fetchGenreTags(): Promise<string[]> {
+  "use cache"
+  cacheLife("days")
+  cacheTag("genre-tags")
   const { data } = await supabase
-    .rpc("genre_counts")
+    .rpc("tag_counts")
     .order("n", { ascending: false })
   return (data ?? []).map((r: { name: string }) => r.name)
 }
 
 export async function fetchPastYears(): Promise<number[]> {
+  "use cache"
+  cacheLife("days")
+  cacheTag("past-years")
   const { data } = await supabase.rpc("distinct_years")
   const currentYear = new Date().getUTCFullYear()
   return ((data ?? []) as { year: number | string }[])

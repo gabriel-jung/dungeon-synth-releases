@@ -5,11 +5,7 @@ import { createPortal } from "react-dom"
 import { Album, AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
 import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
-import { register, unregister } from "@/lib/albumRegistry"
 import { SITE_URL } from "@/lib/site"
-import GenreModal from "./GenreModal"
-import ArtistModal from "./ArtistModal"
-import HostModal from "./HostModal"
 
 export function AlbumGrid({
   albums,
@@ -38,62 +34,53 @@ export function ReleaseCard({
   hideHost?: boolean
   showDate?: boolean
 }) {
-  const [open, setOpen] = useState(false)
-  const { artistModal, setArtistModal, hostModal, setHostModal, showHostInline, onArtistClick } =
-    useAlbumCardModals(album, { hideHost })
+  const { showHostInline, onArtistClick, openHost, push } = useAlbumCardModals(album, { hideHost })
+  const openAlbum = (e?: React.SyntheticEvent) => { e?.stopPropagation(); push("album", album.id) }
 
+  // Card-level click opens the album. Nested buttons stop propagation so
+  // artist/host/date don't trigger the album modal.
   return (
-    <>
-      <article className="relative py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors group">
-        <button
-          type="button"
-          aria-label={`Open ${album.artist} — ${album.title}`}
-          onClick={() => setOpen(true)}
-          className="absolute inset-0 cursor-pointer"
-        />
-        <button
-          type="button"
-          onClick={onArtistClick}
-          className="relative font-display text-sm tracking-[0.05em] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
-        >
-          {album.artist}
-        </button>
-        <div className="relative">
-          <span className="text-text-bright italic text-sm">{album.title}</span>
-          {showHostInline && (
-            <>
-              <span className="text-text-dim"> · </span>
-              <button
-                type="button"
-                onClick={() => setHostModal(true)}
-                className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
-              >
-                {album.host_name}
-              </button>
-            </>
-          )}
-          {showDate && album.date && (
-            <>
-              <span className="text-text-dim"> · </span>
-              <span className="text-text-dim text-xs tracking-wide tabular-nums">
-                {formatDateShort(album.date, true)}
-              </span>
-            </>
-          )}
-        </div>
-      </article>
-      {open && <AlbumDetail albumStub={album} onClose={() => setOpen(false)} />}
-      {artistModal && <ArtistModal artist={album.artist} onClose={() => setArtistModal(false)} />}
-      {hostModal && album.host_id && (
-        <HostModal
-          hostId={album.host_id}
-          hostName={album.host_name!}
-          imageId={album.host_image_id ?? null}
-          url={album.host_url ?? null}
-          onClose={() => setHostModal(false)}
-        />
-      )}
-    </>
+    <article
+      onClick={openAlbum}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${album.artist} — ${album.title}`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAlbum(e) }
+      }}
+      className="py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+    >
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onArtistClick() }}
+        className="text-[0.95rem] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
+      >
+        {album.artist}
+      </button>
+      <div>
+        <span className="text-text-bright italic text-sm">{album.title}</span>
+        {showHostInline && (
+          <>
+            <span className="text-text-dim"> · </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); openHost() }}
+              className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
+            >
+              {album.host_name}
+            </button>
+          </>
+        )}
+        {showDate && album.date && (
+          <>
+            <span className="text-text-dim"> · </span>
+            <span className="text-text-dim text-xs tracking-wide tabular-nums">
+              {formatDateShort(album.date, true)}
+            </span>
+          </>
+        )}
+      </div>
+    </article>
   )
 }
 
@@ -106,33 +93,38 @@ function formatDuration(sec: number): string {
 
 export default function AlbumDetail({
   albumStub,
+  initialAlbum = null,
   onClose,
 }: {
   albumStub: AlbumListItem
+  initialAlbum?: Album | null
   onClose: () => void
 }) {
-  const [album, setAlbum] = useState<Album | null>(null)
+  const [album, setAlbum] = useState<Album | null>(initialAlbum)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [tagModal, setTagModal] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { artistModal, setArtistModal, hostModal, setHostModal, onArtistClick } =
-    useAlbumCardModals(albumStub)
+  const hasInitialRef = useRef(initialAlbum?.id === albumStub.id)
+  const { onArtistClick, openHost, push } = useAlbumCardModals(albumStub)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = `album-modal-title-${albumStub.id}`
 
   useModal(onClose, dialogRef)
 
   useEffect(() => {
-    register(albumStub.id)
     return () => {
-      unregister(albumStub.id)
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
-  }, [albumStub.id])
+  }, [])
 
   useEffect(() => {
+    // Caller already handed us the full album — skip the initial fetch.
+    // Subsequent retries (reloadKey > 0) always refetch.
+    if (hasInitialRef.current && reloadKey === 0) {
+      hasInitialRef.current = false
+      return
+    }
     let cancelled = false
     setError(false)
     fetch(`/api/album?id=${albumStub.id}`)
@@ -160,8 +152,15 @@ export default function AlbumDetail({
     } catch {}
   }
 
-  const img = album ? coverUrl(album.art_id) : null
-  const showHost = album?.host_name && album.host_name.toLowerCase() !== albumStub.artist.toLowerCase()
+  // Prefer stub for fields the card already has so the modal paints without
+  // waiting for the server round-trip. Album-only fields (tags, num_tracks,
+  // duration) stream in when the fetch resolves.
+  const artId = album?.art_id ?? albumStub.art_id ?? null
+  const img = coverUrl(artId)
+  const hostName = album?.host_name ?? albumStub.host_name ?? null
+  const bandcampUrl = album?.url ?? albumStub.url
+  const releaseDate = album?.date ?? albumStub.date
+  const showHost = hostName && hostName.toLowerCase() !== albumStub.artist.toLowerCase()
 
   const portal = createPortal(
     <div
@@ -188,13 +187,9 @@ export default function AlbumDetail({
               decoding="async"
               className="w-full h-auto"
             />
-          ) : album ? (
+          ) : (
             <div className="py-16 sm:py-0 sm:w-full sm:aspect-square flex items-center justify-center">
               <span aria-hidden="true" className="text-5xl text-border select-none">♜</span>
-            </div>
-          ) : (
-            <div className="w-full aspect-square bg-bg-hover flex items-center justify-center">
-              <span aria-hidden="true" className="text-3xl text-border select-none animate-pulse">♜</span>
             </div>
           )}
         </div>
@@ -202,12 +197,12 @@ export default function AlbumDetail({
         {/* Info — right side on desktop, below on mobile */}
         <div className="flex-1 px-6 py-5 flex flex-col gap-3 sm:border-l border-t sm:border-t-0 border-border sm:max-h-72 sm:overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           <div>
-            <h2 id={titleId} className="font-display text-lg text-text-bright font-bold leading-tight">
+            <h2 id={titleId} className="text-xl text-text-bright font-bold leading-tight">
               {albumStub.title}
             </h2>
             <button
               onClick={onArtistClick}
-              className="font-display text-sm text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left tracking-wide mt-0.5"
+              className="text-base text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left mt-0.5"
             >
               {albumStub.artist}
             </button>
@@ -223,12 +218,12 @@ export default function AlbumDetail({
                 Retry
               </button>
             </div>
-          ) : album ? (
+          ) : (
             <>
               <div className="modal-rule" />
               <div className="flex items-center gap-2 text-xs text-text-dim font-display tracking-wide">
-                {album.date && <span>{formatDateShort(album.date, true)}</span>}
-                {album.num_tracks > 0 && (
+                {releaseDate && <span>{formatDateShort(releaseDate, true)}</span>}
+                {album && album.num_tracks > 0 && (
                   <>
                     <span className="text-border">·</span>
                     <span>
@@ -238,13 +233,13 @@ export default function AlbumDetail({
                 )}
               </div>
 
-              {album.tags.length > 0 && (
+              {album && album.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {album.tags.map((tag) => (
                     <button
                       key={tag}
                       type="button"
-                      onClick={() => setTagModal(tag)}
+                      onClick={() => push("genre", tag)}
                       className="text-[10px] tracking-wide uppercase px-2 py-0.5 text-text-dim border-b border-border/60 hover:text-accent hover:border-accent/60 transition-colors cursor-pointer"
                     >
                       {tag}
@@ -257,10 +252,10 @@ export default function AlbumDetail({
               <div className="flex items-center justify-between gap-4">
                 {showHost && (
                   <button
-                    onClick={() => setHostModal(true)}
+                    onClick={openHost}
                     className="text-text-dim text-xs hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left italic"
                   >
-                    on {album.host_name}
+                    on {hostName}
                   </button>
                 )}
                 <div className="flex items-center gap-4 ml-auto">
@@ -272,7 +267,7 @@ export default function AlbumDetail({
                     {copied ? "Copied ✓" : "Share"}
                   </button>
                   <a
-                    href={album.url}
+                    href={bandcampUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
@@ -282,10 +277,6 @@ export default function AlbumDetail({
                 </div>
               </div>
             </>
-          ) : (
-            <div className="py-8 flex flex-col items-center gap-2 animate-pulse">
-              <span className="text-text-dim text-sm italic font-display tracking-wide">Retrieving...</span>
-            </div>
           )}
         </div>
 
@@ -301,29 +292,5 @@ export default function AlbumDetail({
     document.body,
   )
 
-  return (
-    <>
-      {portal}
-      {tagModal && (
-        <GenreModal
-          tags={[tagModal]}
-          expectedCount={0}
-          pairs={[]}
-          onClose={() => setTagModal(null)}
-        />
-      )}
-      {artistModal && (
-        <ArtistModal artist={albumStub.artist} onClose={() => setArtistModal(false)} />
-      )}
-      {hostModal && albumStub.host_id && (
-        <HostModal
-          hostId={albumStub.host_id}
-          hostName={albumStub.host_name ?? albumStub.artist}
-          imageId={album?.host_image_id ?? albumStub.host_image_id ?? null}
-          url={album?.host_url ?? albumStub.host_url ?? null}
-          onClose={() => setHostModal(false)}
-        />
-      )}
-    </>
-  )
+  return portal
 }

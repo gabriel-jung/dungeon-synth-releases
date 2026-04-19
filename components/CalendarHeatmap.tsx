@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatDateShort, localDateStr, releaseCount } from "@/lib/types"
-import DayModal from "./DayModal"
+import { hrefWithModal } from "@/lib/modalUrl"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -36,8 +37,14 @@ type Cell = { key: string; dateStr: string; count: number; weekIdx: number; dow:
 
 export default function CalendarHeatmap({ days, year, today: todayStr }: { days: Day[]; year: number; today: string }) {
   const [hover, setHover] = useState<Cell | null>(null)
-  const [selected, setSelected] = useState<Cell | null>(null)
   const [palette, setPalette] = useState<PaletteName>("theme")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const selectDay = (cell: Cell) => {
+    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "day", cell.dateStr, pathname))
+  }
 
   const { cells, monthSpans, monthPaths, totalWeeks } = useMemo(() => {
     const counts = new Map(days.map((d) => [d.date, d.n]))
@@ -184,7 +191,7 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
               key={c.key}
               onMouseEnter={() => c.inRange && setHover(c)}
               onMouseLeave={() => setHover((h) => (h?.key === c.key ? null : h))}
-              onClick={() => clickable && setSelected(c)}
+              onClick={() => clickable && selectDay(c)}
               className={`group p-[1.5px] ${clickable ? "cursor-pointer" : ""}`}
               style={{ gridColumnStart: c.weekIdx + 2, gridRowStart: c.dow + 2 }}
             >
@@ -222,13 +229,6 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
           ))}
         </svg>
       </div>
-      {selected && (
-        <DayModal
-          date={selected.dateStr}
-          expectedCount={selected.count}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </div>
   )
 }

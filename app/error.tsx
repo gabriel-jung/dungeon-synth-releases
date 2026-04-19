@@ -15,12 +15,12 @@ export default function Error({
 
   return (
     <div className="max-w-xl mx-auto px-6 pt-16 text-center">
-      <div className="font-display text-5xl text-accent mb-6 select-none">⚰</div>
+      <div className="font-display text-5xl text-accent mb-6 select-none">☥</div>
       <h1 className="font-display text-xl tracking-[0.2em] uppercase text-text-bright mb-3">
-        Something stirred in the crypt
+        A scroll went missing in the archive
       </h1>
       <p className="text-text-dim mb-8 italic">
-        {error.message || "An unexpected error disturbed the archives."}
+        {error.message || "The page you sought has slipped from the catalogue."}
       </p>
       <button
         type="button"

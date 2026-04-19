@@ -34,7 +34,7 @@ export default function FilterChips() {
   }
 
   return (
-    <div className="shrink-0 px-4 sm:px-6 py-2 border-b border-border/60 flex items-center justify-end gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {emphasized.map((t) => (
         <FilterChip key={`e-${t}`} kind="include" tag={t} onClear={() => removeTag("tag", t)} />
       ))}

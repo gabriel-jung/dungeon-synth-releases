@@ -31,7 +31,7 @@ function TagButton({
       aria-expanded={open}
       className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
     >
-      <span aria-hidden="true">{open ? "▾" : "▸"}</span> Genres
+      <span aria-hidden="true">{open ? "▾" : "▸"}</span> Filter
       {activeCount > 0 && (
         <span className="bg-accent/20 text-accent text-[10px] px-1.5 rounded-full">
           {activeCount}

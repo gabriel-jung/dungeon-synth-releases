@@ -1,9 +1,7 @@
 {
   "regions": ["arn1"],
   "crons": [
-    {
-      "path": "/api/revalidate",
-      "schedule": "0 0 * * *"
-    }
+    { "path": "/api/revalidate?tag=genres", "schedule": "0 0 * * *" },
+    { "path": "/api/revalidate?tag=stats", "schedule": "5 0 * * *" }
   ]
 }

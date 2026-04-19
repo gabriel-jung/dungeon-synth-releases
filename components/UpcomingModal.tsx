@@ -1,33 +1,23 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlbumListItem, formatDateHeading, releaseCount } from "@/lib/types"
+import { AlbumListItem, releaseCount } from "@/lib/types"
 import { AlbumGrid } from "./AlbumDetail"
 import RecentGrid from "./RecentGrid"
 import { GridSkeleton, ListSkeleton, FetchError } from "./ModalSkeletons"
 import ModalShell from "./ModalShell"
 import ViewToggle, { type ViewMode } from "./ViewToggle"
 
-export default function DayModal({
-  date,
-  expectedCount,
-  onClose,
-}: {
-  date: string
-  expectedCount: number
-  onClose: () => void
-}) {
-  const titleId = `day-modal-title-${date}`
+export default function UpcomingModal({ onClose }: { onClose: () => void }) {
+  const titleId = "upcoming-modal-title"
   const [albums, setAlbums] = useState<AlbumListItem[] | null>(null)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [view, setView] = useState<ViewMode>(expectedCount > 20 ? "list" : "grid")
+  const [view, setView] = useState<ViewMode>("list")
 
   useEffect(() => {
     const ctrl = new AbortController()
-    setAlbums(null)
-    setError(false)
-    fetch(`/api/albums?date=${date}&limit=500`, { signal: ctrl.signal })
+    fetch("/api/upcoming", { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<{ albums: AlbumListItem[] }>
@@ -35,19 +25,19 @@ export default function DayModal({
       .then((d) => setAlbums(d.albums ?? []))
       .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
     return () => ctrl.abort()
-  }, [date, reloadKey])
+  }, [reloadKey])
 
-  const count = albums?.length ?? expectedCount
+  const count = albums?.length ?? 0
 
   return (
     <ModalShell titleId={titleId} onClose={onClose}>
       <div className="pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="text-lg text-text-bright font-bold truncate">
-            {formatDateHeading(date, true)}
+            Upcoming releases
           </h2>
           <p className="font-display text-[10px] tracking-[0.2em] uppercase text-text-dim">
-            {releaseCount(count)}
+            {albums === null ? "loading" : releaseCount(count)}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -66,10 +56,10 @@ export default function DayModal({
         {error ? (
           <FetchError onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !albums ? (
-          view === "grid" ? <GridSkeleton count={expectedCount} /> : <ListSkeleton count={expectedCount} />
+          view === "grid" ? <GridSkeleton count={10} /> : <ListSkeleton count={10} />
         ) : albums.length === 0 ? (
           <div className="py-8 text-center text-text-dim font-display text-xs tracking-wide">
-            No releases found
+            No upcoming releases
           </div>
         ) : view === "grid" ? (
           <RecentGrid albums={albums} showDate />
