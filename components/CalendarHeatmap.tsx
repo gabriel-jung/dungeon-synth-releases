@@ -1,9 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatDateShort, localDateStr, releaseCount } from "@/lib/types"
-import { hrefWithModal } from "@/lib/modalUrl"
+import { useOpenModal } from "@/lib/useModalUrl"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -38,13 +37,9 @@ type Cell = { key: string; dateStr: string; count: number; weekIdx: number; dow:
 export default function CalendarHeatmap({ days, year, today: todayStr }: { days: Day[]; year: number; today: string }) {
   const [hover, setHover] = useState<Cell | null>(null)
   const [palette, setPalette] = useState<PaletteName>("theme")
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const openModal = useOpenModal()
 
-  const selectDay = (cell: Cell) => {
-    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "day", cell.dateStr, pathname))
-  }
+  const selectDay = (cell: Cell) => openModal("day", cell.dateStr)
 
   const { cells, monthSpans, monthPaths, totalWeeks } = useMemo(() => {
     const counts = new Map(days.map((d) => [d.date, d.n]))

@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useRef, useState } from "react"
-import { hrefWithModal } from "@/lib/modalUrl"
+import { useOpenModal } from "@/lib/useModalUrl"
 
 const ITEM = "font-display text-[11px] tracking-[0.15em] uppercase transition-colors py-1 cursor-pointer"
 const INACTIVE = "text-text-dim hover:text-text"
@@ -13,14 +13,10 @@ const ACTIVE = "text-accent"
 // One visual vocabulary for all three. No counts, no badges.
 export default function ReleasesScopeNav({ pastYears = [] }: { pastYears?: number[] }) {
   const pathname = usePathname() ?? "/"
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const onRecent = pathname === "/"
   const onYear = pathname.startsWith("/releases/")
-
-  const openUpcoming = () => {
-    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "upcoming", true, pathname))
-  }
+  const openModal = useOpenModal()
+  const openUpcoming = () => openModal("upcoming", true)
 
   return (
     <div className="flex items-center gap-2">

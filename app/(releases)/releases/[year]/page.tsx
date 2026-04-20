@@ -71,7 +71,7 @@ export default async function YearReleasesPage({
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
-      <div className="flex flex-col sm:flex-row sm:gap-4 sm:pt-6 h-full">
+      <div className="flex flex-col sm:flex-row sm:gap-4 h-full">
         <div className="sm:hidden shrink-0">
           <Suspense>
             <DateSlider dates={allDates} orientation="horizontal" />
@@ -79,7 +79,7 @@ export default async function YearReleasesPage({
           <hr className="border-border" />
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-4 sm:pt-0" id="release-list" style={{ scrollbarWidth: "none" }}>
+        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto" id="release-list" style={{ scrollbarWidth: "none" }}>
           <Suspense>
             <ReleaseList
               albums={rows}

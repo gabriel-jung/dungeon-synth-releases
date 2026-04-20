@@ -1,7 +1,6 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { hrefWithModal } from "@/lib/modalUrl"
+import { useOpenModal } from "@/lib/useModalUrl"
 
 export default function HostRow({
   hostId,
@@ -14,13 +13,8 @@ export default function HostRow({
   count: number
   widthPct: number
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  const open = () => {
-    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "host", hostId, pathname))
-  }
+  const openModal = useOpenModal()
+  const open = () => openModal("host", hostId)
 
   return (
     <li

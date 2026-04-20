@@ -51,14 +51,17 @@ export async function GET(request: NextRequest) {
     ? supabase.from("hosts").select("id, name, image_id, url").eq("id", hostId).maybeSingle()
     : null
 
-  // Genre-only (with optional tag filter) → RPC path.
+  // Genre-only (with optional tag filter) → RPC path. Cap well below the
+  // full catalogue: the modal starts with a 5-tile paged cover grid and the
+  // list view is backed by this same payload, so 100 covers the common case
+  // without shipping 500 rows each open.
   if (!artist && !hostId) {
     const { data, error } = await supabase.rpc("list_filtered_albums", {
       p_include_tags: allInclude,
       p_exclude_tags: allExclude,
       p_before: null,
       p_after: null,
-      p_limit: 500,
+      p_limit: 100,
     })
     if (error) {
       logger.error({ route: "api/albums/by-scope", rpc: "list_filtered_albums", err: error.message }, "RPC failed")

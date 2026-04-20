@@ -12,12 +12,17 @@ export default function ModalShell({
   titleId,
   ariaLabel,
   size = "lg",
+  fixedHeight = false,
   onClose,
   children,
 }: {
   titleId?: string
   ariaLabel?: string
   size?: "sm" | "md" | "lg"
+  // Lock the desktop modal to 85vh regardless of content height. Callers that
+  // swap large content (e.g. ScopeModal toggling between grid and list) use
+  // this so the modal doesn't grow/shrink per view.
+  fixedHeight?: boolean
   onClose: () => void
   children: ReactNode
 }) {
@@ -28,6 +33,12 @@ export default function ModalShell({
     size === "sm" ? "sm:w-[min(24rem,calc(100vw-2rem))]"
     : size === "md" ? "sm:w-[min(36rem,calc(100vw-2rem))]"
     : "sm:w-[min(56rem,calc(100vw-2rem))]"
+
+  // Fixed-height mode locks the desktop modal at ~38rem so grid ↔ list toggles
+  // don't resize the shell. Short viewports fall back to 85vh.
+  const heightClass = fixedHeight
+    ? "sm:h-[min(38rem,85vh)]"
+    : "sm:h-auto sm:max-h-[85vh]"
 
   return createPortal(
     <div
@@ -42,7 +53,7 @@ export default function ModalShell({
         aria-labelledby={titleId}
         aria-label={ariaLabel}
         tabIndex={-1}
-        className={`relative bg-bg w-full h-dvh ${sizeClass} sm:h-auto sm:max-h-[85vh] sm:mx-4 flex flex-col animate-modal-in sm:border border-border outline-none`}
+        className={`relative bg-bg w-full h-dvh ${sizeClass} ${heightClass} sm:mx-4 flex flex-col animate-modal-in sm:border border-border outline-none`}
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >

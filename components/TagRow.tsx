@@ -1,24 +1,20 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { hrefWithModal } from "@/lib/modalUrl"
+import { useOpenModal } from "@/lib/useModalUrl"
 
 export default function TagRow({
   name,
   count,
   widthPct,
+  label,
 }: {
   name: string
   count: number
   widthPct: number
+  label?: string
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  const open = () => {
-    router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "genre", name, pathname))
-  }
+  const openModal = useOpenModal()
+  const open = () => openModal("genre", name)
 
   return (
     <li
@@ -34,7 +30,7 @@ export default function TagRow({
         {name}
       </span>
       <span className="relative font-display text-xs tracking-[0.1em] text-text-bright tabular-nums pl-3 pr-2 shrink-0">
-        {count}
+        {label ?? count}
       </span>
     </li>
   )

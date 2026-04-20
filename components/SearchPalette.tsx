@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AlbumListItem, isHostedRelease } from "@/lib/types"
-import { hrefWithModal } from "@/lib/modalUrl"
+import { useOpenModal } from "@/lib/useModalUrl"
 import { SEARCH_PALETTE_EVENT } from "./searchPaletteEvent"
 
 type SearchResponse = { albums: AlbumListItem[] }
@@ -18,9 +17,7 @@ export default function SearchPalette() {
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const openModal = useOpenModal()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -92,9 +89,9 @@ export default function SearchPalette() {
   const pickAlbum = useCallback(
     (a: AlbumListItem) => {
       setOpen(false)
-      router.push(hrefWithModal(searchParams as unknown as URLSearchParams, "album", a.id, pathname))
+      openModal("album", a.id)
     },
-    [router, pathname, searchParams],
+    [openModal],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

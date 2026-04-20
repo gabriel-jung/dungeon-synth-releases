@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
+import { AlbumListItem, coverUrl, formatDateShort, isHostedRelease } from "@/lib/types"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 
 const DEFAULT_PAGE_SIZE = 10
@@ -80,6 +80,10 @@ export default function RecentGrid({
 
   const shown = albums.slice(0, visible)
   const hasMore = visible < albums.length
+  // Grid row height depends on whether any visible card renders a host row.
+  // When none do, compensate with a one-line spacer so the total release-area
+  // height matches the skeleton (which always reserves the host row).
+  const anyHostRow = !hideHost && shown.some((a) => isHostedRelease(a))
 
   return (
     <>
@@ -88,6 +92,10 @@ export default function RecentGrid({
           <GridCard key={album.id} album={album} showDate={showDate} hideHost={hideHost} />
         ))}
       </div>
+
+      {!anyHostRow && (
+        <div aria-hidden="true" className="font-display tracking-wide uppercase text-[10px] invisible">·</div>
+      )}
 
       {hasMore && (
         <div className="mt-4 flex justify-center">

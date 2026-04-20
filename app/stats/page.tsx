@@ -1,9 +1,9 @@
 import { cacheLife, cacheTag } from "next/cache"
 import { connection } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { parseTagParams } from "@/lib/types"
+import { parseTagParams, type TagCount } from "@/lib/types"
 import HostRow from "@/components/HostRow"
-import TagRow from "@/components/TagRow"
+import TagBarScroll from "@/components/TagBarScroll"
 import Histogram, { HistBin } from "@/components/Histogram"
 import PageHeader from "@/components/PageHeader"
 
@@ -16,7 +16,6 @@ export const metadata = {
 const YEAR_BAR_START = 1990
 
 type HostCount = { host_id: string; name: string; image_id: string | null; url: string | null; n: number }
-type TagCount = { name: string; n: number }
 type YearRow = { year: number | string; n: number | string }
 type HistRow = { bucket: string; bucket_order: number; bucket_width: number; n: number | string }
 
@@ -104,14 +103,13 @@ export default async function StatsPage({
     yearBins.push({ label: String(y), count: yearCounts.get(y) ?? 0, width: 1 })
   }
   const hostMax = rows[0]?.n ?? 1
-  const genreMax = genres[0]?.n ?? 1
-  const themeMax = themes[0]?.n ?? 1
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <PageHeader description="Some statistics on dungeon synth activity across Bandcamp." />
-      <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-12 flex flex-col gap-10">
+      <div className="flex-1 min-h-0 pt-6 sm:pt-8">
+        <div className="h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 flex flex-col gap-10">
           <section>
             <Histogram title="Releases per Year" bins={yearBins} />
           </section>
@@ -149,54 +147,12 @@ export default async function StatsPage({
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            <TagBarList title="Popular Genres" items={genres} max={genreMax} />
-            <TagBarList title="Popular Themes" items={themes} max={themeMax} />
+            <TagBarScroll title="Popular Genres" items={genres} rows={12} headingStyle="section" emptyLabel="No tags." />
+            <TagBarScroll title="Popular Themes" items={themes} rows={12} headingStyle="section" emptyLabel="No tags." />
+          </div>
           </div>
         </div>
       </div>
     </div>
-  )
-}
-
-function TagBarList({
-  title,
-  items,
-  max,
-}: {
-  title: string
-  items: TagCount[]
-  max: number
-}) {
-  return (
-    <section>
-      <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright mb-4">
-        {title}
-      </h2>
-      {items.length === 0 ? (
-        <p className="font-display text-xs tracking-wide text-text-dim">No tags.</p>
-      ) : (
-        <div
-          className="relative"
-          style={{
-            maskImage: "linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%)",
-          }}
-        >
-          <ol
-            className="flex flex-col gap-0.5 overflow-y-auto pr-1"
-            style={{ maxHeight: "calc(12 * 1.75rem + 11 * 0.125rem + 1rem)", scrollbarWidth: "none" }}
-          >
-            {items.map((t) => (
-              <TagRow
-                key={t.name}
-                name={t.name}
-                count={t.n}
-                widthPct={(t.n / max) * 100}
-              />
-            ))}
-          </ol>
-        </div>
-      )}
-    </section>
   )
 }

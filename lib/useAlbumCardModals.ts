@@ -1,9 +1,9 @@
 "use client"
 
 import { useCallback } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { AlbumListItem, isHostedRelease } from "./types"
-import { hrefWithModal, type ModalKind } from "./modalUrl"
+import { hrefWithModal, pushModalUrl, type ModalKind } from "./modalUrl"
 import { cacheAlbumStub, cacheArtistArt, cacheHostStub } from "./albumCache"
 
 // Returns URL-push handlers for the click targets on a release card. Modal
@@ -12,9 +12,7 @@ export function useAlbumCardModals(
   album: AlbumListItem | Pick<AlbumListItem, "artist" | "host_name" | "host_id">,
   { hideHost = false } = {},
 ) {
-  const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   const push = useCallback(
     (kind: ModalKind, value: string | number) => {
@@ -34,9 +32,10 @@ export function useAlbumCardModals(
       } else if (kind === "artist" && a.artist && a.art_id) {
         cacheArtistArt(a.artist, a.art_id)
       }
-      router.push(hrefWithModal(searchParams as unknown as URLSearchParams, kind, value, pathname))
+      const sp = new URLSearchParams(window.location.search)
+      pushModalUrl(hrefWithModal(sp, kind, value, pathname))
     },
-    [router, pathname, searchParams, album],
+    [pathname, album],
   )
 
   const showHostInline = !hideHost && isHostedRelease(album)

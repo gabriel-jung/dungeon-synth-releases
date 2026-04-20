@@ -59,16 +59,20 @@ export function openModal(sp: URLSearchParams, kind: ModalKind, value: string | 
   return next
 }
 
-// Removes a modal param. For multi-valued kinds, removes a single instance;
-// if no value is provided, removes all instances of that kind.
+// Removes a modal param. For multi-valued kinds, removes a single instance
+// when `value` is given; omitting `value` clears all instances of that kind.
 export function closeModal(sp: URLSearchParams, kind: ModalKind, value?: string): URLSearchParams {
   const next = new URLSearchParams(sp.toString())
   if (SINGLE_KINDS.includes(kind)) {
     next.delete(kind)
   } else if (MULTI_KINDS.includes(kind)) {
-    const remaining = next.getAll(kind).filter((v) => value === undefined || v !== value)
-    next.delete(kind)
-    for (const v of remaining) next.append(kind, v)
+    if (value === undefined) {
+      next.delete(kind)
+    } else {
+      const remaining = next.getAll(kind).filter((v) => v !== value)
+      next.delete(kind)
+      for (const v of remaining) next.append(kind, v)
+    }
   }
   return next
 }
@@ -77,6 +81,16 @@ export function closeModal(sp: URLSearchParams, kind: ModalKind, value?: string)
 export function toQueryString(sp: URLSearchParams): string {
   const qs = sp.toString()
   return qs ? `?${qs}` : ""
+}
+
+// Push a URL change that only toggles modal state (?album=, ?genre=, etc.).
+// Skips Next.js routing entirely: no RSC refetch, no re-render of the server
+// page. Listeners use `useModalSearchParams` to react to the emitted event.
+export const MODAL_URL_EVENT = "modal-url-change"
+export function pushModalUrl(url: string): void {
+  if (typeof window === "undefined") return
+  window.history.pushState(null, "", url)
+  window.dispatchEvent(new Event(MODAL_URL_EVENT))
 }
 
 // Convenience: build an href that opens the given modal, preserving current

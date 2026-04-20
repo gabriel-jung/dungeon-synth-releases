@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { AlbumListItem, rpcRowToAlbumListItem } from "@/lib/types"
-import { closeModal, readModalState, toQueryString, type ModalKind } from "@/lib/modalUrl"
+import { closeModal, pushModalUrl, readModalState, toQueryString, type ModalKind } from "@/lib/modalUrl"
+import { useModalSearchParams } from "@/lib/useModalUrl"
 import { getAlbumStub } from "@/lib/albumCache"
 import AlbumDetail from "./AlbumDetail"
 import ScopeModal, { type ScopeKind } from "./ScopeModal"
@@ -14,20 +15,20 @@ import UpcomingModal from "./UpcomingModal"
 // renders the corresponding modals in a stable order so the focus-trap stack
 // in `lib/useModal` always pops in the right sequence.
 export default function ModalRouter() {
-  const searchParams = useSearchParams()
-  const router = useRouter()
+  const searchParams = useModalSearchParams()
   const pathname = usePathname()
 
-  const state = readModalState(searchParams as unknown as URLSearchParams)
+  const state = readModalState(searchParams)
 
-  const close = useCallback(
-    (kind: ModalKind, value?: string) => {
-      const current = new URLSearchParams(searchParams.toString())
-      const next = closeModal(current, kind, value)
-      router.push(`${pathname}${toQueryString(next)}`)
-    },
-    [router, pathname, searchParams],
-  )
+  // × always exits modal mode entirely: clears every modal param in one go.
+  // Back-stepping between modal states is reserved for the browser back button
+  // (and each modal's header back arrow, which calls `router.back`).
+  const closeAll = useCallback(() => {
+    const current = new URLSearchParams(window.location.search)
+    const MODAL_KINDS: ModalKind[] = ["album", "artist", "host", "genre", "xgenre", "upcoming", "day"]
+    for (const kind of MODAL_KINDS) current.delete(kind)
+    pushModalUrl(`${pathname}${toQueryString(current)}`)
+  }, [pathname])
 
   // Determine scope modal kind. Priority: artist → host → genre. Only one
   // shows at a time (a URL with multiple is treated as artist with genre
@@ -51,10 +52,13 @@ export default function ModalRouter() {
     <>
       {scopeKind && scopeValue && (
         <ScopeModal
-          key={`${scopeKind}-${scopeValue}`}
+          // Genre transitions (pair → single, bar click) keep the same mounted
+          // modal to avoid a remount/animation overlap. Artist + host are keyed
+          // by value so switching between them still resets internal state.
+          key={scopeKind === "genre" ? "genre-scope" : `${scopeKind}-${scopeValue}`}
           kind={scopeKind}
           value={scopeValue}
-          onClose={() => close(scopeKind === "genre" ? "genre" : scopeKind, scopeKind === "genre" ? scopeValue : undefined)}
+          onClose={closeAll}
         />
       )}
       {state.day && (
@@ -62,12 +66,12 @@ export default function ModalRouter() {
           key={state.day}
           date={state.day}
           expectedCount={0}
-          onClose={() => close("day")}
+          onClose={closeAll}
         />
       )}
-      {state.upcoming && <UpcomingModal onClose={() => close("upcoming")} />}
+      {state.upcoming && <UpcomingModal onClose={closeAll} />}
       {/* Album detail renders last so its portal sits on top of scope/day/upcoming. */}
-      {state.album && <DeepAlbum id={state.album} onClose={() => close("album")} />}
+      {state.album && <DeepAlbum id={state.album} onClose={closeAll} />}
     </>
   )
 }

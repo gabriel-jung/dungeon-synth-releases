@@ -104,6 +104,8 @@ export interface HostRow {
   url: string | null
 }
 
+export type TagCount = { name: string; n: number }
+
 export function isHostedRelease(album: Pick<AlbumListItem, "artist" | "host_name">): boolean {
   return !!album.host_name && album.host_name.toLowerCase() !== album.artist.toLowerCase()
 }

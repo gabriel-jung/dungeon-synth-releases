@@ -23,8 +23,8 @@ import { select, type Selection } from "d3-selection"
 import "d3-transition"
 import katex from "katex"
 import "katex/dist/katex.min.css"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { openModal, toQueryString } from "@/lib/modalUrl"
+import { usePathname, useSearchParams } from "next/navigation"
+import { openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 
 export type TagCount = { name: string; n: number }
 export type TagPair = { a: string; b: string; n: number }
@@ -320,7 +320,6 @@ export default function TagMap({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const labelSingular = itemLabel
@@ -328,13 +327,14 @@ export default function TagMap({
   const labelCapital = `${itemLabel.charAt(0).toUpperCase()}${itemLabel.slice(1)}`
 
   // Push genre(s) to URL so ModalRouter opens the ScopeModal. Single tag =
-  // node click; two tags = edge click (intersection inside the modal).
+  // node click; two tags = edge click (intersection inside the modal). Uses
+  // pushModalUrl so the /genres RSC tree isn't refetched for a modal toggle.
   const openTagModal = (tags: string[]) => {
-    let next = new URLSearchParams(searchParams.toString())
+    let next = new URLSearchParams(window.location.search)
     // Strip any previous genre params so we don't accidentally accumulate.
     next.delete("genre")
     for (const t of tags) next = openModal(next, "genre", t)
-    router.push(`${pathname}${toQueryString(next)}`)
+    pushModalUrl(`${pathname}${toQueryString(next)}`)
   }
   const maxTopN = counts.length
   const topNDigits = String(maxTopN).length
@@ -514,15 +514,18 @@ export default function TagMap({
     return () => window.removeEventListener("keydown", onKey)
   }, [aboutOpen, showAdvanced, fullscreen, searchParams])
 
-  const banTags = useMemo(
-    () => new Set(searchParams.getAll("xtag")),
-    [searchParams],
-  )
+  // Stabilize via serialized keys so unrelated URL changes (e.g. the scope
+  // modal's ?genre=) don't bust dependent memos and rebuild the graph.
+  const banTagsKey = searchParams.getAll("xtag").join("|")
+  const clickedTagsKey = searchParams.getAll("tag").join("|")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const banTags = useMemo(() => new Set(searchParams.getAll("xtag")), [banTagsKey])
   // Highlight = union of explicit tag chips (?tag=...) and substring matches
   // from the in-canvas search input. Search lives local to this map — it
   // highlights nodes in place rather than navigating to the release list.
   const [searchQuery, setSearchQuery] = useState("")
-  const clickedTags = useMemo(() => new Set(searchParams.getAll("tag")), [searchParams])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const clickedTags = useMemo(() => new Set(searchParams.getAll("tag")), [clickedTagsKey])
   // Precomputed once per counts — keystrokes re-iterate but don't re-lowercase.
   const lowerNames = useMemo(
     () => counts.map((c) => [c.name, c.name.toLowerCase()] as const),

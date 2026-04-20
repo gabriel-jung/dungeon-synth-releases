@@ -25,10 +25,11 @@ This framing is load-bearing. It means:
 /                    → Recent: current year, newest first
 /releases/[year]     → year archive (list mode)
 /genres              → all-time genre map
+/themes              → all-time theme map (same component as /genres)
 /stats               → all-time stats dashboard
 ```
 
-Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · TabBar (Releases / Genres / Stats) · global tag filter chips.
+Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · TabBar (Releases / Genres / Themes / Stats) · global tag filter chips.
 
 Past-years and upcoming-releases navigation live inside the releases area:
 - `ReleasesScopeNav` renders **Recent · Past Years ▾ · Upcoming**.
@@ -44,12 +45,14 @@ All modals are represented as URL params and dispatched centrally by `ModalRoute
 | `?album=<id>` | `AlbumDetail` |
 | `?artist=<name>` | `ScopeModal` kind=artist |
 | `?host=<id>` | `ScopeModal` kind=host |
-| `?genre=<name>` (repeatable) | `ScopeModal` kind=genre (inner intersection) |
+| `?genre=<name>` (repeatable) | `ScopeModal` kind=genre — also used for theme tags; first value is the scope, subsequent values are inner intersections |
 | `?xgenre=<name>` (repeatable) | inner exclusion inside the scope modal |
 | `?day=YYYY-MM-DD` | `DayModal` (from the calendar heatmap popover) |
 | `?upcoming=1` | `UpcomingModal` |
 
 `lib/modalUrl.ts` centralises open/close/href transforms. `hrefWithModal(sp, kind, value, pathname)` is the canonical way components push modal state.
+
+Genre/theme scope modals open with twin **related-tag bar plots** at the top (`TagContextBars` + `TagBarScroll`). Same-category sits on the left, other-category on the right — so a theme modal shows related themes left / related genres right, and vice versa for genres. Data comes from `/api/albums/tag-context` backed by `lib/tagContext.ts` (cached under the `genres` tag).
 
 Page-level filters (`?tag=`, `?xtag=`) live alongside modal params but are owned by `TagFilter` / `FilterChips` in the root layout — not modal state.
 
@@ -70,6 +73,10 @@ Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound
 ### `/genres` — genre map
 
 All-time, corpus-wide. Forces co-occurrence into a force-directed graph. Year filter not applied (per-year maps are too sparse/noisy to be meaningful).
+
+### `/themes` — theme map
+
+Same `TagMap` component as `/genres`, with `itemLabel="theme"` parameterizing user-visible strings (PNG download filename, tooltips, about text). Data comes from `category='theme'` in the `tags` table.
 
 ### `/stats` — stats dashboard
 
@@ -109,6 +116,9 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 - `lib/albumCache.ts` — bounded module-level stub cache so modals can paint instantly from prior click data; server fetch still runs in parallel for authoritative data
 - `lib/types.ts` — `AlbumListItem`, `parseTagParams`, `dedupeById`, `rpcRowToAlbumListItem`, …
 - `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`)
+- `lib/tagMap.ts` — paginated `tag_counts` + `tag_pairs` for the `/genres` and `/themes` maps, cached under `cacheTag("genres")`
+- `lib/tagContext.ts` — per-tag related genres + themes for the scope modal bars, cached under the same `genres` tag
+- `components/TagBarScroll.tsx` — shared vertically-scrolling bar list used by `/stats` and the scope modal's tag-context panel
 
 ### Progressive disclosure on lists
 

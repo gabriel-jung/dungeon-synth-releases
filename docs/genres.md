@@ -23,7 +23,7 @@ These are paginated to completion in `fetchAllPairs` (1000 rows per RPC call).
 
 ### 4. Graph construction (client)
 
-Inside `GenreMap`:
+Inside `TagMap` (shared by `/genres` and `/themes`):
 
 - **Top-N filter** — only the N most popular genres enter the graph, controlled by a slider and numeric input.
 - **Edge weighting** — four similarity metrics are available, each with a LaTeX-rendered formula and a short blurb:
@@ -74,8 +74,10 @@ State is URL-driven (`?metric=…&n=…&d=…&ml=…&lp=…`) so a given view ca
 
 | Path | Role |
 |------|------|
-| `app/genres/page.tsx` | Server component: fetches `tag_counts` and all `tag_pairs`, hands them to `<GenreMap>` inside `<Suspense>` |
-| `components/GenreMap.tsx` | Graph construction, physics, interaction, controls, rendering |
+| `app/genres/page.tsx` | Server component: fetches `tag_counts` and all `tag_pairs` for `category='genre'`, hands them to `<TagMap>` inside `<Suspense>` |
+| `app/themes/page.tsx` | Same as above but for `category='theme'`, with `itemLabel="theme"` on the component |
+| `lib/tagMap.ts` | Shared `fetchTagMap(category)` — paginated `tag_counts` + `tag_pairs`, cached via `"use cache"` |
+| `components/TagMap.tsx` | Graph construction, physics, interaction, controls, rendering — shared by both pages |
 | `components/ScopeModal.tsx` | Shared scope modal that renders when `?genre=<name>` is set |
 
 ## Supabase RPCs
