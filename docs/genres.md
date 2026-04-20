@@ -16,10 +16,10 @@ Raw tags mix many kinds of concepts — sonic genres, themes, instruments, locat
 
 Two RPCs aggregate from the filtered genre set:
 
-- **`tag_counts(p_category default 'genre')`** — `(name, n)` per tag, where `n` is how many albums carry that tag.
-- **`tag_pairs(p_category default 'genre')`** — `(tag_a, tag_b, n)` for each unordered pair of tags in the category that co-occur on at least one album, with `n` the count of shared albums.
+- **`tag_counts(p_category default 'genre', p_top_k)`** — `(name, n)` per tag, where `n` is how many albums carry that tag. `p_top_k` caps to the K most-used tags.
+- **`tag_pairs(p_category default 'genre', p_top_k)`** — `(tag_a, tag_b, n)` for each unordered pair of tags in the category that co-occur on at least one album, with `n` the count of shared albums. When `p_top_k` is set, pairs are restricted to those where both tags are among the top K — bounds the result at C(K,2) and keeps the self-join over a small tag set.
 
-These are paginated to completion in `fetchAllPairs` (1000 rows per RPC call).
+`fetchTagMap` passes `p_top_k = TAG_MAP_TOP_K` (300) and paginates both RPCs 1000 rows at a time.
 
 ### 4. Graph construction (client)
 

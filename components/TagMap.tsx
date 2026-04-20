@@ -1321,7 +1321,7 @@ export default function TagMap({
                         if (Number.isFinite(v)) setTopN(Math.max(10, Math.min(maxTopN, Math.round(v))))
                       }}
                       onBlur={() => setTopNDraft(null)}
-                      style={{ width: `${topNDigits + 1}ch` }}
+                      style={{ width: `${topNDigits + 2}ch` }}
                       className="min-w-0 bg-bg-card border border-border rounded-sm px-1 py-0 text-center tabular-nums text-text normal-case tracking-normal leading-tight"
                     />
                   </label>

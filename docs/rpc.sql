@@ -275,16 +275,29 @@ $$;
 -- tag_counts
 -- Flat count of all tags in a given category across albums. Default category
 -- is 'genre' (preserves pre-rename callers). Feeds the TagFilter panel.
+-- When p_top_k is set, returns only the K most-used tags (by count desc,
+-- name asc for deterministic ties). NULL = unbounded.
+--
+-- Returns a jsonb array in a single row so PostgREST's 1000-row cap does
+-- not bound the result. Caller does one HTTP call, no pagination.
 -- ---------------------------------------------------------------------------
-create or replace function tag_counts(p_category text default 'genre')
-returns table(name text, n bigint)
+create or replace function tag_counts(
+  p_category text default 'genre',
+  p_top_k int default null
+)
+returns jsonb
 language sql stable
 as $$
-  SELECT t.name, count(*)::bigint
-  FROM album_tags at
-  JOIN tags t ON t.id = at.tag_id
-  WHERE t.category = p_category
-  GROUP BY t.name;
+  WITH ranked AS (
+    SELECT t.name, count(*)::bigint AS n
+    FROM album_tags at
+    JOIN tags t ON t.id = at.tag_id
+    WHERE t.category = p_category
+    GROUP BY t.name
+    ORDER BY n DESC, t.name ASC
+    LIMIT p_top_k
+  )
+  SELECT coalesce(jsonb_agg(to_jsonb(ranked) ORDER BY n DESC, name ASC), '[]'::jsonb) FROM ranked;
 $$;
 
 
@@ -292,21 +305,41 @@ $$;
 -- tag_pairs
 -- Unordered co-occurrence pairs of tags in a given category on the same
 -- album, with the shared album count. Default category is 'genre'. Feeds
--- the /genres map edges.
+-- the /genres map edges. When p_top_k is set, only considers pairs where
+-- both tags are among the K most-used tags in the category — caps result
+-- at C(K,2) pairs and keeps the self-join over a small tag set.
+--
+-- Returns a jsonb array in a single row (see tag_counts note). One HTTP
+-- call regardless of pair count.
 -- ---------------------------------------------------------------------------
-create or replace function tag_pairs(p_category text default 'genre')
-returns table(tag_a text, tag_b text, n bigint)
+create or replace function tag_pairs(
+  p_category text default 'genre',
+  p_top_k int default null
+)
+returns jsonb
 language sql stable
 as $$
-  SELECT
-    LEAST(t1.name, t2.name)    AS tag_a,
-    GREATEST(t1.name, t2.name) AS tag_b,
-    count(*)::bigint           AS n
-  FROM album_tags at1
-  JOIN album_tags at2 ON at1.album_id = at2.album_id AND at1.tag_id < at2.tag_id
-  JOIN tags t1 ON t1.id = at1.tag_id AND t1.category = p_category
-  JOIN tags t2 ON t2.id = at2.tag_id AND t2.category = p_category
-  GROUP BY tag_a, tag_b;
+  WITH top_tags AS (
+    SELECT t.id, t.name
+    FROM tags t
+    JOIN album_tags at ON at.tag_id = t.id
+    WHERE t.category = p_category
+    GROUP BY t.id, t.name
+    ORDER BY count(*) DESC, t.name ASC
+    LIMIT p_top_k
+  ),
+  pairs AS (
+    SELECT
+      LEAST(t1.name, t2.name)    AS tag_a,
+      GREATEST(t1.name, t2.name) AS tag_b,
+      count(*)::bigint           AS n
+    FROM album_tags at1
+    JOIN album_tags at2 ON at1.album_id = at2.album_id AND at1.tag_id < at2.tag_id
+    JOIN top_tags t1 ON t1.id = at1.tag_id
+    JOIN top_tags t2 ON t2.id = at2.tag_id
+    GROUP BY tag_a, tag_b
+  )
+  SELECT coalesce(jsonb_agg(to_jsonb(pairs) ORDER BY n DESC, tag_a ASC, tag_b ASC), '[]'::jsonb) FROM pairs;
 $$;
 
 
