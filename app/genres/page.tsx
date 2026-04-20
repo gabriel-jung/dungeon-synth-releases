@@ -9,14 +9,18 @@ export const metadata = {
   alternates: { canonical: "/genres" },
 }
 
-export default async function GenresPage() {
+async function GenreMapAsync() {
   const { counts, pairs } = await fetchTagMap("genre")
+  return <TagMap counts={counts} pairs={pairs} />
+}
+
+export default function GenresPage() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <PageHeader description="A cartography of genre affinities, drawn from shared Bandcamp tags." />
       <div className="flex-1 min-h-0">
         <Suspense>
-          <TagMap counts={counts} pairs={pairs} />
+          <GenreMapAsync />
         </Suspense>
       </div>
     </div>

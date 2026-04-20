@@ -9,14 +9,18 @@ export const metadata = {
   alternates: { canonical: "/themes" },
 }
 
-export default async function ThemesPage() {
+async function ThemeMapAsync() {
   const { counts, pairs } = await fetchTagMap("theme")
+  return <TagMap counts={counts} pairs={pairs} itemLabel="theme" />
+}
+
+export default function ThemesPage() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <PageHeader description="A cartography of theme affinities, drawn from shared Bandcamp tags." />
       <div className="flex-1 min-h-0">
         <Suspense>
-          <TagMap counts={counts} pairs={pairs} itemLabel="theme" />
+          <ThemeMapAsync />
         </Suspense>
       </div>
     </div>

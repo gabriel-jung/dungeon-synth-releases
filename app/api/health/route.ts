@@ -1,7 +1,9 @@
+import { connection } from "next/server"
 import { supabase } from "@/lib/supabase"
 import { logger } from "@/lib/logger"
 
 export async function GET() {
+  await connection()
   const start = Date.now()
   const { error } = await supabase
     .from("albums")
