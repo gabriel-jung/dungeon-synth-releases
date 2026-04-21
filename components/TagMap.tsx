@@ -377,6 +377,11 @@ export default function TagMap({
   const labelPosRef = useRef<LabelPos>("inside")
   const recomputeLabelsRef = useRef<() => void>(() => {})
   const simRef = useRef<Simulation<Node, Edge> | null>(null)
+  const syncSettlingRef = useRef(false)
+  const bumpSimRafRef = useRef<number | null>(null)
+  const updateHullsRef = useRef<() => void>(() => {})
+  const paintPositionsRef = useRef<() => void>(() => {})
+  const linkScaleRef = useRef(1)
   const linkSelRef = useRef<Selection<SVGLineElement, Edge, SVGGElement, unknown> | null>(null)
   const rebuildLinksRef = useRef<(visible: Set<Edge>) => void>(() => {})
   const visibleEdgesRef = useRef<Set<Edge>>(new Set())
@@ -582,7 +587,6 @@ export default function TagMap({
     const g = svg.append("g")
     setSimReady(false)
     setSettling(true)
-    let tickedOnce = false
     let initialFitDone = false
 
     const zoom = d3Zoom<SVGSVGElement, unknown>()
@@ -878,11 +882,29 @@ export default function TagMap({
       .attr("stroke-opacity", 0.18)
       .attr("stroke-width", 1)
 
+    // The "Link length" slider is a visual-only scale: positions are
+    // multiplied by k about the viewport center at paint time so node and
+    // label sizes stay constant. Physics runs on unscaled coords.
+    const scaleX = (x: number, k: number) => (x - w / 2) * k + w / 2
+    const scaleY = (y: number, k: number) => (y - h / 2) * k + h / 2
+    const paintPositions = () => {
+      const k = linkScaleRef.current
+      linkSelRef.current
+        ?.attr("x1", (d) => scaleX((d.source as Node).x ?? 0, k))
+        .attr("y1", (d) => scaleY((d.source as Node).y ?? 0, k))
+        .attr("x2", (d) => scaleX((d.target as Node).x ?? 0, k))
+        .attr("y2", (d) => scaleY((d.target as Node).y ?? 0, k))
+      nodeSel.attr("transform", (d) => `translate(${scaleX(d.x ?? 0, k)},${scaleY(d.y ?? 0, k)})`)
+    }
+    paintPositionsRef.current = paintPositions
+
+    updateHullsRef.current = updateHulls
     function updateHulls() {
+      const k = linkScaleRef.current
       hullSel.attr("d", (cid) => {
         const members = clusterGroups.get(cid)
         if (!members || members.length < 3) return null
-        const points = members.map((n) => [n.x ?? 0, n.y ?? 0] as [number, number])
+        const points = members.map((n) => [scaleX(n.x ?? 0, k), scaleY(n.y ?? 0, k)] as [number, number])
         const hull = polygonHull(points)
         if (!hull) return null
         const cx = mean(hull, (p) => p[0])!
@@ -899,7 +921,6 @@ export default function TagMap({
     }
 
     let tickCount = 0
-    let frameSkip = 0
 
     simRef.current?.stop()
 
@@ -923,7 +944,7 @@ export default function TagMap({
             const s = d.source as Node
             const t = d.target as Node
             const same = s.cluster === t.cluster
-            return ((same ? 30 : 120) + 40 / (1 + d.weight * 3)) * debouncedLinkScale
+            return (same ? 30 : 120) + 40 / (1 + d.weight * 3)
           })
           .strength((d) => {
             const s = d.source as Node
@@ -941,29 +962,25 @@ export default function TagMap({
       .alphaDecay(0.02)
       .stop()
 
-    // Skip the chaotic initial phase so nodes appear already near final position.
-    const PREWARM_TICKS = 30
-    for (let i = 0; i < PREWARM_TICKS; i++) sim.tick()
+    sim.on("tick", () => {
+      if (syncSettlingRef.current) return
+      tickCount++
+      paintPositions()
+      if ((tickCount & 3) === 0) updateHulls()
+    })
 
-    sim
-      .on("tick", () => {
-        tickCount++
-        // 30fps paint is imperceptible from 60fps for a graph settling; physics still runs full-rate.
-        if ((frameSkip++ & 1) === 1) return
-        linkSelRef.current
-          ?.attr("x1", (d) => (d.source as Node).x ?? 0)
-          .attr("y1", (d) => (d.source as Node).y ?? 0)
-          .attr("x2", (d) => (d.target as Node).x ?? 0)
-          .attr("y2", (d) => (d.target as Node).y ?? 0)
-        nodeSel.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
-        if (!tickedOnce) { tickedOnce = true; setSimReady(true) }
-        if ((tickCount & 3) === 0) updateHulls()
-      })
-      .on("end", () => {
-        updateHulls()
-        setSettling(false)
-        if (nodes.length === 0) return
-        if (initialFitDone) return
+    recomputeLabels()
+    simRef.current = sim
+
+    // Defer the sync-settle one frame so React can paint the loader
+    // before the main thread blocks on the tick loop.
+    const rafId = requestAnimationFrame(() => {
+      while (sim.alpha() > sim.alphaMin()) sim.tick()
+
+      // Fit-to-bounds is applied before the first paint so the graph
+      // arrives already framed — avoids a loader → unfit graph → zoom-in
+      // flash.
+      if (nodes.length > 0 && !initialFitDone) {
         initialFitDone = true
         const pad = 60
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -981,13 +998,22 @@ export default function TagMap({
         const cy = (minY + maxY) / 2
         const tx = w / 2 - k * cx
         const ty = h / 2 - k * cy
-        svg.transition().duration(400).call(zoom.transform, zoomIdentity.translate(tx, ty).scale(k))
-      })
+        svg.call(zoom.transform, zoomIdentity.translate(tx, ty).scale(k))
+      }
 
-    recomputeLabels()
-    simRef.current = sim
-    sim.restart()
+      paintPositions()
+      updateHulls()
+
+      setSimReady(true)
+      setSettling(false)
+    })
+
     return () => {
+      cancelAnimationFrame(rafId)
+      if (bumpSimRafRef.current !== null) {
+        cancelAnimationFrame(bumpSimRafRef.current)
+        bumpSimRafRef.current = null
+      }
       sim.stop()
       if (simRef.current === sim) simRef.current = null
     }
@@ -1072,24 +1098,27 @@ export default function TagMap({
       })
   }, [visibleEdges, banTags, hiTags, hiNeighbors])
 
-  // Live-update link length. Nudge alpha so the graph relaxes instead of restarting cold.
   const bumpSim = () => {
     const sim = simRef.current
     if (!sim) return
     setSettling(true)
-    sim.alpha(0.3).restart()
+    syncSettlingRef.current = true
+    sim.alpha(0.3).stop()
+    if (bumpSimRafRef.current !== null) cancelAnimationFrame(bumpSimRafRef.current)
+    bumpSimRafRef.current = requestAnimationFrame(() => {
+      bumpSimRafRef.current = null
+      while (sim.alpha() > sim.alphaMin()) sim.tick()
+      syncSettlingRef.current = false
+      paintPositionsRef.current()
+      updateHullsRef.current()
+      setSettling(false)
+    })
   }
 
   useEffect(() => {
-    const link = simRef.current?.force("link") as ForceLink<Node, Edge> | undefined
-    if (!link) return
-    link.distance((d) => {
-      const s = d.source as Node
-      const t = d.target as Node
-      const same = s.cluster === t.cluster
-      return ((same ? 30 : 120) + 40 / (1 + d.weight * 3)) * debouncedLinkScale
-    })
-    bumpSim()
+    linkScaleRef.current = debouncedLinkScale
+    paintPositionsRef.current()
+    updateHullsRef.current()
   }, [debouncedLinkScale])
 
   useEffect(() => {
@@ -1212,7 +1241,7 @@ export default function TagMap({
       {!simReady && nodes.length > 0 && (
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
           <div className="font-display text-accent/70 text-xs tracking-[0.3em] uppercase animate-pulse">
-            ❧ plotting
+            ❧ drawing the map
           </div>
         </div>
       )}
@@ -1274,7 +1303,7 @@ export default function TagMap({
             <span>Settings</span>
           </button>
           {showAdvanced && (
-            <div className="absolute top-full left-0 mt-2 bg-bg/90 backdrop-blur-sm border border-border/60 rounded-sm px-3 py-3 flex flex-col gap-3 w-[min(44rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-6rem))] overflow-y-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+            <div className="absolute top-full left-0 mt-2 bg-bg/90 backdrop-blur-sm border border-border/60 rounded-sm px-3 py-3 flex flex-col gap-3 w-[min(46rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-6rem))] overflow-y-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
               {/* Data group */}
               <div className="flex flex-row items-start gap-4">
                 <div className="flex items-center gap-1.5 text-accent/70 text-[9px] w-20 shrink-0 pt-1.5">
@@ -1372,7 +1401,7 @@ export default function TagMap({
                       onChange={(e) => setRepulsion(Number(e.target.value))}
                       className="w-32 accent-accent"
                     />
-                    <span className="tabular-nums text-text">{repulsion}</span>
+                    <span className="tabular-nums text-text text-right inline-block min-w-[3ch]">{repulsion}</span>
                   </label>
                   <label className="flex items-center gap-2" title="How strongly each node is pulled toward its community centroid. Zero disables clustering force.">
                     <span>Cluster cohesion</span>
