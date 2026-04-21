@@ -23,67 +23,64 @@ create or replace function year_counts(
 returns table(year int, n bigint)
 language sql stable
 as $$
-  select extract(year from a.date)::int as year, count(*)::bigint as n
-  from albums a
-  where a.date is not null
-    and (
-      cardinality(p_include_tags) = 0
-      or (
-        select count(distinct t.name)
-        from album_tags at
-        join tags t on t.id = at.tag_id
-        where at.album_id = a.id and t.name = any(p_include_tags)
-      ) = cardinality(p_include_tags)
-    )
-    and not exists (
-      select 1
-      from album_tags at
-      join tags t on t.id = at.tag_id
-      where at.album_id = a.id and t.name = any(p_exclude_tags)
-    )
-  group by extract(year from a.date)
-  order by year;
+  SELECT extract(year FROM a.date)::int AS year, count(*)::bigint AS n
+  FROM albums a
+  WHERE a.date IS NOT NULL
+    AND (cardinality(p_include_tags) = 0 OR a.id IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_include_tags)
+      GROUP BY at.album_id
+      HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+    ))
+    AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_exclude_tags)
+    ))
+  GROUP BY extract(year FROM a.date)
+  ORDER BY year;
 $$;
 
 
 -- ---------------------------------------------------------------------------
 -- tag_counts_by_category
--- Top 50 tags in a given category (e.g. 'genre', 'theme'), ranked by album
--- count. Used by the stats page "Popular Genres" / "Popular Themes" lists.
+-- Top-K tags in a given category (e.g. 'genre', 'theme'), ranked by album
+-- count, optionally narrowed by year + include/exclude tag filters. Used by
+-- the stats page "Popular Genres" / "Popular Themes" and by the scope modal
+-- bars. `p_top_k = NULL` returns every tag in the category.
 -- ---------------------------------------------------------------------------
 create or replace function tag_counts_by_category(
   p_category text,
   p_year int default null,
   p_include_tags text[] default array[]::text[],
-  p_exclude_tags text[] default array[]::text[]
+  p_exclude_tags text[] default array[]::text[],
+  p_top_k int default 50
 )
 returns table(name text, n bigint)
 language sql stable
 as $$
-  select t.name, count(distinct a.id)::bigint as n
-  from tags t
-  join album_tags at on at.tag_id = t.id
-  join albums a on a.id = at.album_id
-  where t.category = p_category
-    and (p_year is null or extract(year from a.date)::int = p_year)
-    and (
-      cardinality(p_include_tags) = 0
-      or (
-        select count(distinct t2.name)
-        from album_tags at2
-        join tags t2 on t2.id = at2.tag_id
-        where at2.album_id = a.id and t2.name = any(p_include_tags)
-      ) = cardinality(p_include_tags)
-    )
-    and not exists (
-      select 1
-      from album_tags at3
-      join tags t3 on t3.id = at3.tag_id
-      where at3.album_id = a.id and t3.name = any(p_exclude_tags)
-    )
-  group by t.name
-  order by n desc
-  limit 50;
+  WITH matching_albums AS (
+    SELECT a.id
+    FROM albums a
+    WHERE (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+      AND (cardinality(p_include_tags) = 0 OR a.id IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_include_tags)
+        GROUP BY at.album_id
+        HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+      ))
+      AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_exclude_tags)
+      ))
+  )
+  SELECT t.name, count(*)::bigint AS n
+  FROM matching_albums m
+  JOIN album_tags at ON at.album_id = m.id
+  JOIN tags t ON t.id = at.tag_id
+  WHERE t.category = p_category
+  GROUP BY t.name
+  ORDER BY n DESC
+  LIMIT p_top_k;
 $$;
 
 
@@ -387,25 +384,24 @@ returns table(
 )
 language sql stable
 as $$
-  select
+  SELECT
     a.id, a.artist, a.title, a.url, a.date, a.art_id,
-    h.id as host_id, h.name as host_name, h.image_id as host_image_id, h.url as host_url
-  from albums a
-  join hosts h on h.id = a.host_id
-  where
-    (p_before is null or a.date < p_before)
-    and (p_after is null or a.date > p_after)
-    and (cardinality(p_include_tags) = 0 or (
-      select count(distinct t.name)
-      from album_tags at
-      join tags t on t.id = at.tag_id
-      where at.album_id = a.id and t.name = any(p_include_tags)
-    ) = cardinality(p_include_tags))
-    and (cardinality(p_exclude_tags) = 0 or not exists (
-      select 1 from album_tags at
-      join tags t on t.id = at.tag_id
-      where at.album_id = a.id and t.name = any(p_exclude_tags)
+    h.id AS host_id, h.name AS host_name, h.image_id AS host_image_id, h.url AS host_url
+  FROM albums a
+  JOIN hosts h ON h.id = a.host_id
+  WHERE
+    (p_before IS NULL OR a.date < p_before)
+    AND (p_after IS NULL OR a.date > p_after)
+    AND (cardinality(p_include_tags) = 0 OR a.id IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_include_tags)
+      GROUP BY at.album_id
+      HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
     ))
-  order by a.date desc
-  limit p_limit;
+    AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_exclude_tags)
+    ))
+  ORDER BY a.date DESC
+  LIMIT p_limit;
 $$;

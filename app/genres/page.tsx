@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import TagMap from "@/components/TagMap"
+import TagMap from "@/components/TagMapCanvas"
 import PageHeader from "@/components/PageHeader"
 import { fetchTagMap } from "@/lib/tagMap"
 

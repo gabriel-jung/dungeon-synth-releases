@@ -1,6 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache"
 import { supabase } from "./supabase"
-import type { TagCount, TagPair } from "@/components/TagMap"
+import type { TagCount, TagPair } from "@/lib/tagMapLogic"
 
 // Server-side cap on tags included in the map. Both counts and pairs are
 // restricted to the top K tags by count, so pair payload is bounded by
@@ -19,7 +19,7 @@ export async function fetchTagMap(
 ): Promise<{ counts: TagCount[]; pairs: TagPair[] }> {
   "use cache"
   cacheLife("days")
-  cacheTag("genres")
+  cacheTag(`tag-map-${category}`)
 
   const [countsRes, pairsRes] = await Promise.all([
     supabase.rpc("tag_counts", { p_category: category, p_top_k: topK }),
