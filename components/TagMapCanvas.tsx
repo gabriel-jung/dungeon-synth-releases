@@ -548,11 +548,14 @@ export default function TagMapCanvas({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.clientWidth, h: el.clientHeight })
-    })
+    const update = () => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      setSize((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }))
+    }
+    const ro = new ResizeObserver(update)
     ro.observe(el)
-    setSize({ w: el.clientWidth, h: el.clientHeight })
+    update()
     return () => ro.disconnect()
   }, [fullscreen])
 
