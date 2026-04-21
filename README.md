@@ -67,3 +67,4 @@ npm run dev
 - [docs/rpc.sql](docs/rpc.sql) — full RPC bodies (source of truth for function logic)
 - [docs/stats.md](docs/stats.md) — /stats page breakdown
 - [docs/genres.md](docs/genres.md) — /genres + /themes TagMap pipeline
+- [docs/roadmap.md](docs/roadmap.md) — planned, undecided, parked work

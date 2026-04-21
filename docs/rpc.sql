@@ -405,3 +405,38 @@ as $$
   ORDER BY a.date DESC
   LIMIT p_limit;
 $$;
+
+
+-- ---------------------------------------------------------------------------
+-- search_all
+-- Substring search over artist, title, and host name for the command palette
+-- (components/SearchPalette.tsx → /api/search). Returns a single jsonb row
+-- containing an array of matching albums, newest first.
+--
+-- No title-dedupe: the same release may legitimately exist as multiple rows
+-- when an album is uploaded both to the artist's self-host and to a label's
+-- host (common in the scene — usually different art, tracklist, or physical
+-- edition). Each is a distinct bandcamp release, and search should surface
+-- all of them so users can pick the specific edition they want.
+-- ---------------------------------------------------------------------------
+create or replace function search_all(
+  p_q text,
+  p_limit int default 50
+)
+returns jsonb
+language sql stable
+as $$
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.date desc nulls last), '[]'::jsonb)
+  from (
+    select a.id, a.artist, a.title, a.url, a.date, a.art_id,
+           h.id as host_id, h.name as host_name,
+           h.image_id as host_image_id, h.url as host_url
+    from albums a
+    join hosts h on h.id = a.host_id
+    where a.artist ilike '%' || p_q || '%'
+       or a.title  ilike '%' || p_q || '%'
+       or h.name   ilike '%' || p_q || '%'
+    order by a.date desc nulls last
+    limit p_limit
+  ) x;
+$$;

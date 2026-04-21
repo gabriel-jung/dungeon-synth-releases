@@ -56,3 +56,4 @@ All tag-filtered RPCs accept `p_include_tags text[]` (album must have ALL) and `
 | `album_duration_hist(p_year, p_include_tags, p_exclude_tags)` | year-scoped | same shape as tracks hist |
 | `list_filtered_albums(p_include_tags, p_exclude_tags, p_before, p_after, p_limit)` | keyset pagination | album row list |
 | `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags, p_top_k)` | category + year-scoped (null = all-time); `p_top_k` default 50 | `name, n` |
+| `search_all(p_q, p_limit)` | substring search over artist/title/host name; `p_limit` default 50 | **`jsonb`** — array of matching album rows, newest first. No title-dedupe (label + self-release both surface) |
