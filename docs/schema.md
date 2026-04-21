@@ -46,8 +46,8 @@ All tag-filtered RPCs accept `p_include_tags text[]` (album must have ALL) and `
 
 | Function | Args | Returns |
 |----------|------|---------|
-| `tag_counts(p_category, p_top_k)` | category default `'genre'`; optional top-K cap by count | `name, n` — tag names in that category |
-| `tag_pairs(p_category, p_top_k)` | category default `'genre'`; optional top-K cap restricts pairing to top-K tags | `tag_a, tag_b, n` — unordered co-occurrence pairs |
+| `tag_counts(p_category, p_top_k)` | category default `'genre'`; optional top-K cap | **`jsonb`** — array of `{ name, n }` in a single row (bypasses PostgREST 1000-row cap) |
+| `tag_pairs(p_category, p_top_k)` | category default `'genre'`; optional top-K cap restricts pairing to top-K tags | **`jsonb`** — array of `{ tag_a, tag_b, n }` unordered co-occurrence pairs in a single row |
 | `distinct_years()` | — | `year, n` — every year with releases + count (callers ignore `n`) |
 | `year_counts(p_include_tags, p_exclude_tags)` | tag filters | `year, n` — per-year release counts |
 | `host_counts(p_year, p_include_tags, p_exclude_tags)` | year-scoped | `host_id, name, image_id, url, n` |
@@ -55,4 +55,4 @@ All tag-filtered RPCs accept `p_include_tags text[]` (album must have ALL) and `
 | `tracks_per_album_hist(p_year, p_include_tags, p_exclude_tags)` | year-scoped | `bucket, bucket_order, bucket_width, n` |
 | `album_duration_hist(p_year, p_include_tags, p_exclude_tags)` | year-scoped | same shape as tracks hist |
 | `list_filtered_albums(p_include_tags, p_exclude_tags, p_before, p_after, p_limit)` | keyset pagination | album row list |
-| `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags)` | category + year-scoped (null = all-time) | `name, n` — top 50 tags in that category |
+| `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags, p_top_k)` | category + year-scoped (null = all-time); `p_top_k` default 50 | `name, n` |

@@ -72,11 +72,11 @@ Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound
 
 ### `/genres` — genre map
 
-All-time, corpus-wide. Forces co-occurrence into a force-directed graph. Year filter not applied (per-year maps are too sparse/noisy to be meaningful).
+All-time, corpus-wide. Canvas-rendered force-directed graph (`TagMapCanvas` via `react-force-graph-2d`) over genre co-occurrence. Year filter not applied (per-year maps are too sparse/noisy to be meaningful).
 
 ### `/themes` — theme map
 
-Same `TagMap` component as `/genres`, with `itemLabel="theme"` parameterizing user-visible strings (PNG download filename, tooltips, about text). Data comes from `category='theme'` in the `tags` table.
+Same `TagMapCanvas` component as `/genres`, with `itemLabel="theme"` parameterizing user-visible strings (PNG download filename, tooltips, about text). Data comes from `category='theme'` in the `tags` table.
 
 ### `/stats` — stats dashboard
 
@@ -116,7 +116,8 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 - `lib/albumCache.ts` — bounded module-level stub cache so modals can paint instantly from prior click data; server fetch still runs in parallel for authoritative data
 - `lib/types.ts` — `AlbumListItem`, `parseTagParams`, `dedupeById`, `rpcRowToAlbumListItem`, …
 - `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`)
-- `lib/tagMap.ts` — paginated `tag_counts` + `tag_pairs` for the `/genres` and `/themes` maps, cached under `cacheTag("genres")`
+- `lib/tagMap.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/genres` and `/themes` maps, cached under `cacheTag("genres")`
+- `lib/tagMapLogic.ts` — shared graph construction (metrics, edge filter, Louvain) used by `TagMapCanvas` and `scripts/tune-tagmap.mts`
 - `lib/tagContext.ts` — per-tag related genres + themes for the scope modal bars, cached under the same `genres` tag
 - `components/TagBarScroll.tsx` — shared vertically-scrolling bar list used by `/stats` and the scope modal's tag-context panel
 

@@ -75,4 +75,4 @@ See `docs/rpc.sql` for full bodies. Signatures:
 | `host_counts(p_year, p_include_tags, p_exclude_tags)` | `host_id, name, image_id, url, n` |
 | `tracks_per_album_hist(p_year, p_include_tags, p_exclude_tags)` | `bucket, bucket_order, bucket_width, n` |
 | `album_duration_hist(p_year, p_include_tags, p_exclude_tags)` | same shape |
-| `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags)` | `name, n` |
+| `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags, p_top_k)` | `name, n` — `p_top_k` default 50 |
