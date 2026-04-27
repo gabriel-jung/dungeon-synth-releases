@@ -232,8 +232,9 @@ export default function TagMapCanvas({
   )
   const hiTags = useMemo(() => {
     const set = new Set(clickedTags)
-    if (searchQuery) {
-      for (const [name, lower] of lowerNames) if (lower.includes(searchQuery)) set.add(name)
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      for (const [name, lower] of lowerNames) if (lower.includes(q)) set.add(name)
     }
     return set
   }, [clickedTags, searchQuery, lowerNames])
@@ -1281,15 +1282,16 @@ export default function TagMapCanvas({
         </div>
       </div>
 
-      {/* Top-right: search */}
-      <div className="absolute top-3 right-3 z-20 w-[min(16rem,calc(100vw-1.5rem))]">
+      {/* 13.5rem clearance reserves room for the Settings + ↻ + ? row at top-left. */}
+      <div className="absolute top-3 right-3 z-20 w-9 sm:w-[min(15rem,calc(100vw-13.5rem))] focus-within:w-[min(15rem,calc(100vw-1.5rem))] overflow-hidden transition-[width] duration-200">
         <div className="flex items-center gap-2 bg-bg/75 backdrop-blur-sm border border-border/60 rounded-sm px-2 py-1">
           <span aria-hidden className="font-display text-xs text-text-dim select-none">⌕</span>
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value.trim().toLowerCase())}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Focus on a ${labelSingular}…`}
+            aria-label={`Focus on a ${labelSingular}`}
             className="flex-1 min-w-0 bg-transparent outline-none text-text text-xs placeholder:text-text-dim"
           />
         </div>
