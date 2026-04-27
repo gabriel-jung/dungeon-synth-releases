@@ -67,12 +67,4 @@ const [hostRes, yearRes, tracksHistRes, durationHistRes, genreRes, themeRes] = a
 
 ## Supabase RPCs
 
-See `docs/rpc.sql` for full bodies. Signatures:
-
-| Function | Returns |
-|----------|---------|
-| `year_counts(p_include_tags, p_exclude_tags)` | `year, n` |
-| `host_counts(p_year, p_include_tags, p_exclude_tags)` | `host_id, name, image_id, url, n` |
-| `tracks_per_album_hist(p_year, p_include_tags, p_exclude_tags)` | `bucket, bucket_order, bucket_width, n` |
-| `album_duration_hist(p_year, p_include_tags, p_exclude_tags)` | same shape |
-| `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags, p_top_k)` | `name, n` — `p_top_k` default 50 |
+`year_counts`, `host_counts`, `tracks_per_album_hist`, `album_duration_hist`, `tag_counts_by_category` — see [`docs/schema.md`](./schema.md) for signatures, [`docs/rpc.sql`](./rpc.sql) for bodies.

@@ -70,17 +70,13 @@ Main page under `app/(releases)/`. The release list scopes to the current year w
 
 Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound={yearStart}` caps the scroll at Jan 1 of that year; the release list loads the first 500 rows descending from yearEnd to stay responsive on sparse pre-Bandcamp years.
 
-### `/genres` — genre map
+### `/genres`, `/themes` — TagMaps
 
-All-time, corpus-wide. Canvas-rendered force-directed graph (`TagMapCanvas` via `react-force-graph-2d`) over genre co-occurrence. Year filter not applied (per-year maps are too sparse/noisy to be meaningful).
-
-### `/themes` — theme map
-
-Same `TagMapCanvas` component as `/genres`, with `itemLabel="theme"` parameterizing user-visible strings (PNG download filename, tooltips, about text). Data comes from `category='theme'` in the `tags` table.
+Canvas-rendered force graphs over tag co-occurrence. Same `TagMapCanvas` component, swapped between `category='genre'` and `category='theme'`. All-time only — per-year maps are too sparse to be meaningful. See [`docs/genres.md`](./genres.md).
 
 ### `/stats` — stats dashboard
 
-All-time aggregates — year bar, most active pages, tracks/duration histograms, popular genres, popular themes. See `docs/stats.md`.
+All-time aggregates — year bar, top hosts, tracks/duration histograms, popular genres + themes. See [`docs/stats.md`](./stats.md).
 
 ## Search
 

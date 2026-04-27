@@ -1,6 +1,6 @@
 # Supabase Schema
 
-Snapshot of public schema as used by this site. Source of truth is the live Supabase project; this file mirrors it for reference. Update when tables or RPCs change.
+> Snapshot as of 2026-04-27. Source of truth is the live Supabase project; this file mirrors it. Update the date and the affected sections when tables or RPCs change.
 
 ## Tables
 

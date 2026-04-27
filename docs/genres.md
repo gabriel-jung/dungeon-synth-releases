@@ -87,9 +87,4 @@ State is URL-driven (`?metric=…&n=…&d=…&ml=…&lp=…`) so views are share
 
 ## Supabase RPCs
 
-| Function | Returns |
-|----------|---------|
-| `tag_counts(p_category text default 'genre', p_top_k int default null)` | `jsonb` — array of `{ name, n }` |
-| `tag_pairs(p_category text default 'genre', p_top_k int default null)` | `jsonb` — array of `{ tag_a, tag_b, n }` |
-
-See [`docs/rpc.sql`](./rpc.sql) for bodies.
+`tag_counts` + `tag_pairs` — see [`docs/schema.md`](./schema.md) for signatures, [`docs/rpc.sql`](./rpc.sql) for bodies.
