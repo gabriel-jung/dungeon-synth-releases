@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
 
   const id = request.nextUrl.searchParams.get("id")
 
-  if (!id) {
-    return Response.json({ error: "Missing id" }, { status: 400 })
+  if (!id || !/^\d+$/.test(id)) {
+    return Response.json({ error: "Invalid id" }, { status: 400 })
   }
 
   const [albumRes, tagsRes] = await Promise.all([

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Album, AlbumListItem, coverUrl, formatDateShort } from "@/lib/types"
+import { Album, AlbumListItem, coverUrl, formatDateShort, safeExternalHref } from "@/lib/types"
 import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 import { SITE_URL } from "@/lib/site"
@@ -158,7 +158,7 @@ export default function AlbumDetail({
   const artId = album?.art_id ?? albumStub.art_id ?? null
   const img = coverUrl(artId)
   const hostName = album?.host_name ?? albumStub.host_name ?? null
-  const bandcampUrl = album?.url ?? albumStub.url
+  const bandcampUrl = safeExternalHref(album?.url ?? albumStub.url)
   const releaseDate = album?.date ?? albumStub.date
   const showHost = hostName && hostName.toLowerCase() !== albumStub.artist.toLowerCase()
 
@@ -266,14 +266,16 @@ export default function AlbumDetail({
                   >
                     {copied ? "Copied ✓" : "Share"}
                   </button>
-                  <a
-                    href={bandcampUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
-                  >
-                    Bandcamp →
-                  </a>
+                  {bandcampUrl && (
+                    <a
+                      href={bandcampUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
+                    >
+                      Bandcamp →
+                    </a>
+                  )}
                 </div>
               </div>
             </>

@@ -2,7 +2,9 @@ import { createClient } from "@supabase/supabase-js"
 import { cacheLife, cacheTag } from "next/cache"
 
 const url = process.env.SUPABASE_URL!
-const key = process.env.SUPABASE_SECRET_KEY!
+// Publishable (anon) key is preferred so RLS gates every query; fallback for
+// un-migrated environments. See docs/rls-migration.sql.
+const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_SECRET_KEY!
 
 export const supabase = createClient(url, key)
 

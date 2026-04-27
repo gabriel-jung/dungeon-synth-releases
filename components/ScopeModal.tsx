@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { AlbumListItem, coverUrl, hostImageUrl, releaseCount } from "@/lib/types"
+import { AlbumListItem, coverUrl, hostImageUrl, releaseCount, safeExternalHref } from "@/lib/types"
 import { closeModal, openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 import { useModalSearchParams } from "@/lib/useModalUrl"
 import type { TagContext } from "@/lib/tagContext"
@@ -196,7 +196,7 @@ export default function ScopeModal({
         onNavigatePair={navigateToSingleGenre}
         coverArtId={coverArtId}
         hostImageId={host?.image_id ?? null}
-        hostUrl={host?.url ?? null}
+        hostUrl={safeExternalHref(host?.url)}
         count={count}
         view={view}
         setView={setView}

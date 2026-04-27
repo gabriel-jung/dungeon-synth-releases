@@ -97,6 +97,14 @@ export function hostImageUrl(imageId: string | null | undefined): string | null 
   return `https://f4.bcbits.com/img/${imageId}_10.jpg`
 }
 
+// Guard against `javascript:` / `data:` URLs sneaking in from the scraper.
+// Only http(s) survives; everything else returns null and the caller skips
+// rendering the link.
+export function safeExternalHref(url: string | null | undefined): string | null {
+  if (!url) return null
+  return /^https?:\/\//i.test(url) ? url : null
+}
+
 export interface HostRow {
   id: string
   name: string

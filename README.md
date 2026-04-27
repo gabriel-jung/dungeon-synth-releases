@@ -26,19 +26,14 @@ Past years, upcoming releases, and album / artist / host / day / tag detail view
 
 ## Features
 
-- **Cache Components + ISR** — `"use cache"` + `cacheLife` on /stats, /genres, /themes, /past years index; `cacheTag("genres")` / `cacheTag("stats")` so a single revalidation bust refreshes the map after ingests. Vercel cron hits `/api/revalidate` daily to roll date labels (Today / Yesterday).
-- **Command-palette search** — `SearchPalette` opened via ⌘K, `/`, or the header search trigger. Hits `/api/search` (pg_trgm across albums + artists, 50-row cap). Picking a result opens the album modal via `?album=<id>`.
-- **URL-driven modals** — `ModalRouter` dispatches on `?album` / `?artist` / `?host` / `?genre` / `?xgenre` / `?day` / `?upcoming`. Helpers in `lib/modalUrl.ts`.
-- **Scope modals with related-tag bars** — genre / theme modals render twin `TagBarScroll` columns: same-category on the left, other-category on the right. Data from `/api/albums/tag-context` (`lib/tagContext.ts`).
-- **Tag filtering** — three-state toggles (include / exclude / neutral), URL-driven (`?tag=` / `?xtag=`). Server-side intersection via `list_filtered_albums` RPC. Clear-all-filters button.
-- **Past-years picker** — hover-reveal grid of every year with releases (from `distinct_years` RPC), single-click to `/releases/[year]`.
-- **Per-day cover toggle** — each `DaySection` has a show/hide covers toggle; `/` expands newest day, archive pages start all days collapsed.
-- **10 color themes** — dark and light options, persisted in localStorage.
-- **Cover image proxy** — Bandcamp images cached 1 week via Vercel edge; `/api/cover` enforces anti-hotlink referer + CSP.
-- **Scroll descent** — page gradually darkens as you browse older releases.
-- **Adjustable paper texture** — desaturated fractal noise overlay with opacity slider.
-- **TagMap (`/genres`, `/themes`)** — canvas-rendered force graph with Louvain clustering, four similarity metrics (Jaccard / PMI / cosine / raw), top-N + density + min-links filters, PNG export, URL-driven state, live cluster-separation readout, param-sweep tool in `scripts/tune-tagmap.mts`.
-- **Stats dashboard** — release-per-year bar, top 50 hosts, track-count & duration histograms, popular genres + popular themes columns.
+- **URL-driven modals** — album / artist / host / genre / theme / day / upcoming all surface as overlays driven by query params (`ModalRouter` + `lib/modalUrl.ts`). No entity routes.
+- **Three-state tag filter** — include / exclude / neutral chips, URL-persisted (`?tag=` / `?xtag=`), server-side intersection via the `list_filtered_albums` RPC.
+- **Command-palette search** — `SearchPalette` opened via ⌘K, `/`, or the header trigger. Hits `/api/search` (pg_trgm, 50-row cap).
+- **TagMap on `/genres` and `/themes`** — canvas force graph with Louvain clustering, four similarity metrics, top-N / density / min-links filters, PNG export, shareable URL state. See [docs/genres.md](docs/genres.md).
+- **Stats dashboard** — releases-per-year bar, top hosts, track / duration histograms, popular genres + themes. See [docs/stats.md](docs/stats.md).
+- **Cache Components + ISR** — `"use cache"` + `cacheLife` + `cacheTag("genres")` / `cacheTag("stats")`; daily Vercel cron hits `/api/revalidate` to roll Today / Yesterday labels.
+- **Cover image proxy** — `/api/cover` with anti-hotlink referer + CSP, 1-week edge cache. Album art is otherwise hotlinked direct from Bandcamp via plain `<img>` (zero Vercel egress).
+- **10 color themes**, scroll descent, adjustable paper texture.
 
 ## Setup
 
@@ -50,9 +45,11 @@ Create `.env.local` with your Supabase credentials:
 
 ```
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-service-key
+SUPABASE_PUBLISHABLE_KEY=your-publishable-anon-key
 CRON_SECRET=any-random-string
 ```
+
+The site reads `SUPABASE_PUBLISHABLE_KEY` (anon role, RLS-gated — see [`docs/rls-migration.sql`](docs/rls-migration.sql)) and falls back to `SUPABASE_SECRET_KEY` for environments that haven't migrated yet.
 
 `CRON_SECRET` gates `/api/revalidate`. Vercel injects it as `Authorization: Bearer $CRON_SECRET` on the daily midnight cron (see `vercel.json`) that busts the layout cache for the "Today" / "Yesterday" labels. Set the same value in Vercel project env vars.
 
