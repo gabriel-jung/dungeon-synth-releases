@@ -162,6 +162,18 @@ export default function TagMapCanvas({
   const [zoomLevel, setZoomLevel] = useState(1)
   const [hover, setHover] = useState<HoverInfo | null>(null)
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Touch devices fire onNodeHover on tap but never onMouseMove, so the
+  // tooltip would land at (0,0) and overlap the header. Skip hover UI when
+  // the primary pointer is coarse.
+  const coarsePointerRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return
+    const mq = window.matchMedia("(pointer: coarse)")
+    coarsePointerRef.current = mq.matches
+    const onChange = (e: MediaQueryListEvent) => { coarsePointerRef.current = e.matches }
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [])
   const [spacingStats, setSpacingStats] = useState<{ intra: number; inter: number; ratio: number } | null>(null)
   const spacingStatsRef = useRef<{ intra: number; inter: number; ratio: number } | null>(null)
   // Hull geometry (expanded polygon points per cluster) is constant between
@@ -194,7 +206,7 @@ export default function TagMapCanvas({
   // Only the FIRST settle for a given (nodes, edges) set should auto-fit;
   // physics re-settles must preserve the user's current zoom so parameter
   // changes are actually visible.
-  const firstFitDoneRef = useRef(false)
+  const needsFitRef = useRef(true)
 
   // Base (k=1) positions captured after sync-settle, used by link-length
   // slider to rescale about viewport center without touching the sim.
@@ -510,15 +522,8 @@ export default function TagMapCanvas({
       }
       hullCacheRef.current = nextHulls
       setReady(true)
-      if (!firstFitDoneRef.current) {
-        firstFitDoneRef.current = true
-        // Two rAFs: first lets the library run its mount paint, second
-        // applies zoomToFit so it bases its bbox on the library's fresh
-        // view state instead of the uninitialised one.
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => fgRef.current?.zoomToFit(0, 60))
-        })
-      }
+      // Fit is performed by onEngineStop once the lib has ingested
+      // graphData — guarantees fgRef resolved and node bbox is current.
     })
     return () => {
       cancelAnimationFrame(raf)
@@ -535,7 +540,7 @@ export default function TagMapCanvas({
 
   // Graph shape changed → allow the next settle to auto-fit the viewport.
   useEffect(() => {
-    firstFitDoneRef.current = false
+    needsFitRef.current = true
   }, [nodes, edges])
 
   // Purely visual control changes — trigger a repaint without touching
@@ -753,6 +758,7 @@ export default function TagMapCanvas({
             openTagModal([s, t])
           }}
           onNodeHover={(n) => {
+            if (coarsePointerRef.current) return
             if (!n) { setHover(null); return }
             const tn = n as TagNode
             setHover({
@@ -763,12 +769,21 @@ export default function TagMapCanvas({
             })
           }}
           onLinkHover={(l) => {
+            if (coarsePointerRef.current) return
             if (!l) { setHover(null); return }
             const le = l as TagEdge
             const [a, b] = edgeEndpoints(le)
             setHover({ kind: "edge", a, b, inter: le.inter, weight: le.weight })
           }}
           onZoomEnd={(t) => setZoomLevel(t.k)}
+          onEngineStop={() => {
+            // Gated so user-initiated pan/zoom isn't snapped back on
+            // later settles (param tweaks re-run the engine).
+            if (needsFitRef.current) {
+              fgRef.current?.zoomToFit(0, 60)
+              needsFitRef.current = false
+            }
+          }}
           nodeCanvasObjectMode={() => "replace"}
           nodeCanvasObject={(node, ctx, globalScale) => {
             const n = node as TagNode
@@ -1154,7 +1169,7 @@ export default function TagMapCanvas({
         <button
           type="button"
           onClick={() => {
-            firstFitDoneRef.current = false
+            needsFitRef.current = true
             setReseedTick((t) => t + 1)
           }}
           aria-label="Recompute layout"
