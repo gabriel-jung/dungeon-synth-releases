@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 
+// Hex literals here mirror the bg/accent of each theme in app/globals.css.
+// Kept in sync by hand because the swatches paint *before* a theme is applied,
+// so we can't read them off computed styles. Update both files together.
 const themes = [
   { id: "catacombs", bg: "#1a1410", accent: "#a63d2f" },
   { id: "stone", bg: "#12151a", accent: "#5b8fb9" },

@@ -141,8 +141,8 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
             aria-label={`Current palette: ${palette}. Click to cycle.`}
             className="flex h-3 w-14 overflow-hidden rounded-[1px] border border-border hover:border-text-bright transition-colors"
           >
-            {colorStops.map((c, i) => (
-              <div key={i} style={{ background: c }} className="flex-1" />
+            {colorStops.map((c) => (
+              <div key={c} style={{ background: c }} className="flex-1" />
             ))}
           </button>
           <span>More</span>

@@ -125,16 +125,16 @@ export default function AlbumDetail({
       hasInitialRef.current = false
       return
     }
-    let cancelled = false
+    const ctrl = new AbortController()
     setError(false)
-    fetch(`/api/album?id=${albumStub.id}`)
+    fetch(`/api/album?id=${albumStub.id}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then((data) => { if (!cancelled) setAlbum(data) })
-      .catch(() => { if (!cancelled) setError(true) })
-    return () => { cancelled = true }
+      .then((data) => setAlbum(data))
+      .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
+    return () => ctrl.abort()
   }, [albumStub.id, reloadKey])
 
   async function handleShare() {
@@ -164,8 +164,7 @@ export default function AlbumDetail({
 
   const portal = createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center animate-backdrop-in backdrop-blur-xs"
-      style={{ zIndex: 10000, background: "rgba(0,0,0,0.55)" }}
+      className="fixed inset-0 z-[10000] flex items-center justify-center animate-backdrop-in backdrop-blur-xs bg-backdrop"
       onClick={onClose}
     >
       <div

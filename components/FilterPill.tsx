@@ -12,7 +12,7 @@ export default function FilterPill({
   const isInclude = kind === "include"
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] tracking-wide px-1.5 py-0.5 ${
+      className={`inline-flex items-center gap-1 font-display text-[10px] tracking-wide px-1.5 py-0.5 ${
         isInclude
           ? "bg-tag-include/15 text-tag-include border-b border-tag-include/70"
           : "bg-tag-exclude/15 text-tag-exclude border-b border-tag-exclude/70"

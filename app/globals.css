@@ -13,6 +13,10 @@
   --color-tag-include: #4a7a4a;
   --color-tag-exclude: #7a3a3a;
   --color-tag-neutral: #3d3228;
+  /* Modal backdrop is intentionally dark in every theme so dialogs read on
+     both light and dark pages. Lives in @theme so the `bg-backdrop`
+     Tailwind utility is generated. */
+  --color-backdrop: rgba(0, 0, 0, 0.55);
   --font-sans: var(--font-crimson);
   --font-display: var(--font-cinzel);
 }

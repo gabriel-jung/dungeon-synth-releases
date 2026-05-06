@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { Cinzel, Crimson_Text } from "next/font/google"
 import ThemePicker from "@/components/ThemePicker"
 import SearchTrigger from "@/components/SearchTrigger"
@@ -68,14 +69,14 @@ export default async function RootLayout({
         <ScrollDescent />
         <header className="px-4 sm:px-6 pt-6 sm:pt-8">
           <div className="flex items-start justify-between gap-4">
-            <a href="/" className="group flex flex-col">
+            <Link href="/" className="group flex flex-col">
               <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.1em] leading-tight">
                 Dungeon Synth
               </span>
               <span className="font-display text-[10px] sm:text-xs tracking-[0.2em] uppercase text-text-dim mt-1">
                 — Releases from Bandcamp —
               </span>
-            </a>
+            </Link>
             <div className="flex items-center gap-3 sm:gap-4 shrink-0 pt-1">
               <Suspense>
                 <SearchTrigger />

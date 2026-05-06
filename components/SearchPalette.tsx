@@ -111,8 +111,7 @@ export default function SearchPalette() {
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-start justify-center pt-[10vh] sm:pt-[14vh] animate-backdrop-in"
-      style={{ zIndex: 10050, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-[10050] flex items-start justify-center pt-[10vh] sm:pt-[14vh] animate-backdrop-in backdrop-blur-xs bg-backdrop"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
@@ -170,7 +169,7 @@ export default function SearchPalette() {
                     </div>
                     <div className="truncate font-display text-[10px] tracking-[0.1em] uppercase text-text-dim">
                       {a.artist}
-                      {isHostedRelease(a) && <span className="text-border"> · {a.host_name}</span>}
+                      {isHostedRelease(a) && <span className="text-text-dim/60"> · {a.host_name}</span>}
                     </div>
                   </button>
                 </li>

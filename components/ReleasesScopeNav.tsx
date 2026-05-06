@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useOpenModal } from "@/lib/useModalUrl"
 import { yearFromPath } from "@/lib/types"
 
@@ -58,6 +58,10 @@ function PastYearsPicker({
 }) {
   const [open, setOpen] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
 
   const show = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current)

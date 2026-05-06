@@ -66,6 +66,51 @@ type HoverInfo =
   | { kind: "node"; name: string; count: number; conns: number }
   | { kind: "edge"; a: string; b: string; inter: number; weight: number }
 
+// Canvas ctx.fillStyle won't evaluate CSS custom-property strings, so we
+// resolve the active theme's hex once and convert to rgba() with alpha
+// applied per draw call. The canvas paint loop calls this hundreds of
+// times per frame; cache the parsed channels so we never regex+parseInt
+// the same hex twice.
+const RGB_CACHE = new Map<string, [number, number, number] | null>()
+function hexToRgba(hex: string, alpha: number): string {
+  let rgb = RGB_CACHE.get(hex)
+  if (rgb === undefined) {
+    const m = hex.match(/^#?([0-9a-f]{6})$/i)
+    if (m) {
+      const n = parseInt(m[1], 16)
+      rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    } else {
+      rgb = null
+    }
+    RGB_CACHE.set(hex, rgb)
+  }
+  if (!rgb) return hex
+  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`
+}
+
+type ThemeColors = { font: string; text: string; textDim: string; bg: string }
+
+// Synchronous probe used by the lazy state initializer (so canvas paint
+// has real values on the first frame) and by the data-theme observer.
+function readThemeColors(): ThemeColors {
+  if (typeof document === "undefined") {
+    return { font: "serif", text: "", textDim: "", bg: "" }
+  }
+  const probe = document.createElement("span")
+  probe.className = "font-display"
+  probe.style.visibility = "hidden"
+  probe.style.position = "absolute"
+  document.body.appendChild(probe)
+  const cs = getComputedStyle(probe)
+  const font = cs.fontFamily || "serif"
+  const root = getComputedStyle(document.documentElement)
+  const text = root.getPropertyValue("--color-text-bright").trim()
+  const textDim = root.getPropertyValue("--color-text-dim").trim()
+  const bg = root.getPropertyValue("--color-bg").trim()
+  document.body.removeChild(probe)
+  return { font, text, textDim, bg }
+}
+
 export default function TagMapCanvas({
   counts,
   pairs,
@@ -185,6 +230,10 @@ export default function TagMapCanvas({
   // `showAdvanced` avoids re-renders when the panel is closed.
   const showAdvancedRef = useRef(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (shareTimerRef.current) clearTimeout(shareTimerRef.current)
+  }, [])
 
   const debouncedTopN = useDebounced(topN, 200)
   const debouncedRepulsion = useDebounced(repulsion, 150)
@@ -198,8 +247,11 @@ export default function TagMapCanvas({
 
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
   const [ready, setReady] = useState(false)
-  const [fontFamily, setFontFamily] = useState<string>("serif")
-  const [textColor, setTextColor] = useState<string>("#eee")
+  // Lazy initializer reads the active theme synchronously so the first canvas
+  // frame paints with real colors instead of empty strings. The data-theme
+  // observer below keeps the values in sync on theme switch.
+  const [themeColors, setThemeColors] = useState<ThemeColors>(readThemeColors)
+  const { font: fontFamily, text: textColor, textDim: textDimColor, bg: bgColor } = themeColors
   // Incremented whenever we mutate node fx/fy outside the library's engine —
   // forces graphData identity to change so ForceGraph repaints.
   const [repaintTick, setRepaintTick] = useState(0)
@@ -577,21 +629,12 @@ export default function TagMapCanvas({
     return () => ro.disconnect()
   }, [fullscreen])
 
-  // Resolve CSS vars that canvas ctx.font cannot evaluate (Cinzel via
-  // next/font ships as var(--font-cinzel) → var(--font-display)). Also
-  // grab the theme's text-bright color so labels match the SVG version.
+  // Re-resolve when ThemePicker swaps `data-theme` so canvas labels track
+  // the active palette. (Initial values come from the lazy useState above.)
   useEffect(() => {
-    const probe = document.createElement("span")
-    probe.className = "font-display"
-    probe.style.visibility = "hidden"
-    probe.style.position = "absolute"
-    document.body.appendChild(probe)
-    const cs = getComputedStyle(probe)
-    setFontFamily(cs.fontFamily || "serif")
-    const root = getComputedStyle(document.documentElement)
-    const tb = root.getPropertyValue("--color-text-bright").trim()
-    if (tb) setTextColor(tb)
-    document.body.removeChild(probe)
+    const mo = new MutationObserver(() => setThemeColors(readThemeColors()))
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+    return () => mo.disconnect()
   }, [])
 
   // URL param sync (debounced, history.replaceState — no RSC refetch).
@@ -665,13 +708,12 @@ export default function TagMapCanvas({
     if (!container) return
     const canvas = container.querySelector("canvas") as HTMLCanvasElement | null
     if (!canvas) return
-    const bg = getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim() || "#0a0a0a"
     const out = document.createElement("canvas")
     out.width = canvas.width
     out.height = canvas.height
     const ctx = out.getContext("2d")
     if (!ctx) return
-    ctx.fillStyle = bg
+    ctx.fillStyle = bgColor || "#0a0a0a"
     ctx.fillRect(0, 0, out.width, out.height)
     ctx.drawImage(canvas, 0, 0)
     out.toBlob((blob) => {
@@ -689,7 +731,8 @@ export default function TagMapCanvas({
     try {
       await navigator.clipboard.writeText(window.location.href)
       setShareCopied(true)
-      setTimeout(() => setShareCopied(false), 1800)
+      if (shareTimerRef.current) clearTimeout(shareTimerRef.current)
+      shareTimerRef.current = setTimeout(() => setShareCopied(false), 1800)
     } catch {
       // older browsers / insecure contexts
     }
@@ -714,9 +757,9 @@ export default function TagMapCanvas({
       if (!(emph(s.id) || emph(t.id))) alpha = baseA * 0.25
     }
     return same
-      ? `rgba(180,180,180,${alpha})`
-      : `rgba(120,120,120,${alpha})`
-  }, [hiTags, hiNeighbors])
+      ? hexToRgba(textColor, alpha)
+      : hexToRgba(textDimColor, alpha)
+  }, [hiTags, hiNeighbors, textColor, textDimColor])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkWidth = useCallback((l: any) => 0.5 + ((l as TagEdge).weight / maxWeight) * 2, [maxWeight])
@@ -831,7 +874,7 @@ export default function TagMapCanvas({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ;(ctx as any).letterSpacing = `${fs * 0.04}px`
             ctx.lineWidth = 2.5 / globalScale
-            ctx.strokeStyle = "rgba(20,20,20,0.7)"
+            ctx.strokeStyle = hexToRgba(bgColor, 0.7)
             ctx.lineJoin = "round"
             const ty = (n.y ?? 0) + labelYOffset(r)
             ctx.strokeText(n.id, n.x ?? 0, ty)
@@ -1007,7 +1050,7 @@ export default function TagMapCanvas({
                     {spacingStats && (
                       <span
                         className={`tabular-nums text-[9px] normal-case tracking-normal ${
-                          spacingStats.ratio < 2 ? "text-red-400/80" : "text-text-dim"
+                          spacingStats.ratio < 2 ? "text-accent" : "text-text-dim"
                         }`}
                         title={`Measured inter/intra ratio: ${spacingStats.inter.toFixed(0)}px / ${spacingStats.intra.toFixed(0)}px`}
                       >
@@ -1197,7 +1240,7 @@ export default function TagMapCanvas({
             onClick={() => { setAboutOpen((v) => !v); if (showAdvanced) setShowAdvanced(false) }}
             aria-expanded={aboutOpen}
             aria-label="About this map"
-            className={`w-7 h-7 flex items-center justify-center backdrop-blur-sm border rounded-sm font-serif italic text-sm transition-colors ${
+            className={`w-7 h-7 flex items-center justify-center backdrop-blur-sm border rounded-sm font-sans italic text-sm transition-colors ${
               aboutOpen
                 ? "bg-bg/90 border-accent/40 text-accent"
                 : "bg-bg/75 border-border/60 hover:text-text hover:border-accent/50"
@@ -1403,7 +1446,7 @@ export default function TagMapCanvas({
             <div className="font-display text-accent/60 text-sm tracking-[0.25em] uppercase mb-1">
               ❧ empty cartography
             </div>
-            <div className="font-serif italic text-text-dim text-xs">
+            <div className="font-sans italic text-text-dim text-xs">
               no {labelPlural} match the current filter
             </div>
           </div>

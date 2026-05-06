@@ -48,7 +48,7 @@ function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDat
         {showHostInline && (
           <button
             onClick={(e) => { e.stopPropagation(); openHost() }}
-            className="text-[10px] text-text-dim/60 hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate font-display tracking-wide uppercase"
+            className="text-[10px] text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer text-left truncate font-display tracking-wide uppercase"
           >
             {album.host_name}
           </button>
