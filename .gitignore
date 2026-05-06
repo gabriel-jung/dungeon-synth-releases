@@ -46,7 +46,5 @@ next-env.d.ts
 .idea/
 .vscode/
 .claude/
-CLAUDE.md
-AGENTS.md
 PLAN.md
 AUDIT.md

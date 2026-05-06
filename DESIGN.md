@@ -62,7 +62,7 @@ Two places hold hex literals on purpose. Don't add a third without a comment exp
 
 ### Themes (10)
 
-Each theme replaces every `--color-*` token under a `[data-theme="<name>"]` selector. The default (no `data-theme` attr) matches `catacombs`. A few representative palettes:
+Each theme replaces every `--color-*` token under a `[data-theme="<name>"]` selector. The default (no `data-theme` attr) matches `catacombs`. The active theme is persisted to `localStorage` and read by an inline `<script>` in `<head>` *before* hydration, so a returning visitor on a non-default theme never sees the Catacombs default flash. A few representative palettes:
 
 | Theme | bg | text | accent | Mood |
 |-------|----|------|--------|------|
@@ -160,7 +160,21 @@ Backdrop: `fixed inset-0` + `backdrop-blur-xs` + `rgba(0,0,0,0.55)`. Dialog: `bg
 
 Modal headers carry: cover/avatar tile (10×10) · title block (`<h2>` + dim subtitle) · filter pills cluster · ViewToggle · back arrow (`←`) · close (`×`). Close is always top-right. Back is always immediately left of the view toggle.
 
-`AlbumDetail` is the documented exception — it rolls its own portal because its layout is a side-by-side cover + metadata pane (`max-w-2xl`, `sm:flex-row`) that the size-bucketed `ModalShell` can't host without contortion. Backdrop, animations, and z-index match `ModalShell`; only the dialog frame differs.
+`AlbumDetail` is the documented exception — it rolls its own portal because its layout is a side-by-side cover + metadata pane (`max-w-2xl`, `sm:flex-row`) that the size-bucketed `ModalShell` can't host without contortion. Backdrop, animations, and z-index match `ModalShell`; only the dialog frame differs. `DeepAlbumSkeleton` mirrors the same frame and renders while a deep-linked album fetches.
+
+### Skeletons
+
+While data loads, modals render skeletons rather than blank frames or spinners.
+
+- `GridSkeleton` / `ListSkeleton` (`components/ModalSkeletons.tsx`) — for `ScopeModal`, `DayModal`, `UpcomingModal` body content. `animate-pulse` on the wrapper, placeholder bars sized to match the loaded card heights one-for-one (zero CLS on swap).
+- `DeepAlbumSkeleton` — full modal frame with cover placeholder + text-bar stack. Pulse only on the inner placeholder column so the modal-in entrance animation isn't doubled.
+- `CalendarHeatmapSkeleton` (inside `HeatmapPopoverButton`) — 53×7 grid placeholder using the same grid template as the real calendar so popover height stays stable.
+- `TagContextBarsSkeleton` — used inside genre `ScopeModal` while the tag-context fetch is in flight.
+
+### Navigation feedback
+
+- `NavigationProgress` — 2px accent-coloured bar fixed at the top, fires on every soft nav (any `pathname` or non-modal `searchParam` change). Modal toggles use `pushState` and intentionally don't trigger it. Decays over 500ms.
+- `<a href="#main-content">` skip link — sr-only by default, becomes visible on focus. Lets keyboard users jump past the masthead into the feed.
 
 ### Ranked list rows (`HostRow`, `TagRow`, `BarRow` candidate)
 
@@ -269,8 +283,9 @@ Z-index ladder (low → high):
 | `9997` | Scroll-descent overlay |
 | `9998` | Vignette |
 | `9999` | Paper-noise texture |
-| `10000` | Modal dialog (`ModalShell`, `AlbumDetail`) and theme-picker popover (intentionally coplanar — they never coexist) |
+| `10000` | Modal dialog (`ModalShell`, `AlbumDetail`, `DeepAlbumSkeleton`) and theme-picker popover (intentionally coplanar — they never coexist) |
 | `10050` | Search palette (always on top so ⌘K works mid-modal) |
+| `10100` | Skip-to-content link (focus state) and `NavigationProgress` bar — must clear every other surface |
 
 Hover elevation:
 

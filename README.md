@@ -31,9 +31,10 @@ Past years, upcoming releases, and album / artist / host / day / tag detail view
 - **Command-palette search** — `SearchPalette` opened via ⌘K, `/`, or the header trigger. Hits `/api/search` (`ilike` substring across artist/title/host name, 50-row cap).
 - **TagMap on `/genres` and `/themes`** — canvas force graph with Louvain clustering, four similarity metrics, top-N / density / min-links filters, PNG export, shareable URL state. See [docs/genres.md](docs/genres.md).
 - **Stats dashboard** — releases-per-year bar, top hosts, track / duration histograms, popular genres + themes. See [docs/stats.md](docs/stats.md).
-- **Cache Components + ISR** — `"use cache"` + `cacheLife("days")` + `cacheTag("genres")` (TagMap, scope-modal tag bars, global tag filter list) / `cacheTag("stats")`. Two daily Vercel crons hit `/api/revalidate` to bust each tag after upstream ingests (see `vercel.json`).
+- **Cache Components + ISR** — `"use cache"` + `cacheLife("days")` + `cacheTag("genres")` (TagMap, scope-modal tag bars, global tag filter list, year count, recent feed) / `cacheTag("stats")`. Two daily Vercel crons hit `/api/revalidate` to bust each tag after upstream ingests (see `vercel.json`).
 - **Hotlinked cover art** — album art served direct from Bandcamp via plain `<img>` (zero Vercel egress, no `next/image`).
-- **10 color themes**, scroll descent, adjustable paper texture.
+- **10 color themes**, scroll descent, adjustable paper texture. Pre-hydration script in `<head>` stamps the saved theme synchronously so non-default themes don't flash the default on cold load.
+- **UX polish** — top-of-page progress bar on every soft nav, skeleton frames for deep-linked album modal + heatmap popover, sr-only skip-to-content link.
 
 ## Setup
 
@@ -59,6 +60,7 @@ npm run dev
 
 ## Docs
 
+- [DESIGN.md](DESIGN.md) — visual system spec (palette, typography, components, sigil iconography)
 - [docs/structure.md](docs/structure.md) — routing model, URL-driven modals, data loading strategy
 - [docs/schema.md](docs/schema.md) — Supabase tables + RPC signatures
 - [docs/rpc.sql](docs/rpc.sql) — full RPC bodies (source of truth for function logic)
