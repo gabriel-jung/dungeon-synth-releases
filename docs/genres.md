@@ -19,7 +19,7 @@ Two RPCs aggregate from the filtered category set. Both **return `jsonb` in a si
 - **`tag_counts(p_category default 'genre', p_top_k)`** — jsonb array of `{ name, n }`, where `n` is how many albums carry that tag. `p_top_k` caps to the K most-used tags; `NULL` = unbounded.
 - **`tag_pairs(p_category default 'genre', p_top_k)`** — jsonb array of `{ tag_a, tag_b, n }` for each unordered pair of tags in the category that co-occur on at least one album. When `p_top_k` is set, pairs are restricted to those where both tags are among the top K — bounds the result at C(K,2) and keeps the self-join over a small tag set.
 
-`fetchTagMap` passes `p_top_k = TAG_MAP_TOP_K` (currently `null`, i.e. unbounded; `scripts/tune-tagmap.mts` overrides) to both and parses the single jsonb row client-side. Cached with `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-map-{category}")`.
+`fetchTagMap` passes `p_top_k = TAG_MAP_TOP_K` (currently `300` — the unbounded variant blows Supabase's 8s statement timeout on the `tag_pairs` self-join at corpus scale; `scripts/tune-tagmap.mts` overrides) to both and parses the single jsonb row client-side. Cached with `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-map-{category}")`.
 
 ### 4. Graph construction (client, shared logic)
 

@@ -4,8 +4,10 @@ import type { TagCount, TagPair } from "@/lib/tagMapLogic"
 
 // Server-side cap on tags included in the map. Both counts and pairs are
 // restricted to the top K tags by count, so pair payload is bounded by
-// C(K,2) and the self-join in `tag_pairs` stays small. NULL = unbounded.
-export const TAG_MAP_TOP_K: number | null = null
+// C(K,2) and the self-join in `tag_pairs` stays small. Hard cap of 300
+// keeps the SQL self-join under Supabase's 8s statement timeout — going
+// unbounded blew the build prerender on /genres at corpus scale.
+export const TAG_MAP_TOP_K: number | null = 300
 
 // Lazy-regenerated on visit. Zero traffic = zero Supabase queries. Cron
 // calls /api/revalidate?tag=genres to push a new version when new data
