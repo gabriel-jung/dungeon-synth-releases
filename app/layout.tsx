@@ -6,6 +6,7 @@ import SearchTrigger from "@/components/SearchTrigger"
 import SearchPalette from "@/components/SearchPalette"
 import TabBar from "@/components/TabBar"
 import ScrollDescent from "@/components/ScrollDescent"
+import NavigationProgress from "@/components/NavigationProgress"
 import ModalRouter from "@/components/ModalRouter"
 import TagFilter from "@/components/TagFilter"
 import FilterChips from "@/components/FilterChips"
@@ -65,7 +66,27 @@ export default async function RootLayout({
       lang="en"
       className={`${cinzel.variable} ${crimsonText.variable} antialiased`}
     >
+      <head>
+        {/* Stamp data-theme + texture-opacity from localStorage *before* the
+            first paint so non-default themes don't flash the default palette
+            during hydration. Wrapped in try/catch — Safari private mode and
+            disabled-storage browsers throw on access. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t)document.documentElement.setAttribute("data-theme",t);var o=localStorage.getItem("texture-opacity");if(o!==null)document.documentElement.style.setProperty("--texture-opacity",o)}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="h-dvh flex flex-col font-sans overflow-hidden">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[10100] focus:bg-bg focus:text-accent focus:px-3 focus:py-1 focus:border focus:border-accent focus:font-display focus:text-xs focus:uppercase focus:tracking-[0.15em] focus:no-underline"
+        >
+          Skip to content
+        </a>
+        <Suspense>
+          <NavigationProgress />
+        </Suspense>
         <ScrollDescent />
         <header className="px-4 sm:px-6 pt-6 sm:pt-8">
           <div className="flex items-start justify-between gap-4">
@@ -100,7 +121,7 @@ export default async function RootLayout({
         <Suspense>
           <TagFilter tags={allTags} />
         </Suspense>
-        <main className="flex-1 min-h-0">
+        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0">
           <Suspense>{children}</Suspense>
         </main>
         <Suspense>

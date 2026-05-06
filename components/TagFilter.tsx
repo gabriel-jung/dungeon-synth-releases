@@ -69,6 +69,10 @@ export default function TagFilter({ tags }: { tags: string[] }) {
     setLocalExcluded(new Set(searchParams.getAll("xtag")))
   }, [searchParams])
 
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
   const activeCount = localIncluded.size + localExcluded.size
 
   const topTags = tags.slice(0, TOP_COUNT).sort()

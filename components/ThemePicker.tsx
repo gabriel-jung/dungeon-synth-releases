@@ -19,23 +19,20 @@ const themes = [
 ]
 
 export default function ThemePicker() {
-  const [theme, setTheme] = useState("catacombs")
+  // Both initial values come from the inline pre-hydration script that
+  // stamps data-theme + --texture-opacity on documentElement from
+  // localStorage. Reading them off the DOM here keeps state in sync
+  // without a second flash on mount.
+  const [theme, setTheme] = useState(() => {
+    if (typeof document === "undefined") return "catacombs"
+    return document.documentElement.getAttribute("data-theme") || "catacombs"
+  })
   const [textureOpacity, setTextureOpacity] = useState(() => {
     if (typeof window === "undefined") return 0.075
     return parseFloat(localStorage.getItem("texture-opacity") ?? "0.075")
   })
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved) {
-      setTheme(saved)
-      document.documentElement.setAttribute("data-theme", saved)
-    }
-    const savedOpacity = parseFloat(localStorage.getItem("texture-opacity") ?? "0.075")
-    applyTexture(savedOpacity)
-  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -77,6 +74,11 @@ export default function ThemePicker() {
           background: `linear-gradient(135deg, ${current.bg} 50%, ${current.accent} 50%)`,
         }}
         aria-label="Change theme"
+        // The pre-hydration script may have set data-theme to a saved
+        // non-default value; SSR renders the catacombs gradient. Skip the
+        // hydration check on this single element — the swatch snaps to the
+        // user's theme on first commit either way.
+        suppressHydrationWarning
       />
 
       {open && (

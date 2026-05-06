@@ -7,6 +7,7 @@ import { ALL_MODAL_KINDS, pushModalUrl, readModalState, toQueryString } from "@/
 import { useModalSearchParams } from "@/lib/useModalUrl"
 import { getAlbumStub } from "@/lib/albumCache"
 import AlbumDetail from "./AlbumDetail"
+import DeepAlbumSkeleton from "./DeepAlbumSkeleton"
 import ScopeModal, { type ScopeKind } from "./ScopeModal"
 import DayModal from "./DayModal"
 import UpcomingModal from "./UpcomingModal"
@@ -87,7 +88,6 @@ function DeepAlbum({ id, onClose }: { id: string; onClose: () => void }) {
   useEffect(() => {
     if (getAlbumStub(id)) return
     const ctrl = new AbortController()
-    setStub(null)
     fetch(`/api/album?id=${id}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setStub(rpcRowToAlbumListItem(data)) })
@@ -95,6 +95,6 @@ function DeepAlbum({ id, onClose }: { id: string; onClose: () => void }) {
     return () => ctrl.abort()
   }, [id])
 
-  if (!stub) return null
+  if (!stub) return <DeepAlbumSkeleton onClose={onClose} />
   return <AlbumDetail albumStub={stub} onClose={onClose} />
 }

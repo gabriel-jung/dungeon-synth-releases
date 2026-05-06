@@ -6,6 +6,42 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { tagFilterQs, yearFromPath } from "@/lib/types"
 import CalendarHeatmap from "./CalendarHeatmap"
 
+// Calendar-shaped placeholder rendered while /api/daily is in flight. Mirrors
+// CalendarHeatmap's grid template so the popover height doesn't jump when
+// the real data lands.
+function CalendarHeatmapSkeleton() {
+  // ISO years span 52 or 53 weeks; use 53 as the ceiling so the skeleton
+  // never undershoots the real grid (one column of overshoot is invisible
+  // behind the popover and disappears the moment data lands).
+  const totalWeeks = 53
+  return (
+    <div className="w-full overflow-x-auto">
+      <div className="h-6 mb-2" />
+      <div
+        className="grid w-full animate-pulse"
+        style={{ gridTemplateColumns: `auto repeat(${totalWeeks}, minmax(14px, 1fr))` }}
+      >
+        {Array.from({ length: 7 }).map((_, dow) => (
+          <div key={`r-${dow}`} className="pr-2" style={{ gridColumnStart: 1, gridRowStart: dow + 2 }} />
+        ))}
+        {Array.from({ length: totalWeeks * 7 }).map((_, i) => {
+          const w = Math.floor(i / 7)
+          const d = i % 7
+          return (
+            <div
+              key={i}
+              className="p-[1.5px]"
+              style={{ gridColumnStart: w + 2, gridRowStart: d + 2 }}
+            >
+              <div className="aspect-square rounded-[2px] border border-bg/60 bg-bg-card" />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // Calendar icon that reveals a floating heatmap popover. Collapsed state is
 // a single-icon button so the scope row takes no extra vertical space. Popover
 // is portalled and positioned with getBoundingClientRect so it fits regardless
@@ -95,9 +131,7 @@ export default function HeatmapPopoverButton({
       {days ? (
         <CalendarHeatmap days={days} year={year} today={today} />
       ) : (
-        <div className="h-24 flex items-center justify-center text-text-dim text-xs italic animate-pulse">
-          loading…
-        </div>
+        <CalendarHeatmapSkeleton />
       )}
     </div>,
     document.body,
