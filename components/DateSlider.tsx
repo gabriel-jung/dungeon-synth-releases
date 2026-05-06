@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { MONTH_NAMES } from "@/lib/types"
 import { ShortDate } from "./DateHeading"
 
 function HorizontalSlider({
@@ -74,10 +75,6 @@ function HorizontalSlider({
   )
 }
 
-function monthLabel(m: number): string {
-  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m]
-}
-
 export default function DateSlider({
   dates,
   orientation = "vertical",
@@ -100,6 +97,16 @@ export default function DateSlider({
     const list = document.getElementById("release-list")
     if (!list) return
 
+    // Section list is rebuilt as DaySection mounts/unmounts. Refresh the cache
+    // when the DOM mutates rather than re-querying on every scroll tick.
+    let sections: HTMLElement[] = Array.from(
+      list.querySelectorAll<HTMLElement>("section[id^='date-']"),
+    )
+    const mo = new MutationObserver(() => {
+      sections = Array.from(list.querySelectorAll<HTMLElement>("section[id^='date-']"))
+    })
+    mo.observe(list, { childList: true, subtree: true })
+
     function onScroll() {
       if (dragging.current) return
 
@@ -109,7 +116,6 @@ export default function DateSlider({
         return
       }
 
-      const sections = list!.querySelectorAll<HTMLElement>("section[id^='date-']")
       let closestDate: string | null = null
       for (const section of sections) {
         const top = section.offsetTop - list!.offsetTop - list!.scrollTop
@@ -129,7 +135,10 @@ export default function DateSlider({
     }
 
     list.addEventListener("scroll", onScroll, { passive: true })
-    return () => list.removeEventListener("scroll", onScroll)
+    return () => {
+      list.removeEventListener("scroll", onScroll)
+      mo.disconnect()
+    }
   }, [dates])
 
   const scrollToDate = useCallback((dateStr: string, smooth = false) => {
@@ -239,40 +248,42 @@ export default function DateSlider({
     if (dates[next]) scrollToDate(dates[next])
   }
 
+  // Month dots at first-of-month, labels centered between consecutive dots.
+  // Memoised so scroll-driven `index` changes don't re-walk the dates array.
+  // Computed before the mounted/empty early return so hook order stays stable.
+  const { monthDots, monthLabels } = useMemo(() => {
+    const dots: { label: string; frac: number; pos: string }[] = []
+    const seenMonths = new Set<number>()
+    for (let i = 0; i < count; i++) {
+      const m = new Date(dates[i] + "T00:00:00").getMonth()
+      if (seenMonths.has(m)) continue
+      seenMonths.add(m)
+      const f = count <= 1 ? 0 : i / (count - 1)
+      dots.push({
+        label: MONTH_NAMES[m],
+        frac: f,
+        pos: `calc(8px + ${f} * (100% - 16px))`,
+      })
+    }
+    const labels: { label: string; pos: string }[] = []
+    for (let i = 0; i < dots.length; i++) {
+      const startF = dots[i].frac
+      const endF = i + 1 < dots.length ? dots[i + 1].frac : (count <= 1 ? 0 : 1)
+      const midF = (startF + endF) / 2
+      labels.push({
+        label: dots[i].label,
+        pos: `calc(8px + ${midF} * (100% - 16px))`,
+      })
+    }
+    return { monthDots: dots, monthLabels: labels }
+  }, [dates, count])
+
   if (!mounted || count === 0) {
     return horiz ? <div style={{ height: "44px" }} /> : <div style={{ width: "70px" }} />
   }
 
   const frac = count <= 1 ? 0 : index / (count - 1)
   const pos = `calc(8px + ${frac} * (100% - 16px))`
-
-  // Month dots at first-of-month, labels centered between consecutive dots
-  const monthDots: { label: string; frac: number; pos: string }[] = []
-  const seenMonths = new Set<number>()
-  for (let i = 0; i < count; i++) {
-    const m = new Date(dates[i] + "T00:00:00").getMonth()
-    if (!seenMonths.has(m)) {
-      seenMonths.add(m)
-      const f = count <= 1 ? 0 : i / (count - 1)
-      monthDots.push({
-        label: monthLabel(m),
-        frac: f,
-        pos: `calc(8px + ${f} * (100% - 16px))`,
-      })
-    }
-  }
-
-  // Labels positioned between consecutive dots
-  const monthLabels: { label: string; pos: string }[] = []
-  for (let i = 0; i < monthDots.length; i++) {
-    const startF = monthDots[i].frac
-    const endF = i + 1 < monthDots.length ? monthDots[i + 1].frac : (count <= 1 ? 0 : 1)
-    const midF = (startF + endF) / 2
-    monthLabels.push({
-      label: monthDots[i].label,
-      pos: `calc(8px + ${midF} * (100% - 16px))`,
-    })
-  }
 
   if (horiz) {
     return <HorizontalSlider

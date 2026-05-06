@@ -16,6 +16,7 @@ export type ModalKind = "album" | "artist" | "host" | "genre" | "xgenre" | "upco
 
 const SINGLE_KINDS: ModalKind[] = ["album", "artist", "host", "upcoming", "day"]
 const MULTI_KINDS: ModalKind[] = ["genre", "xgenre"]
+export const ALL_MODAL_KINDS: ModalKind[] = [...SINGLE_KINDS, ...MULTI_KINDS]
 
 export interface ModalState {
   album: string | null

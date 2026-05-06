@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRef, useState } from "react"
 import { useOpenModal } from "@/lib/useModalUrl"
+import { yearFromPath } from "@/lib/types"
 
 const ITEM = "font-display text-[11px] tracking-[0.15em] uppercase transition-colors py-1 cursor-pointer"
 const INACTIVE = "text-text-dim hover:text-text"
@@ -44,11 +45,6 @@ export default function ReleasesScopeNav({ pastYears = [] }: { pastYears?: numbe
 
 function Sep() {
   return <span aria-hidden className="text-border text-[10px] leading-none select-none">·</span>
-}
-
-function yearFromPath(pathname: string): number | null {
-  const m = pathname.match(/^\/releases\/(\d{4})\b/)
-  return m ? Number(m[1]) : null
 }
 
 function PastYearsPicker({

@@ -1,11 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatDateShort, localDateStr, releaseCount } from "@/lib/types"
+import { MONTH_NAMES, formatDateShort, localDateStr, releaseCount } from "@/lib/types"
 import { useOpenModal } from "@/lib/useModalUrl"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 const PALETTES = {
   theme: [

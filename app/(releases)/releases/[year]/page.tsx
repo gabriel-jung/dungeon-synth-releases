@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { connection } from "next/server"
 import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, dateRange, parseTagParams } from "@/lib/types"
+import { AlbumListItem, dateRange, dedupeById, parseTagParams } from "@/lib/types"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
@@ -51,12 +51,7 @@ export default async function YearReleasesPage({
       p_limit: 500,
     })
     if (error) throw new Error(`list_filtered_albums RPC failed: ${error.message}`)
-    const seen = new Set<string>()
-    rows = (data ?? []).map(rpcRowToAlbumListItem).filter((a: AlbumListItem) => {
-      if (seen.has(a.id)) return false
-      seen.add(a.id)
-      return true
-    })
+    rows = dedupeById((data ?? []).map(rpcRowToAlbumListItem))
   } else {
     const { data, error } = await supabase
       .from("albums")

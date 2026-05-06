@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { AlbumListItem, parseWeekKey, weekKeyOf } from "@/lib/types"
+import { AlbumListItem, parseWeekKey, tagFilterQs, weekKeyOf } from "@/lib/types"
 import DaySection from "./DaySection"
 import DateHeading from "./DateHeading"
 
@@ -79,6 +79,9 @@ export default function ReleaseList({
   // rows so the infinite-scroll loader doesn't re-request them. Reset below
   // whenever the filter or initial rows change.
   const loadedWeeksRef = useRef<Set<string>>(new Set())
+  // Mirror of every album id currently in state, kept in lockstep with
+  // setExtraAlbums so we can drop dupes without rebuilding a Set per fetch.
+  const loadedIdsRef = useRef<Set<string>>(new Set())
 
   const albums = useMemo(() => [...initialAlbums, ...extraAlbums], [initialAlbums, extraAlbums])
 
@@ -92,22 +95,26 @@ export default function ReleaseList({
     }, null)
   }, [albums])
 
-  const tagQs = useMemo(() => {
-    const parts: string[] = []
-    for (const t of searchParams.getAll("tag")) parts.push(`tag=${encodeURIComponent(t)}`)
-    for (const t of searchParams.getAll("xtag")) parts.push(`xtag=${encodeURIComponent(t)}`)
-    return parts.join("&")
-  }, [searchParams])
+  const tagQs = useMemo(() => tagFilterQs(searchParams), [searchParams])
+
+  // Initial loaded-weeks set, derived from the SSR rows. Memoised so a parent
+  // re-render that recreates `initialAlbums` doesn't force a re-walk.
+  const initialLoadedWeeks = useMemo(() => {
+    const s = new Set<string>()
+    for (const a of initialAlbums) {
+      if (a.date && a.date !== "Unknown") s.add(weekKeyOf(a.date))
+    }
+    return s
+  }, [initialAlbums])
+  const initialIds = useMemo(() => new Set(initialAlbums.map((a) => a.id)), [initialAlbums])
 
   // Stale extras would bleed across filter changes.
   useEffect(() => {
     setExtraAlbums([])
     setExhausted(false)
-    loadedWeeksRef.current = new Set()
-    for (const a of initialAlbums) {
-      if (a.date && a.date !== "Unknown") loadedWeeksRef.current.add(weekKeyOf(a.date))
-    }
-  }, [tagQs, initialAlbums])
+    loadedWeeksRef.current = new Set(initialLoadedWeeks)
+    loadedIdsRef.current = new Set(initialIds)
+  }, [tagQs, initialLoadedWeeks, initialIds])
 
   // Fetch a single ISO week bucket. Weeks are cache-stable; client never
   // requests arbitrary date ranges — slider drags and scroll both resolve
@@ -122,15 +129,16 @@ export default function ReleaseList({
     const res = await fetch(`/api/albums?week=${weekKey}&limit=500${extra}${clamps}`)
     const { albums: more } = await res.json() as { albums: AlbumListItem[] }
     if (more && more.length > 0) {
-      setExtraAlbums((prev) => {
-        const seen = new Set(prev.map((a) => a.id))
-        for (const a of initialAlbums) seen.add(a.id)
-        const fresh = more.filter((a) => !seen.has(a.id))
-        return [...prev, ...fresh]
-      })
+      const fresh: AlbumListItem[] = []
+      for (const a of more) {
+        if (loadedIdsRef.current.has(a.id)) continue
+        loadedIdsRef.current.add(a.id)
+        fresh.push(a)
+      }
+      if (fresh.length > 0) setExtraAlbums((prev) => [...prev, ...fresh])
     }
     return more?.length ?? 0
-  }, [tagQs, lowerBound, upperBound, initialAlbums])
+  }, [tagQs, lowerBound, upperBound])
 
   // Advance one week beyond the edge date (older for past, newer for future)
   // and stop when a boundary is reached or many empty weeks pile up.

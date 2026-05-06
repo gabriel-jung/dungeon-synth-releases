@@ -17,28 +17,26 @@ export default function SearchPalette() {
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const openRef = useRef(open)
+  openRef.current = open
   const openModal = useOpenModal()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const isTyping = (() => {
-        const t = e.target as HTMLElement | null
-        if (!t) return false
-        const tag = t.tagName
-        return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable
-      })()
+      const t = e.target as HTMLElement | null
+      const isTyping = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
       const cmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"
       const slash = e.key === "/" && !isTyping
       if (cmdK || slash) {
         e.preventDefault()
         setOpen((v) => !v)
-      } else if (e.key === "Escape" && open) {
+      } else if (e.key === "Escape" && openRef.current) {
         setOpen(false)
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [open])
+  }, [])
 
   useEffect(() => {
     // Let any external trigger open the palette without keyboard-coupling.

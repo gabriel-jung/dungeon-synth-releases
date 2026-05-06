@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { usePathname, useSearchParams } from "next/navigation"
+import { tagFilterQs, yearFromPath } from "@/lib/types"
 import CalendarHeatmap from "./CalendarHeatmap"
 
 // Calendar icon that reveals a floating heatmap popover. Collapsed state is
@@ -17,16 +18,10 @@ export default function HeatmapPopoverButton({
   defaultYear: number
 }) {
   const pathname = usePathname() ?? "/"
-  const yearMatch = pathname.match(/^\/releases\/(\d{4})$/)
-  const year = yearMatch ? Number(yearMatch[1]) : defaultYear
+  const year = yearFromPath(pathname) ?? defaultYear
 
   const searchParams = useSearchParams()
-  const tagQs = useMemo(() => {
-    const parts: string[] = []
-    for (const t of searchParams.getAll("tag")) parts.push(`tag=${encodeURIComponent(t)}`)
-    for (const t of searchParams.getAll("xtag")) parts.push(`xtag=${encodeURIComponent(t)}`)
-    return parts.join("&")
-  }, [searchParams])
+  const tagQs = useMemo(() => tagFilterQs(searchParams), [searchParams])
 
   const [open, setOpen] = useState(false)
   const [days, setDays] = useState<{ date: string; n: number }[] | null>(null)

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
-import { supabase, ALBUM_LIST_SELECT, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
+import { supabase, ALBUM_LIST_SELECT, paginateAll, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
 import { AlbumListItem, coverUrl, localDateStr, dateRange, dedupeById, parseTagParams, pickLatestDate } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import DateSlider from "@/components/DateSlider"
@@ -87,53 +87,47 @@ export default async function Page({
   } else {
     // Unfiltered path: only fetch last 7 days for fast initial load.
     const cutoff = allDates[6]
-    const PAGE = 1000
-    let from = 0
-    while (true) {
+    const rows = await paginateAll(async (from, to) => {
       const { data, error } = await supabase
         .from("albums")
         .select(ALBUM_LIST_SELECT)
         .lte("date", today)
         .gte("date", cutoff)
         .order("date", { ascending: false })
-        .range(from, from + PAGE - 1)
+        .range(from, to)
       if (error) throw new Error(`albums query failed: ${error.message}`)
-      if (!data || data.length === 0) break
-      for (const r of data) allRows.push(toAlbumListItem(r))
-      if (data.length < PAGE) break
-      from += PAGE
-    }
+      return data
+    })
+    for (const r of rows) allRows.push(toAlbumListItem(r))
   }
 
   const deduped = dedupeById(allRows)
   const expandDate = pickLatestDate(deduped)
 
   return (
-    <>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
-        <div className="flex flex-col sm:flex-row sm:gap-4 h-full">
-          {/* Horizontal date slider — mobile only */}
-          <div className="sm:hidden shrink-0">
-            <Suspense>
-              <DateSlider dates={allDates} orientation="horizontal" />
-            </Suspense>
-            <hr className="border-border" />
-          </div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full">
+      <div className="flex flex-col sm:flex-row sm:gap-4 h-full">
+        {/* Horizontal date slider — mobile only */}
+        <div className="sm:hidden shrink-0">
+          <Suspense>
+            <DateSlider dates={allDates} orientation="horizontal" />
+          </Suspense>
+          <hr className="border-border" />
+        </div>
 
-          <div className="flex-1 min-w-0 flex flex-col overflow-y-auto" id="release-list" style={{ scrollbarWidth: "none" }}>
-            <Suspense>
-              <ReleaseList albums={deduped} expandDate={expandDate} hasMore lowerBound={yearStart} />
-            </Suspense>
-          </div>
+        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto" id="release-list" style={{ scrollbarWidth: "none" }}>
+          <Suspense>
+            <ReleaseList albums={deduped} expandDate={expandDate} hasMore lowerBound={yearStart} />
+          </Suspense>
+        </div>
 
-          {/* Vertical date slider — desktop only */}
-          <div className="hidden sm:block shrink-0" style={{ width: "70px" }}>
-            <Suspense>
-              <DateSlider dates={allDates} />
-            </Suspense>
-          </div>
+        {/* Vertical date slider — desktop only */}
+        <div className="hidden sm:block shrink-0" style={{ width: "70px" }}>
+          <Suspense>
+            <DateSlider dates={allDates} />
+          </Suspense>
         </div>
       </div>
-    </>
+    </div>
   )
 }

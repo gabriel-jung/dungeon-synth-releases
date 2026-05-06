@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AlbumListItem, rpcRowToAlbumListItem } from "@/lib/types"
-import { closeModal, pushModalUrl, readModalState, toQueryString, type ModalKind } from "@/lib/modalUrl"
+import { ALL_MODAL_KINDS, pushModalUrl, readModalState, toQueryString } from "@/lib/modalUrl"
 import { useModalSearchParams } from "@/lib/useModalUrl"
 import { getAlbumStub } from "@/lib/albumCache"
 import AlbumDetail from "./AlbumDetail"
@@ -25,8 +25,7 @@ export default function ModalRouter() {
   // (and each modal's header back arrow, which calls `router.back`).
   const closeAll = useCallback(() => {
     const current = new URLSearchParams(window.location.search)
-    const MODAL_KINDS: ModalKind[] = ["album", "artist", "host", "genre", "xgenre", "upcoming", "day"]
-    for (const kind of MODAL_KINDS) current.delete(kind)
+    for (const kind of ALL_MODAL_KINDS) current.delete(kind)
     pushModalUrl(`${pathname}${toQueryString(current)}`)
   }, [pathname])
 

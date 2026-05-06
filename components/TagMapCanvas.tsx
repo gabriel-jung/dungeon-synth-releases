@@ -299,9 +299,11 @@ export default function TagMapCanvas({
 
   // Font strings are parsed by the Canvas API each time `ctx.font = …` is
   // assigned. At 1000 nodes/frame that's 60k parses/sec. Cache the
-  // constructed string per distinct count — invalidated when labelSize,
-  // fontFamily, or the count domain shifts.
-  const fontStringCache = useMemo(() => new Map<number, string>(), [fontScale, fontFamily])
+  // constructed string per distinct count. Deps are the primitives that
+  // determine cache validity — they don't appear in the body but bumping
+  // any of them must drop the cache so stale strings don't paint.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fontStringCache = useMemo(() => new Map<number, string>(), [maxCount, labelSize, fontFamily])
 
 
   const labelSet = useMemo(() => {
@@ -381,25 +383,36 @@ export default function TagMapCanvas({
       }
     }
 
+    // Cluster membership is fixed for the lifetime of this simulation —
+    // build the per-cluster member list once. Per-tick work then just sums
+    // positions and runs the pairwise repulsion.
+    type Agg = { x: number; y: number; count: number; r: number; members: TagNode[] }
+    const clusterAggs: Agg[] = []
+    {
+      const byId = new Map<number, Agg>()
+      for (const n of nodes) {
+        let a = byId.get(n.cluster)
+        if (!a) {
+          a = { x: 0, y: 0, count: 0, r: 0, members: [] }
+          byId.set(n.cluster, a)
+          clusterAggs.push(a)
+        }
+        a.members.push(n)
+        a.count++
+      }
+    }
+
     // Cluster-centroid pairwise repulsion so whole communities don't overlap.
     // Each cluster is treated as a super-node at its centroid with effective
     // radius = furthest member edge; overlap → members kicked apart,
     // weighted inversely by cluster size so small clusters move more.
     function clusterRepulsionForce(alpha: number) {
       const STRENGTH = CLUSTER_SEP
-      type Agg = { x: number; y: number; count: number; r: number; members: TagNode[] }
-      const aggs = new Map<number, Agg>()
-      for (const n of nodes) {
-        let a = aggs.get(n.cluster)
-        if (!a) { a = { x: 0, y: 0, count: 0, r: 0, members: [] }; aggs.set(n.cluster, a) }
-        a.x += n.x ?? 0
-        a.y += n.y ?? 0
-        a.count++
-        a.members.push(n)
-      }
-      for (const a of aggs.values()) {
-        a.x /= a.count
-        a.y /= a.count
+      for (const a of clusterAggs) {
+        let sx = 0, sy = 0
+        for (const n of a.members) { sx += n.x ?? 0; sy += n.y ?? 0 }
+        a.x = sx / a.count
+        a.y = sy / a.count
         let maxR = 0
         for (const n of a.members) {
           const dx = (n.x ?? 0) - a.x
@@ -409,10 +422,9 @@ export default function TagMapCanvas({
         }
         a.r = maxR
       }
-      const list = [...aggs.values()]
-      for (let i = 0; i < list.length; i++) {
-        for (let j = i + 1; j < list.length; j++) {
-          const a = list[i], b = list[j]
+      for (let i = 0; i < clusterAggs.length; i++) {
+        for (let j = i + 1; j < clusterAggs.length; j++) {
+          const a = clusterAggs[i], b = clusterAggs[j]
           const dx = b.x - a.x, dy = b.y - a.y
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.01
           const want = a.r + b.r

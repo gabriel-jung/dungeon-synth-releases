@@ -1,6 +1,7 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import FilterPill from "./FilterPill"
 
 export default function FilterChips() {
   const searchParams = useSearchParams()
@@ -36,10 +37,10 @@ export default function FilterChips() {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {emphasized.map((t) => (
-        <FilterChip key={`e-${t}`} kind="include" tag={t} onClear={() => removeTag("tag", t)} />
+        <FilterPill key={`e-${t}`} kind="include" label={t} onClear={() => removeTag("tag", t)} />
       ))}
       {banned.map((t) => (
-        <FilterChip key={`b-${t}`} kind="exclude" tag={t} onClear={() => removeTag("xtag", t)} />
+        <FilterPill key={`b-${t}`} kind="exclude" label={t} onClear={() => removeTag("xtag", t)} />
       ))}
       <button
         type="button"
@@ -52,36 +53,3 @@ export default function FilterChips() {
   )
 }
 
-function FilterChip({
-  kind,
-  tag,
-  onClear,
-}: {
-  kind: "include" | "exclude"
-  tag: string
-  onClear: () => void
-}) {
-  const isInclude = kind === "include"
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-[10px] tracking-wide px-1.5 py-0.5 ${
-        isInclude
-          ? "bg-tag-include/15 text-tag-include border-b border-tag-include/70"
-          : "bg-tag-exclude/15 text-tag-exclude border-b border-tag-exclude/70"
-      }`}
-    >
-      <span aria-hidden className="text-[9px] opacity-80">
-        {isInclude ? "✦" : "⊘"}
-      </span>
-      <span className={isInclude ? "" : "line-through"}>{tag}</span>
-      <button
-        type="button"
-        onClick={onClear}
-        aria-label={`Remove ${tag}`}
-        className="ml-0.5 text-sm leading-none text-current opacity-70 hover:opacity-100 cursor-pointer"
-      >
-        ×
-      </button>
-    </span>
-  )
-}
