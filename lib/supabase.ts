@@ -42,7 +42,7 @@ export async function paginateAll<T>(
 export async function fetchGenreTags(): Promise<string[]> {
   "use cache"
   cacheLife("days")
-  cacheTag("genre-tags")
+  cacheTag("genres")
   const { data } = await supabase
     .rpc("tag_counts")
     .order("n", { ascending: false })

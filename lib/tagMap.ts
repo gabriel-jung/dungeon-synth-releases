@@ -19,6 +19,7 @@ export async function fetchTagMap(
 ): Promise<{ counts: TagCount[]; pairs: TagPair[] }> {
   "use cache"
   cacheLife("days")
+  cacheTag("genres")
   cacheTag(`tag-map-${category}`)
 
   const [countsRes, pairsRes] = await Promise.all([
