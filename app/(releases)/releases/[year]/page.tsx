@@ -79,7 +79,7 @@ export default async function YearReleasesPage({
             <ReleaseList
               albums={rows}
               expandDate={null}
-              hasMore
+              hasMore={rows.length === 500}
               lowerBound={yearStart}
               upperBound={yearEnd}
               includeYear

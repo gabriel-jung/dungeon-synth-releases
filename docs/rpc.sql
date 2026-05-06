@@ -88,11 +88,21 @@ $$;
 -- host_counts
 -- Top Bandcamp hosts (labels / self-published artists) ranked by release
 -- count, honouring year + tag filters. Drives the stats "Most Active Pages".
+-- p_top_k caps the result at the top K hosts (default 50 = the stats page
+-- consumes 50 anyway). Bounds egress as the corpus grows.
+--
+-- NOTE: when migrating from the original 3-arg version, run the DROP first.
+-- `create or replace` only matches identical signatures; adding p_top_k
+-- creates a second overload and PostgREST refuses to pick. Once the old
+-- function is dropped this line becomes a no-op for fresh installs.
 -- ---------------------------------------------------------------------------
+drop function if exists host_counts(int, text[], text[]);
+
 create or replace function host_counts(
   p_year int default null,
   p_include_tags text[] default array[]::text[],
-  p_exclude_tags text[] default array[]::text[]
+  p_exclude_tags text[] default array[]::text[],
+  p_top_k int default 50
 )
 returns table(host_id int8, name text, image_id int8, url text, n bigint)
 language sql stable
@@ -112,7 +122,8 @@ as $$
       WHERE t.name = ANY(p_exclude_tags)
     ))
   GROUP BY h.id, h.name, h.image_id, h.url
-  ORDER BY count(*) DESC;
+  ORDER BY count(*) DESC
+  LIMIT p_top_k;
 $$;
 
 
@@ -404,6 +415,39 @@ as $$
     ))
   ORDER BY a.date DESC
   LIMIT p_limit;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- year_count
+-- Single-integer release count for a given year, optionally clamped to a
+-- date ceiling and narrowed by tag filters. Used by the layout's year
+-- counter so we don't ship the full 365-row daily_counts payload just to
+-- sum it client-side.
+-- ---------------------------------------------------------------------------
+create or replace function year_count(
+  p_year int,
+  p_up_to date default null,
+  p_include_tags text[] default array[]::text[],
+  p_exclude_tags text[] default array[]::text[]
+)
+returns bigint
+language sql stable
+as $$
+  SELECT count(*)::bigint
+  FROM albums a
+  WHERE extract(year FROM a.date)::int = p_year
+    AND (p_up_to IS NULL OR a.date <= p_up_to)
+    AND (cardinality(p_include_tags) = 0 OR a.id IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_include_tags)
+      GROUP BY at.album_id
+      HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+    ))
+    AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+      WHERE t.name = ANY(p_exclude_tags)
+    ));
 $$;
 
 

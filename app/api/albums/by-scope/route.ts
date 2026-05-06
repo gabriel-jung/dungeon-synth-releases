@@ -105,12 +105,14 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Artist or host only (no tag filter) → direct select.
+  // Artist or host only (no tag filter) → direct select. 500-row ceiling
+  // keeps modal payload bounded for prolific hosts; the modal renders a
+  // finite list anyway and the long tail past 500 is rarely browsed.
   let query = supabase
     .from("albums")
     .select(ALBUM_LIST_SELECT)
     .order("date", { ascending: false })
-    .limit(1000)
+    .limit(500)
 
   if (artist) {
     query = query.eq("artist", artist)

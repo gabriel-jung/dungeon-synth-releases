@@ -104,14 +104,14 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 - **Year archive** — query scoped to `WHERE year = X`. Cheap and bounded regardless of corpus size. Cached per year via Cache Components.
 - **Genre map** — RPC aggregates across all `album_tags`; expensive to compute but small payload. Cached with `cacheLife("days")` and `cacheTag("genres")` + `cacheTag("tag-map-{genre|theme}")`; the daily `?tag=genres` cron revalidates after ingests.
 - **Stats** — same caching story (`cacheTag("stats")`, daily `?tag=stats` cron).
-- **Tag filters** — routed through the `list_filtered_albums` RPC for server-side intersection; `/api/albums/by-tags` and `/api/albums/by-scope` both wrap it.
+- **Tag filters** — routed through the `list_filtered_albums` RPC for server-side intersection; `/api/albums/by-scope` wraps it for the scope modal.
 
 ### Shared plumbing
 
 - `lib/modalUrl.ts` — open/close/href helpers for URL-driven modal state
 - `lib/albumCache.ts` — bounded module-level stub cache so modals can paint instantly from prior click data; server fetch still runs in parallel for authoritative data
 - `lib/types.ts` — `AlbumListItem`, `parseTagParams`, `dedupeById`, `rpcRowToAlbumListItem`, …
-- `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`)
+- `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`, `fetchYearCount`, `fetchRecentAlbums`)
 - `lib/tagMap.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/genres` and `/themes` maps, cached under `cacheTag("genres")` + `cacheTag("tag-map-{category}")`
 - `lib/tagMapLogic.ts` — shared graph construction (metrics, edge filter, Louvain) used by `TagMapCanvas` and `scripts/tune-tagmap.mts`
 - `lib/tagContext.ts` — per-tag related genres + themes for the scope modal bars, cached under the same `genres` tag

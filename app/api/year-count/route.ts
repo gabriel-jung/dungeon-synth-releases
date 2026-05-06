@@ -11,22 +11,19 @@ export async function GET(request: NextRequest) {
   const year = Number(sp.get("year")) || new Date().getUTCFullYear()
   const includeTags = sp.getAll("tag")
   const excludeTags = sp.getAll("xtag")
+  const today = localDateStr(new Date())
 
-  const { data } = await supabase.rpc("daily_counts", {
+  // Single scalar from year_count RPC. Avoids shipping ~365 daily rows
+  // just to sum them in JS.
+  const { data } = await supabase.rpc("year_count", {
     p_year: year,
+    p_up_to: today,
     p_include_tags: includeTags,
     p_exclude_tags: excludeTags,
   })
 
-  const today = localDateStr(new Date())
-  const total = (data ?? []).reduce(
-    (sum: number, r: { date: string; n: number | string }) =>
-      r.date <= today ? sum + Number(r.n) : sum,
-    0,
-  )
-
   return Response.json(
-    { count: total },
+    { count: Number(data ?? 0) },
     { headers: { "Cache-Control": HTTP_CACHE_1H } },
   )
 }

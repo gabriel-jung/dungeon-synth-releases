@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
-import { supabase, ALBUM_LIST_SELECT, paginateAll, toAlbumListItem, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { AlbumListItem, coverUrl, localDateStr, dateRange, dedupeById, parseTagParams, pickLatestDate } from "@/lib/types"
+import { supabase, fetchRecentAlbums } from "@/lib/supabase"
+import { type AlbumListItem, coverUrl, dateRange, dedupeById, localDateStr, parseTagParams, pickLatestDate, rpcRowToAlbumListItem } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
@@ -85,20 +85,10 @@ export default async function Page({
     if (error) throw new Error(`list_filtered_albums RPC failed: ${error.message}`)
     for (const r of data ?? []) allRows.push(rpcRowToAlbumListItem(r))
   } else {
-    // Unfiltered path: only fetch last 7 days for fast initial load.
-    const cutoff = allDates[6]
-    const rows = await paginateAll(async (from, to) => {
-      const { data, error } = await supabase
-        .from("albums")
-        .select(ALBUM_LIST_SELECT)
-        .lte("date", today)
-        .gte("date", cutoff)
-        .order("date", { ascending: false })
-        .range(from, to)
-      if (error) throw new Error(`albums query failed: ${error.message}`)
-      return data
-    })
-    for (const r of rows) allRows.push(toAlbumListItem(r))
+    // Unfiltered path: 7-day window via cached helper so all visitors
+    // share one Supabase fetch until the daily cron rolls it.
+    const rows = await fetchRecentAlbums(today)
+    for (const r of rows) allRows.push(r)
   }
 
   const deduped = dedupeById(allRows)

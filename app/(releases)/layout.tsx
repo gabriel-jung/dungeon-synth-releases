@@ -2,7 +2,7 @@ import { connection } from "next/server"
 import YearReleaseCount from "@/components/YearReleaseCount"
 import ReleasesScopeNav from "@/components/ReleasesScopeNav"
 import HeatmapPopoverButton from "@/components/HeatmapPopoverButton"
-import { fetchPastYears, yearCountQuery } from "@/lib/supabase"
+import { fetchPastYears, fetchYearCount } from "@/lib/supabase"
 import { localDateStr } from "@/lib/types"
 import { Suspense } from "react"
 
@@ -16,8 +16,8 @@ export default async function ReleasesLayout({ children }: { children: React.Rea
   await connection()
   const year = new Date().getUTCFullYear()
   const today = localDateStr(new Date())
-  const [{ count: yearCount }, pastYears] = await Promise.all([
-    yearCountQuery(year, today),
+  const [yearCount, pastYears] = await Promise.all([
+    fetchYearCount(year, today),
     fetchPastYears(),
   ])
 
