@@ -18,7 +18,7 @@ Ranked list of the top 50 hosts by lifetime release count (labels and self-publi
 
 ### 3. Tracks per Release — histogram
 
-Distribution of album track counts across the entire corpus. Server-computed bucket widths (e.g. `1`, `2`, `3-4`, `5-7`, …) with density-aware bars: height is `count / bucket_width` so wide buckets aren't artificially tall.
+Distribution of album track counts across the entire corpus. Server-computed buckets (`1`…`10`, `11-12`, `13-15`, `16-20`, `21+`) with density-aware bars: height is `count / bucket_width` so wide buckets aren't artificially tall.
 
 ### 4. Release Duration — histogram
 
@@ -41,17 +41,20 @@ The calendar heatmap is **not** on this page. It lives in a popover invoked from
 One parallel Supabase batch inside a `"use cache"` boundary:
 
 ```ts
+const filterArgs   = { p_include_tags, p_exclude_tags }
+const allTimeArgs  = { p_year: null, ...filterArgs }
+
 const [hostRes, yearRes, tracksHistRes, durationHistRes, genreRes, themeRes] = await Promise.all([
-  supabase.rpc("host_counts",          allTimeArgs),
-  supabase.rpc("year_counts",          filterArgs),
-  supabase.rpc("tracks_per_album_hist", allTimeArgs),
-  supabase.rpc("album_duration_hist",   allTimeArgs),
-  supabase.rpc("tag_counts_by_category", { p_category: "genre", ...allTimeArgs }),
-  supabase.rpc("tag_counts_by_category", { p_category: "theme", ...allTimeArgs }),
+  supabase.rpc("host_counts",            allTimeArgs),
+  supabase.rpc("year_counts",            filterArgs),
+  supabase.rpc("tracks_per_album_hist",  allTimeArgs),
+  supabase.rpc("album_duration_hist",    allTimeArgs),
+  supabase.rpc("tag_counts_by_category", { p_category: "genre", p_year: null, ...filterArgs }),
+  supabase.rpc("tag_counts_by_category", { p_category: "theme", p_year: null, ...filterArgs }),
 ])
 ```
 
-`allTimeArgs = { p_year: null, p_include_tags, p_exclude_tags }`. Passing `p_year: null` tells every RPC to skip the year filter — if/when a UI year picker is added, swap to `p_year: selectedYear` and the cache key takes care of itself.
+Passing `p_year: null` tells every RPC to skip the year filter — if/when a UI year picker is added, swap to `p_year: selectedYear` and the cache key takes care of itself.
 
 `currentYear` lives **outside** the `"use cache"` boundary: only the `yearBins` fill-loop uses it, and keeping it out means year rollover doesn't invalidate cached RPC data.
 

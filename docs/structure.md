@@ -1,6 +1,6 @@
 # Site structure
 
-> **Status: reflects the shipped site as of 2026-04.**
+> **Status: reflects the shipped site as of 2026-05.**
 
 ## What this site is
 
@@ -80,7 +80,7 @@ All-time aggregates — year bar, top hosts, tracks/duration histograms, popular
 
 ## Search
 
-`SearchPalette` is a command-palette overlay. Opened via ⌘K, `/`, or the header search trigger — never a list filter. Typing ≥2 chars hits `/api/search` (pg_trgm-indexed search across albums + artists, 50-row cap). Picking a result opens the album detail modal via `?album=<id>`. No `?q=` URL param, no page-level search state.
+`SearchPalette` is a command-palette overlay. Opened via ⌘K, `/`, or the header search trigger — never a list filter. Typing ≥2 chars hits `/api/search` (`ilike` substring across artist/title/host name, 50-row cap, no title-dedupe). Picking a result opens the album detail modal via `?album=<id>`. No `?q=` URL param, no page-level search state.
 
 ## Calendar heatmap
 
@@ -102,8 +102,8 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 ### Per-view strategy
 
 - **Year archive** — query scoped to `WHERE year = X`. Cheap and bounded regardless of corpus size. Cached per year via Cache Components.
-- **Genre map** — RPC aggregates across all `album_tags`; expensive to compute but small payload. Cached with `cacheLife("days")` and `cacheTag("genres")`; cron revalidates after ingests.
-- **Stats** — same caching story as the map (`cacheTag("stats")`).
+- **Genre map** — RPC aggregates across all `album_tags`; expensive to compute but small payload. Cached with `cacheLife("days")` and `cacheTag("genres")` + `cacheTag("tag-map-{genre|theme}")`; the daily `?tag=genres` cron revalidates after ingests.
+- **Stats** — same caching story (`cacheTag("stats")`, daily `?tag=stats` cron).
 - **Tag filters** — routed through the `list_filtered_albums` RPC for server-side intersection; `/api/albums/by-tags` and `/api/albums/by-scope` both wrap it.
 
 ### Shared plumbing
@@ -112,7 +112,7 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 - `lib/albumCache.ts` — bounded module-level stub cache so modals can paint instantly from prior click data; server fetch still runs in parallel for authoritative data
 - `lib/types.ts` — `AlbumListItem`, `parseTagParams`, `dedupeById`, `rpcRowToAlbumListItem`, …
 - `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`)
-- `lib/tagMap.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/genres` and `/themes` maps, cached under `cacheTag("genres")`
+- `lib/tagMap.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/genres` and `/themes` maps, cached under `cacheTag("genres")` + `cacheTag("tag-map-{category}")`
 - `lib/tagMapLogic.ts` — shared graph construction (metrics, edge filter, Louvain) used by `TagMapCanvas` and `scripts/tune-tagmap.mts`
 - `lib/tagContext.ts` — per-tag related genres + themes for the scope modal bars, cached under the same `genres` tag
 - `components/TagBarScroll.tsx` — shared vertically-scrolling bar list used by `/stats` and the scope modal's tag-context panel

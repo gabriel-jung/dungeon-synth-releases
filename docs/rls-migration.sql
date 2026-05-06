@@ -1,11 +1,15 @@
 -- Migration: switch site from service-role key to publishable (anon) key.
 --
--- The site is read-only and public. Currently lib/supabase.ts uses the
--- service-role key, which bypasses RLS — a future bug that lets user input
--- flow into a dynamic from() call could leak/write any table. Defense in
--- depth: enable RLS on every read table and grant anon SELECT-only.
+-- APPLIED in production. Kept as the source-of-truth record of the policies
+-- enabled on the live database; replay only when bootstrapping a fresh
+-- Supabase project.
 --
--- Steps:
+-- Background: the site is read-only and public. Pre-migration, lib/supabase.ts
+-- used the service-role key, which bypasses RLS — a future bug that let user
+-- input flow into a dynamic from() call could have leaked/written any table.
+-- Defense in depth: enable RLS on every read table and grant anon SELECT-only.
+--
+-- Steps (for a fresh project):
 --   1. Apply this SQL via the Supabase SQL editor.
 --   2. Set SUPABASE_PUBLISHABLE_KEY in Vercel env (and .env.local) to the
 --      project's publishable / anon key (Supabase dashboard → API).

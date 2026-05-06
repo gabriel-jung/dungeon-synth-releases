@@ -22,17 +22,17 @@ Past years, upcoming releases, and album / artist / host / day / tag detail view
 | Visualizations | `react-force-graph-2d` + d3 subpackages (force, scale, polygon, array) |
 | Math rendering | KaTeX (similarity-metric formulas on /genres and /themes) |
 | Hosting | Vercel (free tier) |
-| Data pipeline | Python + uv + [bandcamp-explorer](https://github.com/gabriel-jung/bandcamp-explorer) |
+| Data pipeline | Python + uv + [bandcamp-explorer-data](https://github.com/gabriel-jung/bandcamp-explorer-data) |
 
 ## Features
 
 - **URL-driven modals** — album / artist / host / genre / theme / day / upcoming all surface as overlays driven by query params (`ModalRouter` + `lib/modalUrl.ts`). No entity routes.
 - **Three-state tag filter** — include / exclude / neutral chips, URL-persisted (`?tag=` / `?xtag=`), server-side intersection via the `list_filtered_albums` RPC.
-- **Command-palette search** — `SearchPalette` opened via ⌘K, `/`, or the header trigger. Hits `/api/search` (pg_trgm, 50-row cap).
+- **Command-palette search** — `SearchPalette` opened via ⌘K, `/`, or the header trigger. Hits `/api/search` (`ilike` substring across artist/title/host name, 50-row cap).
 - **TagMap on `/genres` and `/themes`** — canvas force graph with Louvain clustering, four similarity metrics, top-N / density / min-links filters, PNG export, shareable URL state. See [docs/genres.md](docs/genres.md).
 - **Stats dashboard** — releases-per-year bar, top hosts, track / duration histograms, popular genres + themes. See [docs/stats.md](docs/stats.md).
-- **Cache Components + ISR** — `"use cache"` + `cacheLife` + `cacheTag("genres")` / `cacheTag("stats")`; daily Vercel cron hits `/api/revalidate` to roll Today / Yesterday labels.
-- **Cover image proxy** — `/api/cover` with anti-hotlink referer + CSP, 1-week edge cache. Album art is otherwise hotlinked direct from Bandcamp via plain `<img>` (zero Vercel egress).
+- **Cache Components + ISR** — `"use cache"` + `cacheLife("days")` + `cacheTag("genres")` (TagMap, scope-modal tag bars, global tag filter list) / `cacheTag("stats")`. Two daily Vercel crons hit `/api/revalidate` to bust each tag after upstream ingests (see `vercel.json`).
+- **Hotlinked cover art** — album art served direct from Bandcamp via plain `<img>` (zero Vercel egress, no `next/image`).
 - **10 color themes**, scroll descent, adjustable paper texture.
 
 ## Setup
@@ -49,9 +49,9 @@ SUPABASE_PUBLISHABLE_KEY=your-publishable-anon-key
 CRON_SECRET=any-random-string
 ```
 
-The site reads `SUPABASE_PUBLISHABLE_KEY` (anon role, RLS-gated — see [`docs/rls-migration.sql`](docs/rls-migration.sql)) and falls back to `SUPABASE_SECRET_KEY` for environments that haven't migrated yet.
+The site reads `SUPABASE_PUBLISHABLE_KEY` (anon role, RLS-gated — see [`docs/rls-migration.sql`](docs/rls-migration.sql)) and falls back to `SUPABASE_SECRET_KEY` for legacy environments. RLS migration is applied in production.
 
-`CRON_SECRET` gates `/api/revalidate`. Vercel injects it as `Authorization: Bearer $CRON_SECRET` on the daily midnight cron (see `vercel.json`) that busts the layout cache for the "Today" / "Yesterday" labels. Set the same value in Vercel project env vars.
+`CRON_SECRET` gates `/api/revalidate`. Vercel injects it as `Authorization: Bearer $CRON_SECRET` on two daily midnight crons (see `vercel.json`) that bust the `genres` and `stats` cache tags after upstream ingests. Set the same value in Vercel project env vars.
 
 ```bash
 npm run dev
