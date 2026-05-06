@@ -831,7 +831,13 @@ export default function TagMapCanvas({
             const [a, b] = edgeEndpoints(le)
             setHover({ kind: "edge", a, b, inter: le.inter, weight: le.weight })
           }}
-          onZoomEnd={(t) => setZoomLevel(t.k)}
+          onZoomEnd={(t) => {
+            // ForceGraph fires this synchronously inside its render path; defer
+            // the state write so React doesn't see a setState during another
+            // component's render.
+            const k = t.k
+            queueMicrotask(() => setZoomLevel(k))
+          }}
           onEngineStop={() => {
             // Gated so user-initiated pan/zoom isn't snapped back on
             // later settles (param tweaks re-run the engine).
