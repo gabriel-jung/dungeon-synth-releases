@@ -155,7 +155,7 @@ export default function TagMapCanvas({
     gravity: 0.05,
     linkSpread: 1,
     interRatio: 4,
-    linkScale: 1,
+    linkScale: 1.5,
     nodeScale: 1,
     nodeOpacity: 0.75,
     labelSize: 1,
@@ -178,7 +178,7 @@ export default function TagMapCanvas({
   // sparse/isolated clusters. Inter/intra ratio does the visible work.
   const COHESION = 0.2
   const CLUSTER_SEP = 0.2
-  const [linkScale, setLinkScale] = useState(1)
+  const [linkScale, setLinkScale] = useState(1.5)
   const [nodeScale, setNodeScale] = useState(1)
   const [nodeOpacity, setNodeOpacity] = useState(0.75)
   const [labelSize, setLabelSize] = useState(1)
