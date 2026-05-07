@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { AlbumListItem, formatDateHeading, releaseCount } from "@/lib/types"
+import { useResetOnChange } from "@/lib/useResetOnChange"
 import { AlbumGrid } from "./AlbumDetail"
 import RecentGrid from "./RecentGrid"
 import { GridSkeleton, ListSkeleton, FetchError } from "./ModalSkeletons"
@@ -20,17 +21,9 @@ export default function DayModal({
   const titleId = `day-modal-title-${date}`
   const [reloadKey, setReloadKey] = useState(0)
   const [view, setView] = useState<ViewMode>(expectedCount > 20 ? "list" : "grid")
-  const fetchKey = `${date}-${reloadKey}`
-  // Reset album/error state during render when the fetch key changes so the
-  // skeleton shows immediately, without an extra commit phase from useEffect.
-  const [albumsState, setAlbumsState] = useState<{ key: string; data: AlbumListItem[] | null; error: boolean }>(
-    { key: fetchKey, data: null, error: false },
-  )
-  if (albumsState.key !== fetchKey) {
-    setAlbumsState({ key: fetchKey, data: null, error: false })
-  }
-  const albums = albumsState.data
-  const error = albumsState.error
+  const [albums, setAlbums] = useState<AlbumListItem[] | null>(null)
+  const [error, setError] = useState(false)
+  useResetOnChange([date, reloadKey], () => { setAlbums(null); setError(false) })
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -39,14 +32,10 @@ export default function DayModal({
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<{ albums: AlbumListItem[] }>
       })
-      .then((d) => setAlbumsState({ key: fetchKey, data: d.albums ?? [], error: false }))
-      .catch((err) => {
-        if ((err as Error).name !== "AbortError") {
-          setAlbumsState({ key: fetchKey, data: null, error: true })
-        }
-      })
+      .then((d) => { setError(false); setAlbums(d.albums ?? []) })
+      .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
     return () => ctrl.abort()
-  }, [date, reloadKey, fetchKey])
+  }, [date, reloadKey])
 
   const count = albums?.length ?? expectedCount
 

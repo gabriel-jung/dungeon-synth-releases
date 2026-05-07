@@ -6,6 +6,7 @@ import { Album, AlbumListItem, coverUrl, formatDateShort, safeExternalHref } fro
 import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 import { SITE_URL } from "@/lib/site"
+import BandcampImg from "./BandcampImg"
 
 export function AlbumGrid({
   albums,
@@ -179,10 +180,7 @@ export default function AlbumDetail({
         {/* Cover — left side on desktop, top on mobile */}
         <div className="sm:w-72 shrink-0 bg-bg-card flex items-center justify-center">
           {img ? (
-            // Hotlinked Bandcamp art — see CLAUDE.md (no next/image to keep
-            // bytes off Vercel egress).
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <BandcampImg
               src={img}
               alt={`${albumStub.artist} — ${albumStub.title}`}
               decoding="async"

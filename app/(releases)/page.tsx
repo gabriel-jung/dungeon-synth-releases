@@ -64,10 +64,11 @@ export default async function Page({
   const sp = await searchParams
   const { includeTags, excludeTags } = parseTagParams(sp)
 
-  const today = localDateStr(new Date())
-  const yearStart = `${new Date().getUTCFullYear()}-01-01`
+  const now = new Date()
+  const today = localDateStr(now)
+  const yearStart = `${now.getUTCFullYear()}-01-01`
+  const tomorrow = localDateStr(new Date(now.getTime() + 86400000))
   const allDates = dateRange(today, yearStart)
-  const tomorrow = localDateStr(new Date(Date.parse(today) + 86400000))
 
   const allRows: AlbumListItem[] = []
   const hasTagFilters = includeTags.length > 0 || excludeTags.length > 0

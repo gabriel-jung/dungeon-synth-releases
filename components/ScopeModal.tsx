@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { AlbumListItem, coverUrl, hostImageUrl, releaseCount, safeExternalHref } from "@/lib/types"
 import { closeModal, openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 import { useModalSearchParams } from "@/lib/useModalUrl"
+import { useResetOnChange } from "@/lib/useResetOnChange"
 import type { TagContext } from "@/lib/tagContext"
 import { getHostStub, getArtistArt } from "@/lib/albumCache"
 import { AlbumGrid } from "./AlbumDetail"
@@ -14,6 +15,7 @@ import ModalShell from "./ModalShell"
 import ViewToggle, { type ViewMode } from "./ViewToggle"
 import TagContextBars, { TagContextBarsSkeleton } from "./TagContextBars"
 import FilterPill from "./FilterPill"
+import BandcampImg from "./BandcampImg"
 
 export type ScopeKind = "artist" | "host" | "genre"
 
@@ -69,19 +71,11 @@ export default function ScopeModal({
   // Artist art comes from the click source. No fetch-time dependency.
   const seededArtistArt = kind === "artist" ? getArtistArt(value) : null
 
-  // Reset albums/error during render when the fetch URL or retry counter
-  // changes — skeleton paints in one commit instead of an effect-driven
-  // second render. Host is preserved across filter changes (only resets when
-  // the scope kind/value itself changes, handled via key on ScopeModal).
-  const fetchKey = `${fetchUrl}|${reloadKey}`
-  const [fetchState, setFetchState] = useState<{ key: string; albums: AlbumListItem[] | null; error: boolean }>(
-    { key: fetchKey, albums: null, error: false },
-  )
-  if (fetchState.key !== fetchKey) {
-    setFetchState({ key: fetchKey, albums: null, error: false })
-  }
-  const albums = fetchState.albums
-  const error = fetchState.error
+  // Host is preserved across filter changes; it only resets when the scope
+  // kind/value itself changes (via key on ScopeModal).
+  const [albums, setAlbums] = useState<AlbumListItem[] | null>(null)
+  const [error, setError] = useState(false)
+  useResetOnChange([fetchUrl, reloadKey], () => { setAlbums(null); setError(false) })
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -91,23 +85,19 @@ export default function ScopeModal({
         return r.json() as Promise<{ albums: AlbumListItem[]; host?: HostMeta | null }>
       })
       .then((d) => {
-        setFetchState({ key: fetchKey, albums: d.albums ?? [], error: false })
+        setError(false)
+        setAlbums(d.albums ?? [])
         if (d.host) setHost(d.host)
-        // Auto-default to list view for large non-genre result sets, one
-        // shot per scope load. autoSwitchedRef is reset by the effect below
-        // when kind/value changes.
+        // Auto-default to list view for large non-genre result sets,
+        // one-shot per scope load (autoSwitchedRef resets on kind/value).
         if (!autoSwitchedRef.current && kind !== "genre" && (d.albums?.length ?? 0) > 20) {
           autoSwitchedRef.current = true
           setView("list")
         }
       })
-      .catch((err) => {
-        if ((err as Error).name !== "AbortError") {
-          setFetchState({ key: fetchKey, albums: null, error: true })
-        }
-      })
+      .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
     return () => ctrl.abort()
-  }, [fetchUrl, reloadKey, fetchKey, kind])
+  }, [fetchUrl, reloadKey, kind])
 
   // Tags fed to the related-tags bars. Primary scope + every active include
   // filter (page tags + chip genres), and every active exclude. Bars reflect
@@ -296,10 +286,7 @@ function ScopeHeader({
     <div className="pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex items-center gap-4">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {imgSrc ? (
-          // Hotlinked Bandcamp art — see CLAUDE.md (no next/image to keep
-          // bytes off Vercel egress).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <BandcampImg
             src={imgSrc}
             alt=""
             decoding="async"

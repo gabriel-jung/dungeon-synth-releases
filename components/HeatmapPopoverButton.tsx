@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { usePathname, useSearchParams } from "next/navigation"
 import { tagFilterQs, yearFromPath } from "@/lib/types"
+import { useResetOnChange } from "@/lib/useResetOnChange"
 import CalendarHeatmap from "./CalendarHeatmap"
 
 // Calendar-shaped placeholder rendered while /api/daily is in flight. Mirrors
@@ -65,20 +66,9 @@ export default function HeatmapPopoverButton({
   const btnRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
 
-  // Invalidate cached payload + position when year or filter changes (during
-  // render, not via effect — avoids the brief flash where stale data shows
-  // for the new scope).
-  const cacheKey = `${year}|${tagQs}`
-  const [prevCacheKey, setPrevCacheKey] = useState(cacheKey)
-  if (prevCacheKey !== cacheKey) {
-    setPrevCacheKey(cacheKey)
-    setDays(null)
-  }
-  const [prevOpen, setPrevOpen] = useState(open)
-  if (prevOpen !== open) {
-    setPrevOpen(open)
-    if (!open) setPos(null)
-  }
+  // Invalidate cached payload when year or filter changes; clearing during
+  // render avoids the flash of stale data for the new scope.
+  useResetOnChange([year, tagQs], () => setDays(null))
 
   useEffect(() => {
     if (!open || days) return
@@ -104,9 +94,8 @@ export default function HeatmapPopoverButton({
     }
     update()
     window.addEventListener("resize", update)
-    // passive: handler only reads getBoundingClientRect + setState, never
-    // calls preventDefault — flagging passive lets the browser keep scrolling
-    // smoothly while the popover repositions.
+    // passive: handler never calls preventDefault, so let the browser keep
+    // scrolling smoothly while the popover repositions.
     window.addEventListener("scroll", update, { passive: true, capture: true })
     return () => {
       window.removeEventListener("resize", update)

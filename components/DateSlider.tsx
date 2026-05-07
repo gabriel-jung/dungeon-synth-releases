@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { MONTH_NAMES } from "@/lib/types"
 import { ShortDate } from "./DateHeading"
 
-// Broadcasts the current visible-date fraction to scroll-descent listeners.
-// Lives outside the component so React Compiler treats it as a leaf side
-// effect rather than render-scope code (which would trip the immutability
-// rule because of the global window.dispatchEvent call).
+// Broadcasts the visible-date fraction to scroll-descent listeners. Hoisted
+// out of the component to keep React Compiler from flagging the global
+// dispatchEvent as render-scope mutation.
 function dispatchVisibleDateChange(idx: number, count: number) {
   const frac = count <= 1 ? 0 : idx / (count - 1)
   window.dispatchEvent(new CustomEvent("visible-date-change", { detail: frac }))
@@ -100,8 +99,6 @@ export default function DateSlider({
   const count = dates.length
 
   useEffect(() => {
-    // One-shot mount setup: reset index for new dates window + flip the
-    // mounted gate so the slider hydrates after SSR with the correct DOM.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIndex(0)
     setMounted(true)

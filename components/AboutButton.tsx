@@ -1,8 +1,5 @@
 import Link from "next/link"
 
-// Header-cluster icon next to ThemePicker. Single entry point to /about so
-// site-shell content (data source, methodology, repo links) stays out of
-// the masthead and footer, both intentionally chrome-light.
 export default function AboutButton() {
   return (
     <Link

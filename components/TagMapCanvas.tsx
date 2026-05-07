@@ -43,9 +43,7 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FgMethods = ForceGraphMethods<any, any>
 
-// Tex pulls in katex + its CSS (~50KB gzipped) — only needed inside the
-// "About this map" panel, so we dynamic-import it. The chunk loads the first
-// time the user opens the panel; rest of the canvas ships katex-free.
+// Lazy-loaded so katex (see TagMapTex) only ships when the About panel opens.
 const Tex = dynamic(() => import("./TagMapTex"), {
   ssr: false,
   loading: () => null,

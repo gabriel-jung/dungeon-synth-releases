@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { AlbumListItem, coverUrl, formatDateShort, isHostedRelease } from "@/lib/types"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
+import { useResetOnChange } from "@/lib/useResetOnChange"
+import BandcampImg from "./BandcampImg"
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -20,10 +22,7 @@ function GridCard({ album, showDate, hideHost }: { album: AlbumListItem; showDat
         className="aspect-square bg-bg-card border border-border overflow-hidden flex items-center justify-center hover-candlelight cursor-pointer"
       >
         {img ? (
-          // Hotlinked Bandcamp art — see CLAUDE.md (no next/image to keep
-          // bytes off Vercel egress).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <BandcampImg
             src={img}
             alt={`${album.artist} — ${album.title}`}
             className="w-full h-full object-cover"
@@ -78,16 +77,7 @@ export default function RecentGrid({
   pageSize?: number
 }) {
   const [visible, setVisible] = useState(pageSize)
-  // Reset paging when the underlying list or page size changes. Adjust state
-  // during render (per React docs) instead of an effect — avoids the brief
-  // flash where the previous list's `visible` window applies to new data.
-  const [prevAlbums, setPrevAlbums] = useState(albums)
-  const [prevPageSize, setPrevPageSize] = useState(pageSize)
-  if (albums !== prevAlbums || pageSize !== prevPageSize) {
-    setPrevAlbums(albums)
-    setPrevPageSize(pageSize)
-    setVisible(pageSize)
-  }
+  useResetOnChange([albums, pageSize], () => setVisible(pageSize))
 
   const shown = albums.slice(0, visible)
   const hasMore = visible < albums.length
