@@ -4,6 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { MONTH_NAMES } from "@/lib/types"
 import { ShortDate } from "./DateHeading"
 
+// Broadcasts the current visible-date fraction to scroll-descent listeners.
+// Lives outside the component so React Compiler treats it as a leaf side
+// effect rather than render-scope code (which would trip the immutability
+// rule because of the global window.dispatchEvent call).
+function dispatchVisibleDateChange(idx: number, count: number) {
+  const frac = count <= 1 ? 0 : idx / (count - 1)
+  window.dispatchEvent(new CustomEvent("visible-date-change", { detail: frac }))
+}
+
 function HorizontalSlider({
   trackRef,
   index,
@@ -91,6 +100,9 @@ export default function DateSlider({
   const count = dates.length
 
   useEffect(() => {
+    // One-shot mount setup: reset index for new dates window + flip the
+    // mounted gate so the slider hydrates after SSR with the correct DOM.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIndex(0)
     setMounted(true)
 
@@ -129,7 +141,7 @@ export default function DateSlider({
         const idx = dates.indexOf(closestDate)
         if (idx >= 0) {
           setIndex(idx)
-          emitDateChange(idx)
+          dispatchVisibleDateChange(idx, count)
         }
       }
     }
@@ -139,7 +151,7 @@ export default function DateSlider({
       list.removeEventListener("scroll", onScroll)
       mo.disconnect()
     }
-  }, [dates])
+  }, [dates, count])
 
   const scrollToDate = useCallback((dateStr: string, smooth = false) => {
     const el = document.getElementById(`date-${dateStr}`)
@@ -177,29 +189,24 @@ export default function DateSlider({
     return Math.round(pct * (count - 1))
   }
 
-  function emitDateChange(idx: number) {
-    const frac = count <= 1 ? 0 : idx / (count - 1)
-    window.dispatchEvent(new CustomEvent("visible-date-change", { detail: frac }))
-  }
-
   function startDrag(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault()
     dragging.current = true
     const idx = indexFromEvent(e)
     setIndex(idx)
-    emitDateChange(idx)
+    dispatchVisibleDateChange(idx, count)
 
     function onMove(ev: MouseEvent | TouchEvent) {
       ev.preventDefault()
       const i = indexFromEvent(ev)
       setIndex(i)
-      emitDateChange(i)
+      dispatchVisibleDateChange(i, count)
     }
 
     function onUp(ev: MouseEvent | TouchEvent) {
       const idx = indexFromEvent(ev)
       setIndex(idx)
-      emitDateChange(idx)
+      dispatchVisibleDateChange(idx, count)
       if (dates[idx]) scrollToDate(dates[idx])
       // Keep dragging flag on briefly so scroll handler doesn't snap back
       setTimeout(() => { dragging.current = false }, 100)
@@ -218,7 +225,7 @@ export default function DateSlider({
   function handleClick(e: React.MouseEvent) {
     const idx = indexFromEvent(e)
     setIndex(idx)
-    emitDateChange(idx)
+    dispatchVisibleDateChange(idx, count)
     if (dates[idx]) scrollToDate(dates[idx])
   }
 
@@ -244,7 +251,7 @@ export default function DateSlider({
     }
     e.preventDefault()
     setIndex(next)
-    emitDateChange(next)
+    dispatchVisibleDateChange(next, count)
     if (dates[next]) scrollToDate(dates[next])
   }
 

@@ -15,15 +15,16 @@ function TagButton({
   setOpen: (v: boolean) => void
   activeCount: number
 }) {
-  const slotRef = useRef<HTMLElement | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
-    slotRef.current = document.getElementById("tag-filter-slot")
-    setMounted(true)
+    // One-shot DOM lookup for the portal target. Slot is mounted by the
+    // root layout, so a single read on hydration is sufficient.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSlot(document.getElementById("tag-filter-slot"))
   }, [])
 
-  if (!mounted || !slotRef.current) return null
+  if (!slot) return null
 
   return createPortal(
     <button
@@ -38,7 +39,7 @@ function TagButton({
         </span>
       )}
     </button>,
-    slotRef.current,
+    slot,
   )
 }
 
@@ -63,11 +64,15 @@ export default function TagFilter({ tags }: { tags: string[] }) {
   const [localExcluded, setLocalExcluded] = useState<Set<string>>(new Set(searchParams.getAll("xtag")))
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Sync from URL when searchParams change externally
-  useEffect(() => {
+  // Sync from URL when searchParams change externally (back/forward, link
+  // navigation). Adjust state during render so the new URL paints in one
+  // commit instead of an effect-driven second render.
+  const [prevSearchParams, setPrevSearchParams] = useState(searchParams)
+  if (searchParams !== prevSearchParams) {
+    setPrevSearchParams(searchParams)
     setLocalIncluded(new Set(searchParams.getAll("tag")))
     setLocalExcluded(new Set(searchParams.getAll("xtag")))
-  }, [searchParams])
+  }
 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current)

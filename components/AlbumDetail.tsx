@@ -126,13 +126,12 @@ export default function AlbumDetail({
       return
     }
     const ctrl = new AbortController()
-    setError(false)
     fetch(`/api/album?id=${albumStub.id}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then((data) => setAlbum(data))
+      .then((data) => { setError(false); setAlbum(data) })
       .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
     return () => ctrl.abort()
   }, [albumStub.id, reloadKey])
@@ -180,6 +179,9 @@ export default function AlbumDetail({
         {/* Cover — left side on desktop, top on mobile */}
         <div className="sm:w-72 shrink-0 bg-bg-card flex items-center justify-center">
           {img ? (
+            // Hotlinked Bandcamp art — see CLAUDE.md (no next/image to keep
+            // bytes off Vercel egress).
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={img}
               alt={`${albumStub.artist} — ${albumStub.title}`}

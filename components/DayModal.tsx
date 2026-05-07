@@ -18,24 +18,35 @@ export default function DayModal({
   onClose: () => void
 }) {
   const titleId = `day-modal-title-${date}`
-  const [albums, setAlbums] = useState<AlbumListItem[] | null>(null)
-  const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [view, setView] = useState<ViewMode>(expectedCount > 20 ? "list" : "grid")
+  const fetchKey = `${date}-${reloadKey}`
+  // Reset album/error state during render when the fetch key changes so the
+  // skeleton shows immediately, without an extra commit phase from useEffect.
+  const [albumsState, setAlbumsState] = useState<{ key: string; data: AlbumListItem[] | null; error: boolean }>(
+    { key: fetchKey, data: null, error: false },
+  )
+  if (albumsState.key !== fetchKey) {
+    setAlbumsState({ key: fetchKey, data: null, error: false })
+  }
+  const albums = albumsState.data
+  const error = albumsState.error
 
   useEffect(() => {
     const ctrl = new AbortController()
-    setAlbums(null)
-    setError(false)
     fetch(`/api/albums?date=${date}&limit=500`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<{ albums: AlbumListItem[] }>
       })
-      .then((d) => setAlbums(d.albums ?? []))
-      .catch((err) => { if ((err as Error).name !== "AbortError") setError(true) })
+      .then((d) => setAlbumsState({ key: fetchKey, data: d.albums ?? [], error: false }))
+      .catch((err) => {
+        if ((err as Error).name !== "AbortError") {
+          setAlbumsState({ key: fetchKey, data: null, error: true })
+        }
+      })
     return () => ctrl.abort()
-  }, [date, reloadKey])
+  }, [date, reloadKey, fetchKey])
 
   const count = albums?.length ?? expectedCount
 

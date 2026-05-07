@@ -67,6 +67,7 @@ export default async function Page({
   const today = localDateStr(new Date())
   const yearStart = `${new Date().getUTCFullYear()}-01-01`
   const allDates = dateRange(today, yearStart)
+  const tomorrow = localDateStr(new Date(Date.parse(today) + 86400000))
 
   const allRows: AlbumListItem[] = []
   const hasTagFilters = includeTags.length > 0 || excludeTags.length > 0
@@ -74,7 +75,6 @@ export default async function Page({
   if (hasTagFilters) {
     // Filtered path: first page via RPC. Infinite scroll paginates further
     // through /api/albums with tag params (cursor = edge date).
-    const tomorrow = localDateStr(new Date(Date.now() + 86400000))
     const { data, error } = await supabase.rpc("list_filtered_albums", {
       p_include_tags: includeTags,
       p_exclude_tags: excludeTags,

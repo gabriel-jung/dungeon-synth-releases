@@ -65,8 +65,20 @@ export default function HeatmapPopoverButton({
   const btnRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
 
-  // Invalidate cached payload when year or filter changes.
-  useEffect(() => { setDays(null) }, [year, tagQs])
+  // Invalidate cached payload + position when year or filter changes (during
+  // render, not via effect — avoids the brief flash where stale data shows
+  // for the new scope).
+  const cacheKey = `${year}|${tagQs}`
+  const [prevCacheKey, setPrevCacheKey] = useState(cacheKey)
+  if (prevCacheKey !== cacheKey) {
+    setPrevCacheKey(cacheKey)
+    setDays(null)
+  }
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (prevOpen !== open) {
+    setPrevOpen(open)
+    if (!open) setPos(null)
+  }
 
   useEffect(() => {
     if (!open || days) return
@@ -80,7 +92,7 @@ export default function HeatmapPopoverButton({
   }, [open, days, year, tagQs])
 
   useLayoutEffect(() => {
-    if (!open) { setPos(null); return }
+    if (!open) return
     const update = () => {
       const btn = btnRef.current
       if (!btn) return

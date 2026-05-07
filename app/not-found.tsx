@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 export default function NotFound() {
   return (
     <div className="max-w-xl mx-auto px-6 pt-16 text-center">
@@ -8,12 +10,12 @@ export default function NotFound() {
       <p className="text-text-dim mb-8 italic">
         No page dwells at this path.
       </p>
-      <a
+      <Link
         href="/"
         className="font-display text-xs tracking-[0.2em] uppercase text-accent hover:text-accent-hover border border-border hover:border-accent px-6 py-2 transition-colors"
       >
         Return to the archive
-      </a>
+      </Link>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { AlbumListItem, parseWeekKey, tagFilterQs, weekKeyOf } from "@/lib/types"
 import DaySection from "./DaySection"
@@ -31,14 +31,15 @@ function groupByDate(albums: AlbumListItem[]): [string, AlbumListItem[]][] {
 
 function LoadTrigger({ loading, onVisible }: { loading: boolean; onVisible: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
-  const onVisibleRef = useRef(onVisible)
-  onVisibleRef.current = onVisible
+  // useEffectEvent gives the IntersectionObserver callback a stable identity
+  // that reads the latest `onVisible` without putting it in the effect deps.
+  const onVisibleEvent = useEffectEvent(onVisible)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) onVisibleRef.current() },
+      ([entry]) => { if (entry.isIntersecting) onVisibleEvent() },
       { root: document.getElementById("release-list"), rootMargin: "400px" },
     )
     observer.observe(el)

@@ -34,6 +34,10 @@ export default function NavigationProgress() {
       firstRenderRef.current = false
       return
     }
+    // Triggering a transient flash on route change is the only thing we can
+    // do here — there's no external store to subscribe to. setState-in-effect
+    // is intentional: cascade is bounded by the timeout below.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActive(true)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => setActive(false), 500)
