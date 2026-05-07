@@ -14,8 +14,6 @@ import {
 import { polygonHull } from "d3-polygon"
 import { mean } from "d3-array"
 import { scaleLinear, scaleSqrt } from "d3-scale"
-import katex from "katex"
-import "katex/dist/katex.min.css"
 import { usePathname, useSearchParams } from "next/navigation"
 import { openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 import {
@@ -45,13 +43,13 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FgMethods = ForceGraphMethods<any, any>
 
-function Tex({ tex, block = false }: { tex: string; block?: boolean }) {
-  const html = useMemo(
-    () => katex.renderToString(tex, { throwOnError: false, displayMode: block }),
-    [tex, block],
-  )
-  return <span dangerouslySetInnerHTML={{ __html: html }} />
-}
+// Tex pulls in katex + its CSS (~50KB gzipped) — only needed inside the
+// "About this map" panel, so we dynamic-import it. The chunk loads the first
+// time the user opens the panel; rest of the canvas ships katex-free.
+const Tex = dynamic(() => import("./TagMapTex"), {
+  ssr: false,
+  loading: () => null,
+})
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value)

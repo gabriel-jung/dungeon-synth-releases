@@ -174,12 +174,14 @@ export default function ReleaseList({
       const targetDate = (e as CustomEvent).detail as string
       if (!targetDate) return
       const targetWeek = weekKeyOf(targetDate)
+      const prev = shiftWeek(targetWeek, -1)
+      const next = shiftWeek(targetWeek, 1)
       setLoading(true)
       try {
         await Promise.all([
           fetchWeek(targetWeek),
-          shiftWeek(targetWeek, -1) ? fetchWeek(shiftWeek(targetWeek, -1)!) : Promise.resolve(0),
-          shiftWeek(targetWeek, 1) ? fetchWeek(shiftWeek(targetWeek, 1)!) : Promise.resolve(0),
+          prev ? fetchWeek(prev) : Promise.resolve(0),
+          next ? fetchWeek(next) : Promise.resolve(0),
         ])
       } finally {
         setLoading(false)
@@ -209,7 +211,14 @@ export default function ReleaseList({
             key={date}
             id={`date-${date}`}
             className={`${sectionCls} animate-fade-slide-in`}
-            style={{ animationDelay: `${Math.min(gi * 50, 300)}ms` }}
+            style={{
+              animationDelay: `${Math.min(gi * 50, 300)}ms`,
+              // Skip layout/paint for off-screen day sections. The `auto`
+              // fallback keeps the rendered height once known so scroll
+              // anchoring (DateSlider's section-offset lookup) stays stable.
+              contentVisibility: "auto",
+              containIntrinsicSize: "auto 600px",
+            }}
           >
             <DaySection
               label={heading}

@@ -104,10 +104,13 @@ export default function HeatmapPopoverButton({
     }
     update()
     window.addEventListener("resize", update)
-    window.addEventListener("scroll", update, true)
+    // passive: handler only reads getBoundingClientRect + setState, never
+    // calls preventDefault — flagging passive lets the browser keep scrolling
+    // smoothly while the popover repositions.
+    window.addEventListener("scroll", update, { passive: true, capture: true })
     return () => {
       window.removeEventListener("resize", update)
-      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("scroll", update, { capture: true })
     }
   }, [open])
 
