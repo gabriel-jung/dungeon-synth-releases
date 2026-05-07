@@ -24,12 +24,14 @@ This framing is load-bearing. It means:
 ```
 /                    → Recent: current year, newest first
 /releases/[year]     → year archive (list mode)
-/genres              → all-time genre map
-/themes              → all-time theme map (same component as /genres)
-/stats               → all-time stats dashboard
+/graphs              → redirects to /graphs/genres
+/graphs/genres       → all-time genre graph
+/graphs/themes       → all-time theme graph (same component as /graphs/genres)
+/statistics               → overall stats dashboard
+/statistics/by-year       → per-year stats (placeholder)
 ```
 
-Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · TabBar (Releases / Genres / Themes / Stats) · global tag filter chips.
+Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · about · TabBar (Releases / Statistics / Tag Graphs) · tag filter button (with `?` tooltip). Per-page sub-nav rows ((Recent / Past Years / Upcoming), (Overall / By Year), (Genres / Themes)) live in the page-specific layouts. Filter chips render absolute on the sub-nav row right side for `/` and `/statistics`; hidden on `/graphs/*`.
 
 Past-years and upcoming-releases navigation live inside the releases area:
 - `ReleasesScopeNav` renders **Recent · Past Years ▾ · Upcoming**.
@@ -70,13 +72,13 @@ Main page under `app/(releases)/`. The release list scopes to the current year w
 
 Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound={yearStart}` caps the scroll at Jan 1 of that year; the release list loads the first 500 rows descending from yearEnd to stay responsive on sparse pre-Bandcamp years.
 
-### `/genres`, `/themes` — TagMaps
+### `/graphs/genres`, `/graphs/themes` — TagGraphs
 
-Canvas-rendered force graphs over tag co-occurrence. Same `TagMapCanvas` component, swapped between `category='genre'` and `category='theme'`. All-time only — per-year maps are too sparse to be meaningful. See [`docs/genres.md`](./genres.md).
+Canvas-rendered force graphs over tag co-occurrence. Same `TagGraphCanvas` component, swapped between `category='genre'` and `category='theme'`. All-time only — per-year maps are too sparse to be meaningful. See [`docs/graphs.md`](./graphs.md).
 
-### `/stats` — stats dashboard
+### `/statistics` — stats dashboard
 
-All-time aggregates — year bar, top hosts, tracks/duration histograms, popular genres + themes. See [`docs/stats.md`](./stats.md).
+All-time aggregates — year bar, top hosts, tracks/duration histograms, popular genres + themes. See [`docs/statistics.md`](./statistics.md).
 
 ## Search
 
@@ -102,7 +104,7 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 ### Per-view strategy
 
 - **Year archive** — query scoped to `WHERE year = X`. Cheap and bounded regardless of corpus size. Cached per year via Cache Components.
-- **Genre map** — RPC aggregates across all `album_tags`; expensive to compute but small payload. Cached with `cacheLife("days")` and `cacheTag("genres")` + `cacheTag("tag-map-{genre|theme}")`; the daily `?tag=genres` cron revalidates after ingests.
+- **Genre map** — RPC aggregates across all `album_tags`; expensive to compute but small payload. Cached with `cacheLife("days")` and `cacheTag("genres")` + `cacheTag("tag-graph-{genre|theme}")`; the daily `?tag=genres` cron revalidates after ingests.
 - **Stats** — same caching story (`cacheTag("stats")`, daily `?tag=stats` cron).
 - **Tag filters** — routed through the `list_filtered_albums` RPC for server-side intersection; `/api/albums/by-scope` wraps it for the scope modal.
 
@@ -111,11 +113,11 @@ Supabase free tier constrains both egress (5GB/month) and DB size (500MB). At cu
 - `lib/modalUrl.ts` — open/close/href helpers for URL-driven modal state
 - `lib/albumCache.ts` — bounded module-level stub cache so modals can paint instantly from prior click data; server fetch still runs in parallel for authoritative data
 - `lib/types.ts` — `AlbumListItem`, `parseTagParams`, `dedupeById`, `rpcRowToAlbumListItem`, …
-- `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchGenreTags`, `fetchPastYears`, `fetchYearCount`, `fetchRecentAlbums`)
-- `lib/tagMap.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/genres` and `/themes` maps, cached under `cacheTag("genres")` + `cacheTag("tag-map-{category}")`
-- `lib/tagMapLogic.ts` — shared graph construction (metrics, edge filter, Louvain) used by `TagMapCanvas` and `scripts/tune-tagmap.mts`
+- `lib/supabase.ts` — Supabase client, `ALBUM_LIST_SELECT`, `HTTP_CACHE_1H`, cached helpers (`fetchTagsByCategory`, `fetchPastYears`, `fetchYearCount`, `fetchRecentAlbums`)
+- `lib/tagGraph.ts` — single-call `tag_counts` + `tag_pairs` (jsonb) for the `/graphs/genres` and `/graphs/themes` maps, cached under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")`
+- `lib/tagGraphLogic.ts` — shared graph construction (metrics, edge filter, Louvain) used by `TagGraphCanvas` and `scripts/tune-taggraph.mts`
 - `lib/tagContext.ts` — per-tag related genres + themes for the scope modal bars, cached under the same `genres` tag
-- `components/TagBarScroll.tsx` — shared vertically-scrolling bar list used by `/stats` and the scope modal's tag-context panel
+- `components/TagBarScroll.tsx` — shared vertically-scrolling bar list used by `/statistics` and the scope modal's tag-context panel
 
 ### Progressive disclosure on lists
 
@@ -126,6 +128,6 @@ Artwork is hotlinked directly from Bandcamp — no egress cost to us, no storage
 ## Deferred decisions
 
 - **Artist/label entity pages**: only once identity is stable.
-- **Yearly filter on /stats**: RPC args (`p_year`) are already nullable; missing piece is a year-picker UI component.
+- **Yearly filter on /statistics**: RPC args (`p_year`) are already nullable; missing piece is a year-picker UI component.
 - **Hosting upgrade**: revisit if DB size crosses ~300MB or egress trends above ~3GB/month.
 - **Artwork fallback strategy**: defer until Bandcamp hotlinking actually breaks.

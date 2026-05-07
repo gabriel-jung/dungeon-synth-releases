@@ -48,3 +48,7 @@ next-env.d.ts
 .claude/
 PLAN.md
 AUDIT.md
+
+# local data
+*.db
+bandcamp_sync.db

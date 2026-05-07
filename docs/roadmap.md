@@ -31,10 +31,10 @@ geocode_status text         -- ok | failed | fictional | blank
 ### Tag category curation
 Attribution quality in `tags.category` is uneven. User is exploring/curating manually in the scraper repo.
 
-Example of planned addition: **`band` category** for tags that are literally artist/project names (common bandcamp convention: users tag releases with related bands). Keeps those tags out of the `/genres` and `/themes` maps.
+Example of planned addition: **`band` category** for tags that are literally artist/project names (common bandcamp convention: users tag releases with related bands). Keeps those tags out of the `/graphs/genres` and `/graphs/themes` maps.
 
 If new categories land, the site may need either:
-- A new TagMap scope (analogous to `/genres`, `/themes`), or
+- A new TagGraph scope (analogous to `/graphs/genres`, `/graphs/themes`), or
 - A filter in existing scopes to exclude them.
 
 Decide on a per-category basis.
@@ -52,12 +52,12 @@ Deferred — not needed before geo map work.
 
 ### Site shell
 Right now `/` drops straight into the release feed — no onboarding for new visitors. Candidates:
-- Landing / about / methodology page explaining data source + how tag maps are built.
-- Consistent cross-nav between `/`, `/genres`, `/themes`, `/stats`, `/releases`.
+- Landing / about / methodology page explaining data source + how tag graphs are built.
+- Consistent cross-nav between `/`, `/graphs/genres`, `/graphs/themes`, `/statistics`, `/releases`.
 - Not yet prioritised.
 
 ## Parked / rejected
 
-- **Louvain cluster browser** — expose communities from `lib/tagMapLogic.ts` as browsable "subgenre families". Rejected: feels more like a paper/blog post than a useful site feature. Clusters are already used for node colour, which is enough.
-- **TagMap polish** (search-to-focus, per-map filters, share URLs) — not a current itch.
+- **Louvain cluster browser** — expose communities from `lib/tagGraphLogic.ts` as browsable "subgenre families". Rejected: feels more like a paper/blog post than a useful site feature. Clusters are already used for node colour, which is enough.
+- **TagGraph polish** (search-to-focus, per-map filters, share URLs) — not a current itch.
 - **Release-level artist/label graph** — too many nodes, not compelling; host-level aggregation is what becomes the reco engine above.

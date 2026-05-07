@@ -1,6 +1,8 @@
-# /stats — Release Statistics
+# /statistics — Release Statistics
 
 A dashboard of aggregate views over all known dungeon synth releases. Server-rendered with Next.js Cache Components (`"use cache"` + `cacheLife("days")` + `cacheTag("stats")`). Cron calls `/api/revalidate?tag=stats` to push new data after ingests.
+
+Sub-routes: `/statistics` (Overall, this doc) and `/statistics/by-year` (placeholder, "Coming soon"). Sub-nav lives in `app/statistics/layout.tsx`; filter chips render absolute on the right of that row.
 
 ## Sections
 
@@ -62,7 +64,7 @@ Passing `p_year: null` tells every RPC to skip the year filter — if/when a UI 
 
 | Path | Role |
 |------|------|
-| `app/stats/page.tsx` | Server component, issues the 6 parallel RPC calls, renders sections |
+| `app/statistics/page.tsx` | Server component, issues the 6 parallel RPC calls, renders sections |
 | `components/HostRow.tsx` | Single ranked host entry with bar; opens `ScopeModal` via `?host=` |
 | `components/TagRow.tsx` | Single ranked tag entry with bar; opens `ScopeModal` via `?genre=` |
 | `components/TagBarScroll.tsx` | Shared scrollable tag bar column, also used by the scope modal's tag-context panel |

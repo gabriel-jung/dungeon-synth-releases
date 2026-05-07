@@ -19,13 +19,11 @@ export default function YearReleaseCount({
   const displayYear = pastYear ?? year
 
   const filtered = searchParams.has("tag") || searchParams.has("xtag")
-  const hidden = pathname === "/genres"
   const spKey = searchParams.toString()
 
   const [count, setCount] = useState<number | null>(pastYear ? null : initialCount)
 
   useEffect(() => {
-    if (hidden) return
     if (!pastYear && !filtered) {
       setCount(initialCount)
       return
@@ -43,9 +41,7 @@ export default function YearReleaseCount({
       .catch(() => {})
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spKey, displayYear, initialCount, filtered, pastYear, hidden])
-
-  if (hidden) return null
+  }, [spKey, displayYear, initialCount, filtered, pastYear])
 
   return (
     <span className="text-xs italic text-text-dim">

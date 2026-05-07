@@ -1,10 +1,10 @@
-// Sweeps TagMap physics parameters against real genre data, runs a
+// Sweeps TagGraph physics parameters against real genre data, runs a
 // synchronous d3-force settle per combination, and reports layout metrics
 // that matter for legibility: cluster separation, link-length ratio, and
 // total bounding-box area. Goal: pick defaults that give clear structure
 // without exaggerated spread.
 //
-// Run: npx tsx scripts/tune-tagmap.mts
+// Run: npx tsx scripts/tune-taggraph.mts
 //
 // Requires SUPABASE_URL + SUPABASE_SECRET_KEY in .env.local (same vars the
 // site uses).
@@ -21,10 +21,10 @@ import { readFileSync } from "node:fs"
 import { scaleSqrt } from "d3-scale"
 // Node 25's native TS loader conflicts with tsx for static imports of .ts —
 // use a dynamic import so tsx's hook is in control.
-const logicMod = await import("../lib/tagMapLogic.ts")
-const buildTagGraph = logicMod.buildTagGraph as typeof import("../lib/tagMapLogic.ts").buildTagGraph
-type TagNode = import("../lib/tagMapLogic.ts").TagNode
-type TagEdge = import("../lib/tagMapLogic.ts").TagEdge
+const logicMod = await import("../lib/tagGraphLogic.ts")
+const buildTagGraph = logicMod.buildTagGraph as typeof import("../lib/tagGraphLogic.ts").buildTagGraph
+type TagNode = import("../lib/tagGraphLogic.ts").TagNode
+type TagEdge = import("../lib/tagGraphLogic.ts").TagEdge
 
 function loadEnv() {
   const raw = readFileSync(new URL("../.env.local", import.meta.url), "utf8")

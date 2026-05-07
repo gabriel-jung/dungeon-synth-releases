@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
       { source: "/past", destination: "/", permanent: true },
       { source: "/past/:year", destination: "/releases/:year", permanent: true },
       { source: "/upcoming", destination: "/?upcoming=1", permanent: true },
+      { source: "/genres", destination: "/graphs/genres", permanent: true },
+      { source: "/themes", destination: "/graphs/themes", permanent: true },
+      { source: "/stats", destination: "/statistics", permanent: true },
+      { source: "/stats/:path*", destination: "/statistics/:path*", permanent: true },
     ]
   },
 }

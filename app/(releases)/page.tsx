@@ -84,7 +84,12 @@ export default async function Page({
       p_limit: 500,
     })
     if (error) throw new Error(`list_filtered_albums RPC failed: ${error.message}`)
-    for (const r of data ?? []) allRows.push(rpcRowToAlbumListItem(r))
+    // Setting p_after=yearStart regresses the RPC planner on broad
+    // include/exclude sets. Clip client-side instead.
+    for (const r of data ?? []) {
+      const item = rpcRowToAlbumListItem(r)
+      if (item.date && item.date >= yearStart) allRows.push(item)
+    }
   } else {
     // Unfiltered path: 7-day window via cached helper so all visitors
     // share one Supabase fetch until the daily cron rolls it.

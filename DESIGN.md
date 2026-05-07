@@ -216,7 +216,7 @@ Approved Unicode glyphs only. No SVG icon sets.
 | `←` | Back |
 | `×` | Close |
 | `→` | "Bandcamp →" external link tag |
-| `❧` | TagMap empty-state ornament |
+| `❧` | TagGraph empty-state ornament |
 
 When adding a glyph that isn't on this list, justify it in the PR or use one of the above.
 
@@ -252,17 +252,22 @@ The page must read as a chronicle, not a feed. Days separated by ornamental rule
 
 ```
 <header>
-  [Masthead title + tagline]                [Search trigger] [Theme picker]
+  [Masthead title + tagline]                [Search] [Theme] [About]
   [masthead-rule]
-  [TabBar]                                  ┌─────────────────┐
-                                            │ #tag-filter-slot │  ← TagFilter button portals here
-                                            │ [FilterChips]    │
-                                            └─────────────────┘
+  [TabBar: Releases / Statistics / Tag Graphs]   #tag-filter-slot ← [▸ Tag Filter (n)] [?]
 </header>
-[TagFilter expanded panel — renders below <header>, full-width]
+[TagFilter expanded panel — absolute overlay, z-40, max-h-[70vh], renders below <header>]
+[Per-page sub-nav row]
+  /              → Recent · Past Years ▾ · Upcoming + count + heatmap          [FilterChips]
+  /releases/[y]  → same                                                         [FilterChips]
+  /statistics    → Overall · By Year                                            [FilterChips]
+  /graphs/*      → Genres · Themes                                              (no chips)
+[gradient divider]
 ```
 
-The right column is vertically stacked. `TagFilter` mounts the trigger button into `#tag-filter-slot` via portal so the expanded panel can render outside the `<header>` element without pushing other affordances around.
+`TagFilter` mounts its trigger button + `?` info icon into `#tag-filter-slot` via portal so the expanded panel can render outside the `<header>` element without pushing other affordances around. Inside the panel: category tabs (genres / themes / aesthetics / artists / locations / instruments / formats) right-aligned at the top, then the tag chip grid with `border-b-2` on every chip so toggling include/exclude doesn't reflow. Hidden entirely on `/graphs/*`.
+
+`FilterChipsSlot` renders absolute on the right of each sub-nav row (`absolute top-1 right-4 sm:right-6 max-w-[60%] overflow-x-auto`) so adding chips never resizes the row.
 
 ---
 
@@ -279,7 +284,7 @@ Z-index ladder (low → high):
 | Z | Layer |
 |---|-------|
 | `50` | Heatmap popover (intentionally low — never overlaps with a modal because the user can't trigger both at once) |
-| `9000` | TagMapCanvas fullscreen mode (sits below vignette + texture so the page chrome still reads) |
+| `9000` | TagGraphCanvas fullscreen mode (sits below vignette + texture so the page chrome still reads) |
 | `9997` | Scroll-descent overlay |
 | `9998` | Vignette |
 | `9999` | Paper-noise texture |
@@ -341,7 +346,7 @@ Tablet sizes (`md`, `lg`) only adjust grid column counts. No third layout tier.
 - Filter cluster: chip set wraps to a second row. Never truncated.
 - Tab bar: scrollable horizontally on overflow, with nav glyph fallback if more tabs ever land.
 - Header avatar / icon row: shrinks first; title text truncates last (`truncate min-w-0`).
-- TagMap canvas: full-width on mobile, fixed control panel slides in from the right on desktop.
+- TagGraph canvas: full-width on mobile, fixed control panel slides in from the right on desktop.
 
 ### Typography
 

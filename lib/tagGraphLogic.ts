@@ -1,4 +1,4 @@
-// Pure logic for TagMapCanvas — metrics, Louvain clustering, edge filtering,
+// Pure logic for TagGraphCanvas: metrics, Louvain clustering, edge filtering,
 // and color palette. No React, no DOM, no d3-selection.
 
 import { hsl } from "d3-color"

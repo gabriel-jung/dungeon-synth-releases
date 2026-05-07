@@ -39,28 +39,28 @@ export default function AboutPage() {
 
             <section className="flex flex-col gap-3">
               <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright">
-                Genre and theme maps
+                Tag graphs
               </h2>
               <p>
                 The{" "}
                 <Link
-                  href="/genres"
+                  href="/graphs/genres"
                   className="text-text hover:text-accent underline decoration-dotted underline-offset-2 transition-colors"
                 >
                   genres
                 </Link>
                 {" "}and{" "}
                 <Link
-                  href="/themes"
+                  href="/graphs/themes"
                   className="text-text hover:text-accent underline decoration-dotted underline-offset-2 transition-colors"
                 >
                   themes
                 </Link>
-                {" "}maps each draw from a curated selection of tags (genres on one, themes
+                {" "}graphs each draw from a curated selection of tags (genres on one, themes
                 on the other) and position them by how often they share releases. Tags used
                 together frequently sit close; unrelated ones drift apart. Tightly linked
                 tags share a color, marking the loose subgenre families that emerge from the
-                data. Open the <span className="text-text">?</span> on either map for the
+                data. Open the <span className="text-text">?</span> on either graph for the
                 formulas behind the layout.
               </p>
             </section>

@@ -10,8 +10,7 @@ import ScrollDescent from "@/components/ScrollDescent"
 import NavigationProgress from "@/components/NavigationProgress"
 import ModalRouter from "@/components/ModalRouter"
 import TagFilter from "@/components/TagFilter"
-import FilterChips from "@/components/FilterChips"
-import { fetchGenreTags } from "@/lib/supabase"
+import { fetchTagsByCategory } from "@/lib/supabase"
 import { SITE_URL } from "@/lib/site"
 import { Suspense } from "react"
 import "./globals.css"
@@ -28,6 +27,8 @@ const crimsonText = Crimson_Text({
   weight: ["400", "600", "700"],
 })
 
+
+const TAG_CATEGORIES = ["genre", "theme", "aesthetic", "artist", "location", "instrument", "format"] as const
 
 const DESCRIPTION =
   "A chronicle of dungeon synth releases from Bandcamp. Browse by genre, label, and artist."
@@ -61,7 +62,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const allTags = await fetchGenreTags()
+  const tagLists = await Promise.all(TAG_CATEGORIES.map((c) => fetchTagsByCategory(c)))
+  const tagsByCategory = Object.fromEntries(TAG_CATEGORIES.map((c, i) => [c, tagLists[i]]))
   return (
     <html
       lang="en"
@@ -112,17 +114,14 @@ export default async function RootLayout({
             <Suspense>
               <TabBar />
             </Suspense>
-            <div className="flex flex-col items-end gap-1 min-w-0 pb-2">
-              <div id="tag-filter-slot" />
-              <Suspense>
-                <FilterChips />
-              </Suspense>
-            </div>
+            <div id="tag-filter-slot" className="pb-2" />
           </div>
         </header>
-        <Suspense>
-          <TagFilter tags={allTags} />
-        </Suspense>
+        <div className="relative">
+          <Suspense>
+            <TagFilter tagsByCategory={tagsByCategory} />
+          </Suspense>
+        </div>
         <main id="main-content" tabIndex={-1} className="flex-1 min-h-0">
           <Suspense>{children}</Suspense>
         </main>

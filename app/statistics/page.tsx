@@ -5,12 +5,11 @@ import { parseTagParams, type TagCount } from "@/lib/types"
 import HostRow from "@/components/HostRow"
 import TagBarScroll from "@/components/TagBarScroll"
 import Histogram, { HistBin } from "@/components/Histogram"
-import PageHeader from "@/components/PageHeader"
 
 export const metadata = {
-  title: "Stats",
+  title: "Statistics",
   description: "Release activity across years, top labels, and distributions for dungeon synth on Bandcamp.",
-  alternates: { canonical: "/stats" },
+  alternates: { canonical: "/statistics" },
 }
 
 const YEAR_BAR_START = 1990
@@ -105,11 +104,9 @@ export default async function StatsPage({
   const hostMax = rows[0]?.n ?? 1
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <PageHeader description="Some statistics on dungeon synth activity across Bandcamp." />
-      <div className="flex-1 min-h-0 pt-6 sm:pt-8">
-        <div className="h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 flex flex-col gap-10">
+    <div className="h-full pt-6 sm:pt-8">
+      <div className="h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 flex flex-col gap-10">
           <section>
             <Histogram title="Releases per Year" bins={yearBins} />
           </section>
@@ -149,7 +146,6 @@ export default async function StatsPage({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             <TagBarScroll title="Popular Genres" items={genres} rows={12} headingStyle="section" emptyLabel="No tags." />
             <TagBarScroll title="Popular Themes" items={themes} rows={12} headingStyle="section" emptyLabel="No tags." />
-          </div>
           </div>
         </div>
       </div>

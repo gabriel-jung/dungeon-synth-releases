@@ -40,17 +40,16 @@ export async function paginateAll<T>(
   return out
 }
 
-export async function fetchGenreTags(): Promise<string[]> {
+export async function fetchTagsByCategory(category: string): Promise<string[]> {
   "use cache"
   cacheLife("days")
   cacheTag("genres")
   // Hard cap on the global tag-filter list. The TagFilter panel surfaces
   // these for autocomplete; long-tail tags below the top ~500 are vanishingly
   // useful and the egress cost grows linearly with the corpus.
-  const { data } = await supabase
-    .rpc("tag_counts", { p_top_k: 500 })
-    .order("n", { ascending: false })
-  return (data ?? []).map((r: { name: string }) => r.name)
+  const { data, error } = await supabase.rpc("tag_counts", { p_category: category, p_top_k: 500 })
+  if (error) throw new Error(`tag_counts RPC failed: ${error.message}`)
+  return ((data ?? []) as Array<{ name: string }>).map((r) => r.name)
 }
 
 export async function fetchPastYears(): Promise<number[]> {

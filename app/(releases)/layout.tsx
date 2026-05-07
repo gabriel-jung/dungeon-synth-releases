@@ -2,13 +2,14 @@ import { connection } from "next/server"
 import YearReleaseCount from "@/components/YearReleaseCount"
 import ReleasesScopeNav from "@/components/ReleasesScopeNav"
 import HeatmapPopoverButton from "@/components/HeatmapPopoverButton"
+import FilterChipsSlot from "@/components/FilterChipsSlot"
 import { fetchPastYears, fetchYearCount } from "@/lib/supabase"
 import { localDateStr } from "@/lib/types"
 import { Suspense } from "react"
 
 // Nested layout for browse-list pages (/ and /releases/[year]). Owns the
-// scope nav + year count. Tag filter lives in the root header (shared
-// with /stats and /genres).
+// scope nav + year count + filter chips. Tag filter button lives in the
+// root header (shared with /statistics and /graphs).
 export default async function ReleasesLayout({ children }: { children: React.ReactNode }) {
   // Opt into dynamic rendering: layout reads the current time to compute the
   // current year / today, which Cache Components disallows during static
@@ -23,7 +24,7 @@ export default async function ReleasesLayout({ children }: { children: React.Rea
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="shrink-0 px-4 sm:px-6 flex items-start justify-between gap-4 pt-1 pb-2">
+      <div className="shrink-0 relative px-4 sm:px-6 flex items-start justify-between gap-4 pt-1 pb-2">
         <div className="flex flex-col items-start min-w-0">
           <Suspense>
             <ReleasesScopeNav pastYears={pastYears} />
@@ -39,6 +40,7 @@ export default async function ReleasesLayout({ children }: { children: React.Rea
             </div>
           )}
         </div>
+        <FilterChipsSlot />
       </div>
       <div aria-hidden className="shrink-0 h-px mx-4 sm:mx-6 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
       <div className="flex-1 min-h-0 pt-6 sm:pt-8">{children}</div>

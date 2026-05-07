@@ -32,7 +32,7 @@ import {
   type TagPair,
   type TagNode,
   type TagEdge,
-} from "@/lib/tagMapLogic"
+} from "@/lib/tagGraphLogic"
 import type { ForceGraphMethods, ForceGraphProps } from "react-force-graph-2d"
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
@@ -43,8 +43,8 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FgMethods = ForceGraphMethods<any, any>
 
-// Lazy-loaded so katex (see TagMapTex) only ships when the About panel opens.
-const Tex = dynamic(() => import("./TagMapTex"), {
+// Lazy-loaded so katex (see TagGraphTex) only ships when the About panel opens.
+const Tex = dynamic(() => import("./TagGraphTex"), {
   ssr: false,
   loading: () => null,
 })
@@ -107,7 +107,7 @@ function readThemeColors(): ThemeColors {
   return { font, text, textDim, bg }
 }
 
-export default function TagMapCanvas({
+export default function TagGraphCanvas({
   counts,
   pairs,
   itemLabel = "genre",
@@ -130,7 +130,7 @@ export default function TagMapCanvas({
 
   // URL → initial state, read once on mount. Subsequent URL writes flow
   // the other direction (see the sync effect below). Safe to keep empty
-  // deps: `TagMapCanvas` is mounted per route (`/genres` and `/themes`
+  // deps: `TagGraphCanvas` is mounted per route (`/graphs/genres` and `/graphs/themes`
   // are separate pages), so `counts`/`maxTopN` never mutate under us.
   const initial = useMemo(() => ({
     metric: parseEnum<Metric>(searchParams.get("m"), METRIC_VALUES, "jaccard"),
@@ -717,7 +717,7 @@ export default function TagMapCanvas({
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `${labelSingular}-map-${metric}.png`
+      a.download = `${labelSingular}-graph-${metric}.png`
       a.click()
       URL.revokeObjectURL(url)
     }, "image/png")
@@ -783,7 +783,7 @@ export default function TagMapCanvas({
     <div
       ref={containerRef}
       role="img"
-      aria-label={`${labelSingular.charAt(0).toUpperCase()}${labelSingular.slice(1)} co-occurrence map: ${nodes.length} ${labelPlural}, ${visibleEdges.size} connections`}
+      aria-label={`${labelSingular.charAt(0).toUpperCase()}${labelSingular.slice(1)} co-occurrence graph: ${nodes.length} ${labelPlural}, ${visibleEdges.size} connections`}
       onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
       className={
         fullscreen
@@ -1004,7 +1004,7 @@ export default function TagMapCanvas({
                     </select>
                     {resetBtn(metric, DEFAULTS.metric, () => setMetric(DEFAULTS.metric))}
                   </label>
-                  <label className="flex items-center gap-2" title={`How many of the most-tagged ${labelPlural} to include in the map. Rebuilds clusters.`}>
+                  <label className="flex items-center gap-2" title={`How many of the most-tagged ${labelPlural} to include in the graph. Rebuilds clusters.`}>
                     <span>Keep top N</span>
                     <input
                       type="range" min={10} max={maxTopN} step={1} value={topN}
@@ -1090,7 +1090,7 @@ export default function TagMapCanvas({
                     <span className="tabular-nums text-text text-right inline-block min-w-[4ch]">{repulsion}</span>
                     {resetBtn(repulsion, DEFAULTS.repulsion, () => setRepulsion(DEFAULTS.repulsion))}
                   </label>
-                  <label className="flex items-center gap-2" title="Pull toward the centre of the canvas. Zero lets the map drift; higher values keep everything anchored.">
+                  <label className="flex items-center gap-2" title="Pull toward the centre of the canvas. Zero lets the graph drift; higher values keep everything anchored.">
                     <span>Centring</span>
                     <input
                       type="range" min={0} max={1} step={0.01} value={gravity}
@@ -1241,7 +1241,7 @@ export default function TagMapCanvas({
             type="button"
             onClick={() => { setAboutOpen((v) => !v); if (showAdvanced) setShowAdvanced(false) }}
             aria-expanded={aboutOpen}
-            aria-label="About this map"
+            aria-label="About this graph"
             className={`w-7 h-7 flex items-center justify-center backdrop-blur-sm border rounded-sm font-sans italic text-sm transition-colors ${
               aboutOpen
                 ? "bg-bg/90 border-accent/40 text-accent"
@@ -1254,7 +1254,7 @@ export default function TagMapCanvas({
             <div className="absolute top-full left-0 mt-2 w-[min(34rem,calc(100vw-1.5rem))] max-h-[min(70vh,calc(100svh-8rem))] overflow-y-auto bg-bg-card border border-border rounded-sm shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
                 <span className="font-display text-[10px] tracking-[0.2em] uppercase text-accent">
-                  About this map
+                  About this graph
                 </span>
                 <button
                   type="button"
@@ -1406,8 +1406,8 @@ export default function TagMapCanvas({
         <button
           type="button"
           onClick={downloadPng}
-          aria-label="Save map as PNG"
-          title="Save map as PNG"
+          aria-label="Save graph as PNG"
+          title="Save graph as PNG"
           className="w-8 h-8 flex items-center justify-center text-accent border border-transparent hover:text-accent-hover hover:border-accent/40 hover:bg-accent/10 rounded-sm transition-colors"
         >
           <svg aria-hidden viewBox="0 0 16 16" className="w-4 h-4 fill-none stroke-current" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1459,7 +1459,7 @@ export default function TagMapCanvas({
       {!ready && nodes.length > 0 && (
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
           <div className="font-display text-accent/70 text-xs tracking-[0.3em] uppercase animate-pulse">
-            ❧ drawing the map
+            ❧ drawing the graph
           </div>
         </div>
       )}
