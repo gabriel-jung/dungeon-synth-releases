@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Cinzel, Crimson_Text } from "next/font/google"
+import AboutButton from "@/components/AboutButton"
 import ThemePicker from "@/components/ThemePicker"
 import SearchTrigger from "@/components/SearchTrigger"
 import SearchPalette from "@/components/SearchPalette"
@@ -103,6 +104,7 @@ export default async function RootLayout({
                 <SearchTrigger />
               </Suspense>
               <ThemePicker />
+              <AboutButton />
             </div>
           </div>
           <div className="masthead-rule mt-4 sm:mt-6"></div>
