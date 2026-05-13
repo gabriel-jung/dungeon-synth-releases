@@ -10,25 +10,30 @@ export function releaseCount(n: number): string {
 }
 
 type TagParamsInput = { tag?: string | string[]; xtag?: string | string[] }
+// Sort + dedupe so two URLs with the same tags in different order share one
+// server cache key and one CDN cache entry.
 export function parseTagParams(sp: TagParamsInput): { includeTags: string[]; excludeTags: string[] } {
-  const norm = (v?: string | string[]) => (Array.isArray(v) ? v : v ? [v] : [])
+  const norm = (v?: string | string[]) => {
+    const arr = Array.isArray(v) ? v : v ? [v] : []
+    return Array.from(new Set(arr)).sort()
+  }
   return { includeTags: norm(sp.tag), excludeTags: norm(sp.xtag) }
 }
 
 // Reads ?tag=/?xtag= from a URLSearchParams and emits the encoded query string
-// fragment (no leading "?", no leading "&"). Used by API fetches that need to
-// forward the page-level tag filter.
+// fragment (no leading "?", no leading "&"). Sorted + deduped so permuted
+// orderings share one CDN cache entry.
 export function tagFilterQs(sp: URLSearchParams): string {
+  const dedupeSort = (vs: string[]) => Array.from(new Set(vs)).sort()
   const parts: string[] = []
-  for (const t of sp.getAll("tag")) parts.push(`tag=${encodeURIComponent(t)}`)
-  for (const t of sp.getAll("xtag")) parts.push(`xtag=${encodeURIComponent(t)}`)
+  for (const t of dedupeSort(sp.getAll("tag"))) parts.push(`tag=${encodeURIComponent(t)}`)
+  for (const t of dedupeSort(sp.getAll("xtag"))) parts.push(`xtag=${encodeURIComponent(t)}`)
   return parts.join("&")
 }
 
-// "/releases/<year>" → year, anything else → null. Centralised so the header
-// scope nav and the heatmap popover stay in lockstep.
+// Centralised so scope navs, heatmap popover, and YearReleaseCount agree.
 export function yearFromPath(pathname: string): number | null {
-  const m = pathname.match(/^\/releases\/(\d{4})\b/)
+  const m = pathname.match(/^\/(?:releases|statistics\/by-year)\/(\d{4})\b/)
   return m ? Number(m[1]) : null
 }
 

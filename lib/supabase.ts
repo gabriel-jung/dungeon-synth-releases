@@ -79,6 +79,27 @@ export async function fetchYearCount(year: number, upTo: string): Promise<number
   return count
 }
 
+// Derived by summing `year_counts` (one row per year, ~30) so no schema
+// migration is needed. Shared between `fetchTotalCount` (server, cached) and
+// `/api/total-count` (client refetch on filter change).
+export async function sumYearCounts(includeTags: string[], excludeTags: string[]): Promise<number> {
+  const { data, error } = await supabase.rpc("year_counts", {
+    p_include_tags: includeTags,
+    p_exclude_tags: excludeTags,
+  })
+  if (error) throw new Error(`year_counts RPC failed: ${error.message}`)
+  return ((data ?? []) as { n: number | string }[]).reduce((acc, r) => acc + Number(r.n), 0)
+}
+
+// Cached all-time unfiltered total. Backs the /statistics layout header.
+export async function fetchTotalCount(): Promise<number> {
+  "use cache"
+  cacheLife("days")
+  cacheTag("genres")
+  cacheTag("stats")
+  return sumYearCounts([], [])
+}
+
 // Recent unfiltered release list for the `/` server component. Cached so
 // every visitor in the same day shares one Supabase fetch; the daily cron
 // busts `genres` and rolls the window. `today` is the only request-time

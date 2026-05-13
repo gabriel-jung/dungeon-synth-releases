@@ -9,8 +9,9 @@ export async function GET(request: NextRequest) {
 
   const sp = request.nextUrl.searchParams
   const year = Number(sp.get("year")) || new Date().getUTCFullYear()
-  const includeTags = sp.getAll("tag")
-  const excludeTags = sp.getAll("xtag")
+  const dedupeSort = (vs: string[]) => Array.from(new Set(vs)).sort()
+  const includeTags = dedupeSort(sp.getAll("tag"))
+  const excludeTags = dedupeSort(sp.getAll("xtag"))
   const today = localDateStr(new Date())
 
   // Single scalar from year_count RPC. Avoids shipping ~365 daily rows

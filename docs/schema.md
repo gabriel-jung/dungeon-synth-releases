@@ -55,6 +55,8 @@ All tag-filtered RPCs accept `p_include_tags text[]` (album must have ALL) and `
 | `year_count(p_year, p_up_to, p_include_tags, p_exclude_tags)` | scalar count for year, optional date ceiling | **`bigint`** — single value |
 | `tracks_per_album_hist(p_year, p_include_tags, p_exclude_tags)` | year-scoped | `bucket, bucket_order, bucket_width, n` |
 | `album_duration_hist(p_year, p_include_tags, p_exclude_tags)` | year-scoped | same shape as tracks hist |
+| `dow_counts(p_year, p_include_tags, p_exclude_tags)` | year-scoped; zero-padded via `generate_series` | same shape as tracks hist (7 bins, Mon..Sun) |
+| `month_counts(p_year, p_include_tags, p_exclude_tags)` | year-scoped; zero-padded via `generate_series` | same shape as tracks hist (12 bins, Jan..Dec) |
 | `list_filtered_albums(p_include_tags, p_exclude_tags, p_before, p_after, p_limit)` | keyset pagination | album row list |
 | `tag_counts_by_category(p_category, p_year, p_include_tags, p_exclude_tags, p_top_k)` | category + year-scoped (null = all-time); `p_top_k` default 50 | `name, n` |
 | `search_all(p_q, p_limit)` | substring search over artist/title/host name; `p_limit` default 50 | **`jsonb`** — array of matching album rows, newest first. No title-dedupe (label + self-release both surface) |

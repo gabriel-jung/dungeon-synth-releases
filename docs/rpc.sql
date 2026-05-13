@@ -484,3 +484,86 @@ as $$
     limit p_limit
   ) x;
 $$;
+
+
+-- ---------------------------------------------------------------------------
+-- dow_counts
+-- Histogram of releases by day of the week (Mon..Sun, 7 bins). Empty days
+-- are zero-padded via a generate_series LEFT JOIN so the bar chart keeps a
+-- consistent 7-bar layout even when a year has no releases on, say, Sunday.
+-- ---------------------------------------------------------------------------
+create or replace function dow_counts(
+  p_year int default null,
+  p_include_tags text[] default array[]::text[],
+  p_exclude_tags text[] default array[]::text[]
+)
+returns table(bucket text, bucket_order int, bucket_width int, n bigint)
+language sql stable
+as $$
+  WITH filtered AS (
+    -- pg extract(dow): 0 = Sunday .. 6 = Saturday. Normalise to Mon-first
+    -- ordering (Mon = 0, Sun = 6) so the chart reads left-to-right Mon..Sun.
+    SELECT CASE extract(dow FROM a.date)::int WHEN 0 THEN 6 ELSE extract(dow FROM a.date)::int - 1 END AS idx
+    FROM albums a
+    WHERE a.date IS NOT NULL
+      AND (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+      AND (cardinality(p_include_tags) = 0 OR a.id IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_include_tags)
+        GROUP BY at.album_id
+        HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+      ))
+      AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_exclude_tags)
+      ))
+  ),
+  series AS (SELECT generate_series(0, 6) AS idx)
+  SELECT (ARRAY['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])[s.idx + 1] AS bucket,
+         s.idx AS bucket_order,
+         1 AS bucket_width,
+         count(f.idx)::bigint AS n
+  FROM series s LEFT JOIN filtered f ON f.idx = s.idx
+  GROUP BY s.idx
+  ORDER BY s.idx;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- month_counts
+-- Histogram of releases by calendar month (Jan..Dec, 12 bins). Same
+-- zero-padding pattern as dow_counts.
+-- ---------------------------------------------------------------------------
+create or replace function month_counts(
+  p_year int default null,
+  p_include_tags text[] default array[]::text[],
+  p_exclude_tags text[] default array[]::text[]
+)
+returns table(bucket text, bucket_order int, bucket_width int, n bigint)
+language sql stable
+as $$
+  WITH filtered AS (
+    SELECT extract(month FROM a.date)::int AS m
+    FROM albums a
+    WHERE a.date IS NOT NULL
+      AND (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+      AND (cardinality(p_include_tags) = 0 OR a.id IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_include_tags)
+        GROUP BY at.album_id
+        HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+      ))
+      AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
+        SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_exclude_tags)
+      ))
+  ),
+  series AS (SELECT generate_series(1, 12) AS m)
+  SELECT (ARRAY['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'])[s.m] AS bucket,
+         s.m AS bucket_order,
+         1 AS bucket_width,
+         count(f.m)::bigint AS n
+  FROM series s LEFT JOIN filtered f ON f.m = s.m
+  GROUP BY s.m
+  ORDER BY s.m;
+$$;

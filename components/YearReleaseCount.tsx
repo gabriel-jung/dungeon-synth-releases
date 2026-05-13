@@ -1,52 +1,53 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
-import { releaseCount } from "@/lib/types"
+import ReleaseCountText from "./ReleaseCountText"
+import { tagFilterQs, yearFromPath } from "@/lib/types"
 
+// `initialCount` is the unfiltered count for the layout's home scope: current
+// year on releases, all-time on statistics. The component refetches whenever
+// the user navigates to a non-home scope or toggles a tag filter.
 export default function YearReleaseCount({
   initialCount,
   year,
+  mode = "releases",
 }: {
   initialCount: number
   year: number
+  mode?: "releases" | "stats"
 }) {
   const searchParams = useSearchParams()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? "/"
 
-  const pastMatch = pathname?.match(/^\/releases\/(\d{4})$/)
-  const pastYear = pastMatch ? Number(pastMatch[1]) : null
-  const displayYear = pastYear ?? year
+  const pathYear = yearFromPath(pathname)
+  const onStatsOverall = mode === "stats" && pathname === "/statistics"
+  const onStatsByYear = mode === "stats" && pathname.startsWith("/statistics/by-year")
+  const allTime = onStatsOverall
+  const scopeYear = allTime ? null : pathYear ?? year
+  const isHomeScope = !onStatsByYear && (allTime || scopeYear === year)
 
-  const filtered = searchParams.has("tag") || searchParams.has("xtag")
-  const spKey = searchParams.toString()
+  const tagQs = useMemo(() => tagFilterQs(searchParams), [searchParams])
+  const filtered = tagQs.length > 0
 
-  const [count, setCount] = useState<number | null>(pastYear ? null : initialCount)
+  const useInitial = isHomeScope && !filtered
+  const [fetched, setFetched] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!pastYear && !filtered) {
-      setCount(initialCount)
-      return
-    }
-    const params = new URLSearchParams()
-    params.set("year", String(displayYear))
-    for (const t of searchParams.getAll("tag")) params.append("tag", t)
-    for (const t of searchParams.getAll("xtag")) params.append("xtag", t)
+    if (useInitial) return
+    const endpoint = allTime ? "/api/total-count" : "/api/year-count"
+    const yearQs = !allTime && scopeYear != null ? `year=${scopeYear}` : ""
+    const qs = [yearQs, tagQs].filter(Boolean).join("&")
     const ctrl = new AbortController()
-    fetch(`/api/year-count?${params.toString()}`, { signal: ctrl.signal })
+    fetch(`${endpoint}?${qs}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d) => {
-        if (typeof d.count === "number") setCount(d.count)
+        if (typeof d.count === "number") setFetched(d.count)
       })
       .catch(() => {})
     return () => ctrl.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spKey, displayYear, initialCount, filtered, pastYear])
+  }, [tagQs, scopeYear, allTime, useInitial])
 
-  return (
-    <span className="text-xs italic text-text-dim">
-      {count === null ? "…" : releaseCount(count)} in {displayYear}
-      {filtered && <span className="text-accent not-italic"> · filtered</span>}
-    </span>
-  )
+  const display = useInitial ? initialCount : fetched
+  return <ReleaseCountText count={display} year={scopeYear} filtered={filtered} />
 }
