@@ -67,7 +67,7 @@ export function TagContextBarsSkeleton() {
 function SkeletonColumn({ rowHeights }: { rowHeights: string }) {
   return (
     <section>
-      <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/80 mb-3">
+      <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/60 mb-3">
         <span className="invisible">Related</span>
       </div>
       <div className="flex flex-col gap-0.5" style={{ height: rowHeights }}>

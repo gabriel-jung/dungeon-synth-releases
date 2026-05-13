@@ -13,7 +13,7 @@ export default function YearReleaseCount({
   year,
   mode = "releases",
 }: {
-  initialCount: number
+  initialCount: number | null
   year: number
   mode?: "releases" | "stats"
 }) {

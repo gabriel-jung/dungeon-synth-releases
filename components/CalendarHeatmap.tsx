@@ -139,16 +139,14 @@ export default function CalendarHeatmap({
 
   return (
     <div className="w-full overflow-x-auto relative">
-      <div className="h-6 mb-2 font-display text-sm tracking-wide text-text-bright flex items-center justify-between gap-4">
-        <div className="min-w-0 truncate">
+      <div className="h-6 mb-2 flex items-center justify-between gap-4">
+        <div className="font-display text-xs tracking-wide text-text-dim truncate shrink min-w-0">
           {hover?.inRange && (
             <>
               <span className="text-text-bright">{formatDateShort(hover.dateStr, true)}</span>
-              <span className="text-text-dim">
-                {", "}
-                {releaseCount(hover.count)}
-                {hover.isFuture && hover.count > 0 ? " (upcoming)" : ""}
-              </span>
+              {", "}
+              {releaseCount(hover.count)}
+              {hover.isFuture && hover.count > 0 ? " (upcoming)" : ""}
             </>
           )}
         </div>

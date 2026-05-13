@@ -90,7 +90,7 @@ function Heading({
     return <SectionHeader chapter={chapter} title={children} />
   }
   return (
-    <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/80 mb-3">
+    <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/60 mb-3">
       {children}
     </div>
   )

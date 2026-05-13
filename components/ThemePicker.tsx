@@ -82,7 +82,7 @@ export default function ThemePicker() {
       />
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border rounded-sm shadow-lg flex flex-col gap-3" style={{ zIndex: 10000 }}>
+        <div className="absolute right-0 top-full mt-2 p-3 bg-bg-card border border-border shadow-lg flex flex-col gap-3" style={{ zIndex: 10000 }}>
           {[themes.slice(0, 5), themes.slice(5, 10)].map((row, i) => (
             <div key={i} className="flex gap-3">
               {row.map((t) => (
@@ -103,7 +103,7 @@ export default function ThemePicker() {
               ))}
             </div>
           ))}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <span className={`font-display text-[10px] tracking-[0.15em] uppercase ${textureOpacity > 0 ? "text-accent" : "text-text-dim"}`}>Texture</span>
             <input
               type="range"
@@ -112,7 +112,7 @@ export default function ThemePicker() {
               step="0.01"
               value={textureOpacity}
               onChange={(e) => handleTextureChange(parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-accent cursor-pointer"
+              className="w-24 h-1 accent-accent cursor-pointer"
             />
           </div>
         </div>

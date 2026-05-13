@@ -52,7 +52,7 @@ export default function ModalShell({
         aria-labelledby={titleId}
         aria-label={ariaLabel}
         tabIndex={-1}
-        className={`relative bg-bg w-full h-dvh ${sizeClass} ${heightClass} sm:mx-4 flex flex-col animate-modal-in sm:border border-border outline-none`}
+        className={`relative bg-bg-card w-full h-dvh ${sizeClass} ${heightClass} sm:mx-4 flex flex-col animate-modal-in border border-border outline-none`}
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >

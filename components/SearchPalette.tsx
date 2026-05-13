@@ -140,7 +140,7 @@ export default function SearchPalette() {
         <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
           {query.trim().length < 2 ? (
             <div className="px-4 py-3 font-display text-xs tracking-[0.1em] text-text-dim italic">
-              Type 2+ characters to search releases and artists.
+              Type 2+ characters to consult the archive.
             </div>
           ) : loading && !results ? (
             <div className="px-4 py-3 font-display text-xs tracking-[0.1em] text-text-dim animate-pulse">
@@ -148,7 +148,7 @@ export default function SearchPalette() {
             </div>
           ) : results && results.length === 0 ? (
             <div className="px-4 py-3 font-display text-xs tracking-[0.1em] text-text-dim">
-              No matches
+              (no entries) ✧
             </div>
           ) : results ? (
             <ul role="listbox" aria-label="Search results">

@@ -173,7 +173,7 @@ export default function AlbumDetail({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto sm:overflow-visible animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
+        className="relative bg-bg-card max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto sm:overflow-visible animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -284,7 +284,7 @@ export default function AlbumDetail({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg/80 border border-border/50 transition-colors cursor-pointer text-base leading-none"
+          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg-card/80 border border-border transition-colors cursor-pointer text-base leading-none"
         >
           ×
         </button>

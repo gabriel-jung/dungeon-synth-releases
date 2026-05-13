@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { AlbumListItem, coverUrl, formatCount, hostImageUrl, releaseCount, safeExternalHref } from "@/lib/types"
+import { AlbumListItem, coverUrl, hostImageUrl, safeExternalHref } from "@/lib/types"
 import { closeModal, openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 import { useModalSearchParams } from "@/lib/useModalUrl"
 import { useResetOnChange } from "@/lib/useResetOnChange"
@@ -12,12 +12,22 @@ import { AlbumGrid } from "./AlbumDetail"
 import RecentGrid from "./RecentGrid"
 import { GridSkeleton, ListSkeleton, FetchError } from "./ModalSkeletons"
 import ModalShell from "./ModalShell"
+import ModalHeader from "./ModalHeader"
+import ModalCloseButton from "./ModalCloseButton"
+import ModalIconButton from "./ModalIconButton"
+import ModalCountSubtitle from "./ModalCountSubtitle"
 import ViewToggle, { type ViewMode } from "./ViewToggle"
 import TagContextBars, { TagContextBarsSkeleton } from "./TagContextBars"
 import FilterPill from "./FilterPill"
 import BandcampImg from "./BandcampImg"
 
 export type ScopeKind = "artist" | "host" | "genre"
+
+const SCOPE_GLYPH: Record<ScopeKind, string> = {
+  genre: "❖",
+  host: "♜",
+  artist: "♞",
+}
 
 type HostMeta = { id: string; name: string; image_id: string | null; url: string | null }
 type FilterSpec = { id: string; kind: "include" | "exclude"; label: string; onClear: () => void }
@@ -206,7 +216,7 @@ export default function ScopeModal({
         titleId={titleId}
       />
 
-      <div className="flex-1 overflow-y-auto px-6 py-4" style={{ scrollbarWidth: "auto", scrollbarGutter: "stable" }}>
+      <div className="flex-1 overflow-y-auto px-6 py-4" style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}>
         {kind === "genre" && (tagContext ? (
           <TagContextBars
             category={tagContext.category}
@@ -277,93 +287,82 @@ function ScopeHeader({
     kind === "artist" && coverArtId ? coverUrl(coverArtId, "thumb") :
     null
 
-  const subtitle =
-    count === null ? `${kind} releases` :
-    pairPartner ? `${formatCount(count)} releases sharing both` :
-    `${releaseCount(count)}`
+  const leading = imgSrc ? (
+    <BandcampImg
+      src={imgSrc}
+      alt=""
+      decoding="async"
+      className="w-10 h-10 object-cover border border-border shrink-0"
+    />
+  ) : (
+    <div className="w-10 h-10 flex items-center justify-center border border-border bg-bg-card shrink-0">
+      <span aria-hidden="true" className="text-xl text-border select-none">
+        {SCOPE_GLYPH[kind]}
+      </span>
+    </div>
+  )
+
+  const titleNode = pairPartner && onNavigatePair ? (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onNavigatePair(value) }}
+        className="hover:text-accent transition-colors cursor-pointer underline-offset-2 decoration-accent/40 hover:underline"
+      >
+        {value}
+      </button>
+      <span aria-hidden className="text-text-dim mx-1">×</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onNavigatePair(pairPartner) }}
+        className="hover:text-accent transition-colors cursor-pointer underline-offset-2 decoration-accent/40 hover:underline"
+      >
+        {pairPartner}
+      </button>
+    </>
+  ) : (
+    value
+  )
 
   return (
-    <div className="pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        {imgSrc ? (
-          <BandcampImg
-            src={imgSrc}
-            alt=""
-            decoding="async"
-            className="w-10 h-10 object-cover border border-border shrink-0"
-          />
-        ) : (
-          <div className="w-10 h-10 flex items-center justify-center border border-border bg-bg-card shrink-0">
-            <span aria-hidden="true" className="text-xl text-border select-none">
-              {kind === "genre" ? "❖" : kind === "host" ? "♜" : "♞"}
-            </span>
-          </div>
-        )}
-        <div className="min-w-0">
-          <h2 id={titleId} className="text-lg text-text-bright font-bold truncate">
-            {pairPartner && onNavigatePair ? (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onNavigatePair(value) }}
-                  className="hover:text-accent transition-colors cursor-pointer underline-offset-2 decoration-accent/40 hover:underline"
-                >
-                  {value}
-                </button>
-                <span className="text-text-dim"> × </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onNavigatePair(pairPartner) }}
-                  className="hover:text-accent transition-colors cursor-pointer underline-offset-2 decoration-accent/40 hover:underline"
-                >
-                  {pairPartner}
-                </button>
-              </>
-            ) : (
-              value
-            )}
-          </h2>
-          <p className="font-display text-[10px] tracking-[0.2em] uppercase text-text-dim">
-            {subtitle}
-          </p>
-        </div>
-      </div>
-      {filters.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap basis-full sm:basis-auto sm:justify-end shrink min-w-0 order-3 sm:order-none">
-          {filters.map((f) => (
-            <FilterPill key={f.id} kind={f.kind} label={f.label} onClear={f.onClear} />
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-2 shrink-0">
-        {kind === "host" && hostUrl && (
-          <a
-            href={hostUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
-          >
-            Bandcamp →
-          </a>
-        )}
-        <button
-          onClick={onBack}
-          aria-label="Back"
-          title="Back"
-          className="w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright border border-border/50 transition-colors cursor-pointer text-base leading-none"
-        >
-          ←
-        </button>
-        <ViewToggle view={view} setView={setView} />
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="hidden sm:flex w-7 h-7 items-center justify-center text-text-dim hover:text-text-bright border border-border/50 transition-colors cursor-pointer text-base leading-none"
-        >
-          ×
-        </button>
-      </div>
-    </div>
+    <ModalHeader
+      titleId={titleId}
+      leading={leading}
+      title={titleNode}
+      subtitle={
+        <ModalCountSubtitle
+          count={count}
+          suffix={pairPartner ? "releases sharing both" : undefined}
+          loadingLabel={`${kind} releases`}
+        />
+      }
+      chips={
+        filters.length > 0
+          ? filters.map((f) => (
+              <FilterPill key={f.id} kind={f.kind} label={f.label} onClear={f.onClear} />
+            ))
+          : undefined
+      }
+      actions={
+        <>
+          {kind === "host" && hostUrl && (
+            <a
+              href={hostUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-display text-xs tracking-[0.1em] text-accent hover:text-accent-hover transition-colors"
+            >
+              Bandcamp →
+            </a>
+          )}
+          <ModalIconButton onClick={onBack} label="Back" title="Back">
+            ←
+          </ModalIconButton>
+          <ViewToggle view={view} setView={setView} />
+          <ModalCloseButton onClick={onClose} />
+        </>
+      }
+    />
   )
 }
 

@@ -306,7 +306,7 @@ export default function DateSlider({
   return (
     <div className="flex flex-col items-center h-full pb-8">
       {/* Current date label */}
-      <div className="mb-3 px-2 py-1 rounded bg-bg-card border border-border font-display text-xs text-text-bright text-center whitespace-nowrap tracking-wide">
+      <div className="mb-3 px-2 py-1 bg-bg-card border border-border font-display text-xs text-text-bright text-center whitespace-nowrap tracking-wide">
         <ShortDate date={dates[index] ?? ""} />
       </div>
 

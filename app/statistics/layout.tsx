@@ -19,7 +19,7 @@ export default async function StatsLayout({ children }: { children: React.ReactN
   const currentYear = new Date().getUTCFullYear()
   const [pastYears, totalCount] = await Promise.all([
     safe("fetchPastYears", fetchPastYears, [] as number[]),
-    safe("fetchTotalCount", fetchTotalCount, 0),
+    safe<number | null>("fetchTotalCount", fetchTotalCount, null),
   ])
   const years = [currentYear, ...pastYears]
 

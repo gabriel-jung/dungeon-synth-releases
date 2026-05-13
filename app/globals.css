@@ -309,7 +309,7 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   padding: 0 0.5rem;
   color: var(--color-text-dim);
   font-size: 0.75rem;

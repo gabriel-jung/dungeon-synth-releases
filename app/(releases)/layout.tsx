@@ -43,7 +43,7 @@ export default async function ReleasesLayout({ children }: { children: React.Rea
         <FilterChipsSlot />
       </div>
       <div aria-hidden className="shrink-0 h-px mx-4 sm:mx-6 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
-      <div className="flex-1 min-h-0 pt-6 sm:pt-8">{children}</div>
+      <div className="flex-1 min-h-0 pt-6 sm:pt-10">{children}</div>
     </div>
   )
 }
