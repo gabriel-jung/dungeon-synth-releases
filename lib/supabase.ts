@@ -47,13 +47,10 @@ export async function fetchTagsByCategory(category: string): Promise<string[]> {
   // Hard cap on the global tag-filter list. The TagFilter panel surfaces
   // these for autocomplete; long-tail tags below the top ~500 are vanishingly
   // useful and the egress cost grows linearly with the corpus.
-  // Degrade to [] on RPC failure so a slow Supabase doesn't break the build
-  // (this runs at prerender time for every /releases/[year] entry).
+  // Throw on RPC failure so the empty result is NOT cached. Callers catch +
+  // degrade for this request only; the next request retries cleanly.
   const { data, error } = await supabase.rpc("tag_counts", { p_category: category, p_top_k: 500 })
-  if (error) {
-    console.error(`tag_counts RPC failed: ${error.message}`)
-    return []
-  }
+  if (error) throw new Error(`tag_counts RPC failed: ${error.message}`)
   return ((data ?? []) as Array<{ name: string }>).map((r) => r.name)
 }
 
@@ -97,18 +94,13 @@ export async function sumYearCounts(includeTags: string[], excludeTags: string[]
 }
 
 // Cached all-time unfiltered total. Backs the /statistics layout header.
-// Degrade to 0 on RPC failure: build / prerender should keep going.
+// Throws on RPC failure so the failure isn't cached; callers catch + degrade.
 export async function fetchTotalCount(): Promise<number> {
   "use cache"
   cacheLife("days")
   cacheTag("genres")
   cacheTag("stats")
-  try {
-    return await sumYearCounts([], [])
-  } catch (e) {
-    console.error("fetchTotalCount failed:", e)
-    return 0
-  }
+  return sumYearCounts([], [])
 }
 
 // Recent unfiltered release list for the `/` server component. Cached so

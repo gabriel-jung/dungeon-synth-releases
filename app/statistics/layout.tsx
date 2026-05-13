@@ -5,10 +5,22 @@ import YearReleaseCount from "@/components/YearReleaseCount"
 import { fetchPastYears, fetchTotalCount } from "@/lib/supabase"
 import { Suspense } from "react"
 
+async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    console.error(`${label} failed:`, e)
+    return fallback
+  }
+}
+
 export default async function StatsLayout({ children }: { children: React.ReactNode }) {
   await connection()
   const currentYear = new Date().getUTCFullYear()
-  const [pastYears, totalCount] = await Promise.all([fetchPastYears(), fetchTotalCount()])
+  const [pastYears, totalCount] = await Promise.all([
+    safe("fetchPastYears", fetchPastYears, [] as number[]),
+    safe("fetchTotalCount", fetchTotalCount, 0),
+  ])
   const years = [currentYear, ...pastYears]
 
   return (

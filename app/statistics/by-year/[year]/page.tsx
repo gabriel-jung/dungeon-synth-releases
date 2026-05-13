@@ -2,15 +2,17 @@ import { cacheLife, cacheTag } from "next/cache"
 import { connection } from "next/server"
 import { notFound } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { parseTagParams } from "@/lib/types"
+import { parseTagParams, type TagCount } from "@/lib/types"
 import {
   YEAR_LOWER_BOUND,
   toBins,
   toHostCounts,
   toTagCounts,
-  unwrapSafe,
+  unwrap,
   type DayRow,
+  type HostCount,
 } from "@/lib/stats"
+import type { HistBin } from "@/components/Histogram"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
 import StatsPageContent from "@/components/StatsPageContent"
 
@@ -27,7 +29,35 @@ export async function generateMetadata({
   }
 }
 
-async function fetchYearStats(year: number, includeTags: string[], excludeTags: string[]) {
+type YearStatsData = {
+  rows: HostCount[]
+  genres: TagCount[]
+  themes: TagCount[]
+  trackBins: HistBin[]
+  durationBins: HistBin[]
+  dowBins: HistBin[]
+  monthBins: HistBin[]
+  days: { date: string; n: number }[]
+}
+
+const EMPTY: YearStatsData = {
+  rows: [],
+  genres: [],
+  themes: [],
+  trackBins: [],
+  durationBins: [],
+  dowBins: [],
+  monthBins: [],
+  days: [],
+}
+
+// Strict: throws on any RPC error so the failure isn't cached. Page-level
+// try/catch falls back to EMPTY for that request; next request retries clean.
+async function fetchYearStats(
+  year: number,
+  includeTags: string[],
+  excludeTags: string[],
+): Promise<YearStatsData> {
   "use cache"
   cacheLife("days")
   cacheTag("stats")
@@ -45,19 +75,19 @@ async function fetchYearStats(year: number, includeTags: string[], excludeTags: 
     supabase.rpc("month_counts", yearArgs),
   ])
 
-  const days: { date: string; n: number }[] = unwrapSafe<DayRow[]>("daily_counts", dailyRes).map((r) => ({
+  const days = unwrap<DayRow[]>("daily_counts", dailyRes).map((r) => ({
     date: r.date,
     n: Number(r.n),
   }))
 
   return {
-    rows: toHostCounts(unwrapSafe("host_counts", hostRes)),
-    genres: toTagCounts(unwrapSafe("tag_counts_by_category(genre)", genreRes)),
-    themes: toTagCounts(unwrapSafe("tag_counts_by_category(theme)", themeRes)),
-    trackBins: toBins(unwrapSafe("tracks_per_album_hist", tracksHistRes)),
-    durationBins: toBins(unwrapSafe("album_duration_hist", durationHistRes)),
-    dowBins: toBins(unwrapSafe("dow_counts", dowRes)),
-    monthBins: toBins(unwrapSafe("month_counts", monthRes)),
+    rows: toHostCounts(unwrap("host_counts", hostRes)),
+    genres: toTagCounts(unwrap("tag_counts_by_category(genre)", genreRes)),
+    themes: toTagCounts(unwrap("tag_counts_by_category(theme)", themeRes)),
+    trackBins: toBins(unwrap("tracks_per_album_hist", tracksHistRes)),
+    durationBins: toBins(unwrap("album_duration_hist", durationHistRes)),
+    dowBins: toBins(unwrap("dow_counts", dowRes)),
+    monthBins: toBins(unwrap("month_counts", monthRes)),
     days,
   }
 }
@@ -77,11 +107,14 @@ export default async function StatsByYearPage({
 
   const sp = await searchParams
   const { includeTags, excludeTags } = parseTagParams(sp)
-  const { rows, genres, themes, trackBins, durationBins, dowBins, monthBins, days } = await fetchYearStats(
-    year,
-    includeTags,
-    excludeTags,
-  )
+
+  let stats: YearStatsData = EMPTY
+  try {
+    stats = await fetchYearStats(year, includeTags, excludeTags)
+  } catch (e) {
+    console.error(`/statistics/by-year/${year}: fetchYearStats failed, rendering empty:`, e)
+  }
+  const { rows, genres, themes, trackBins, durationBins, dowBins, monthBins, days } = stats
 
   const today = new Date().toISOString().slice(0, 10)
 

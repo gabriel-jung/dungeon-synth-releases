@@ -62,7 +62,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const tagLists = await Promise.all(TAG_CATEGORIES.map((c) => fetchTagsByCategory(c)))
+  const tagLists = await Promise.all(
+    TAG_CATEGORIES.map(async (c) => {
+      try {
+        return await fetchTagsByCategory(c)
+      } catch (e) {
+        console.error(`fetchTagsByCategory(${c}) failed:`, e)
+        return [] as string[]
+      }
+    }),
+  )
   const tagsByCategory = Object.fromEntries(TAG_CATEGORIES.map((c, i) => [c, tagLists[i]]))
   return (
     <html
