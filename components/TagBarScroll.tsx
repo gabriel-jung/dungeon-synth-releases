@@ -2,6 +2,7 @@
 
 import type { TagCount } from "@/lib/types"
 import TagRow from "./TagRow"
+import SectionHeader from "./SectionHeader"
 
 type HeadingStyle = "section" | "caption"
 
@@ -14,6 +15,7 @@ export default function TagBarScroll({
   rows = 8,
   fixedHeight = false,
   headingStyle = "caption",
+  chapter,
   emptyLabel,
   denominator,
 }: {
@@ -24,6 +26,7 @@ export default function TagBarScroll({
   // (keeps layout steady with the matching skeleton and across modal transitions).
   fixedHeight?: boolean
   headingStyle?: HeadingStyle
+  chapter?: string
   emptyLabel?: string
   // When set, bars scale as n/denominator and labels render as percentages
   // rather than raw counts (used for "share of current tag's releases").
@@ -36,7 +39,7 @@ export default function TagBarScroll({
     if (!emptyLabel) return null
     return (
       <section>
-        <Heading style={headingStyle}>{title}</Heading>
+        <Heading style={headingStyle} chapter={chapter}>{title}</Heading>
         <div
           className="flex items-center font-display text-xs tracking-wide text-text-dim"
           style={fixedHeight ? { height: listHeight } : undefined}
@@ -51,7 +54,7 @@ export default function TagBarScroll({
 
   return (
     <section>
-      <Heading style={headingStyle}>{title}</Heading>
+      <Heading style={headingStyle} chapter={chapter}>{title}</Heading>
       <div
         className="relative"
         style={{
@@ -74,13 +77,17 @@ export default function TagBarScroll({
   )
 }
 
-function Heading({ style, children }: { style: HeadingStyle; children: React.ReactNode }) {
+function Heading({
+  style,
+  chapter,
+  children,
+}: {
+  style: HeadingStyle
+  chapter?: string
+  children: string
+}) {
   if (style === "section") {
-    return (
-      <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright mb-4">
-        {children}
-      </h2>
-    )
+    return <SectionHeader chapter={chapter} title={children} />
   }
   return (
     <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/80 mb-3">

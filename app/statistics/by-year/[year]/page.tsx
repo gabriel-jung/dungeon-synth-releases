@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { parseTagParams, type TagCount } from "@/lib/types"
 import {
   YEAR_LOWER_BOUND,
+  emptyMsg,
   toBins,
   toHostCounts,
   toTagCounts,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/stats"
 import type { HistBin } from "@/components/Histogram"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
+import SectionHeader from "@/components/SectionHeader"
 import StatsPageContent from "@/components/StatsPageContent"
 
 export async function generateMetadata({
@@ -109,23 +111,24 @@ export default async function StatsByYearPage({
   const { includeTags, excludeTags } = parseTagParams(sp)
 
   let stats: YearStatsData = EMPTY
+  let degraded = false
   try {
     stats = await fetchYearStats(year, includeTags, excludeTags)
   } catch (e) {
     console.error(`/statistics/by-year/${year}: fetchYearStats failed, rendering empty:`, e)
+    degraded = true
   }
   const { rows, genres, themes, trackBins, durationBins, dowBins, monthBins, days } = stats
 
   const today = new Date().toISOString().slice(0, 10)
+  const empty = emptyMsg(degraded)
 
   return (
     <StatsPageContent
       head={
         <>
-          <h2 className="font-display text-base sm:text-lg tracking-[0.15em] uppercase text-text-bright mb-4">
-            Daily Release Activity
-          </h2>
-          <CalendarHeatmap days={days} year={year} today={today} />
+          <SectionHeader chapter="I" title="Daily Release Activity" />
+          <CalendarHeatmap days={days} year={year} today={today} emptyLabel={empty} />
         </>
       }
       rows={rows}
@@ -135,6 +138,7 @@ export default async function StatsByYearPage({
       durationBins={durationBins}
       dowBins={dowBins}
       monthBins={monthBins}
+      emptyLabel={empty}
     />
   )
 }

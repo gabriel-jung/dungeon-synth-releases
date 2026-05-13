@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase"
 import { parseTagParams, type TagCount } from "@/lib/types"
 import {
   YEAR_LOWER_BOUND,
+  emptyMsg,
   toBins,
   toHostCounts,
   toTagCounts,
@@ -90,10 +91,12 @@ export default async function StatsPage({
   const currentYear = new Date().getUTCFullYear()
 
   let stats: StatsData = EMPTY
+  let degraded = false
   try {
     stats = await fetchStatsData(includeTags, excludeTags)
   } catch (e) {
     console.error("/statistics: fetchStatsData failed, rendering empty:", e)
+    degraded = true
   }
   const { rows, genres, themes, yearCounts, trackBins, durationBins, dowBins, monthBins } = stats
 
@@ -104,7 +107,7 @@ export default async function StatsPage({
 
   return (
     <StatsPageContent
-      head={<Histogram title="Releases per Year" bins={yearBins} />}
+      head={<Histogram chapter="I" title="Releases per Year" bins={yearBins} barHeight="h-40" framed minBarPx={36} />}
       rows={rows}
       genres={genres}
       themes={themes}
@@ -112,6 +115,7 @@ export default async function StatsPage({
       durationBins={durationBins}
       dowBins={dowBins}
       monthBins={monthBins}
+      emptyLabel={emptyMsg(degraded)}
     />
   )
 }

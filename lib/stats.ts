@@ -3,6 +3,9 @@ import type { TagCount } from "@/lib/types"
 
 export const YEAR_LOWER_BOUND = 1990
 
+export const emptyMsg = (degraded: boolean) =>
+  degraded ? "(could not load) ✧" : "(no entries) ✧"
+
 export type HostCount = { host_id: string; name: string; image_id: string | null; url: string | null; n: number }
 export type HistRow = { bucket: string; bucket_order: number; bucket_width: number; n: number | string }
 export type YearRow = { year: number | string; n: number | string }
@@ -14,10 +17,7 @@ export function unwrap<T>(name: string, res: { data: T | null; error: { message:
   return (res.data ?? ([] as unknown as T))
 }
 
-// Same as `unwrap` but degrades to `fallback` (default empty array) when the
-// RPC errors. Use for non-essential sections so one slow query doesn't take
-// the whole stats page down. `host_counts` under a heavy tag filter is the
-// concrete case that motivated this.
+// Returns `fallback` (default empty array) instead of throwing on RPC error.
 export function unwrapSafe<T>(
   name: string,
   res: { data: T | null; error: { message: string } | null },

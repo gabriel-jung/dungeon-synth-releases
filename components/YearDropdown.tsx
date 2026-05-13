@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 
-export const NAV_ITEM = "font-display text-[11px] tracking-[0.15em] uppercase transition-colors py-1 cursor-pointer"
+export const NAV_ITEM = "font-display text-xs tracking-[0.1em] uppercase transition-colors py-1 cursor-pointer"
 export const NAV_INACTIVE = "text-text-dim hover:text-text"
 export const NAV_ACTIVE = "text-accent"
 
@@ -59,6 +59,7 @@ export default function YearDropdown({
         className={`${NAV_ITEM} ${active ? NAV_ACTIVE : NAV_INACTIVE}`}
       >
         {active && activeYear ? activeYear : idleLabel}
+        <span aria-hidden className="ml-1 text-[8px] opacity-70">▾</span>
       </button>
       {open && (
         <div

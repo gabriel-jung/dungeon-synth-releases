@@ -263,6 +263,14 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes skeletonStep {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
 .animate-fade-slide-in {
   animation: fadeSlideIn 0.4s ease both;
 }
@@ -271,6 +279,22 @@
 }
 .animate-backdrop-in {
   animation: backdropIn 0.25s ease both;
+}
+.animate-bar-grow {
+  transform-origin: bottom;
+  animation: barGrow 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-skeleton-step {
+  animation: skeletonStep 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-bar-grow,
+  .animate-skeleton-step,
+  .animate-fade-slide-in,
+  .animate-modal-in,
+  .animate-backdrop-in {
+    animation: none !important;
+  }
 }
 
 /* Modal ornamental rule */

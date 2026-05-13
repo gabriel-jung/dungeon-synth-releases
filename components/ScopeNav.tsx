@@ -3,10 +3,7 @@
 import Link from "next/link"
 import { Fragment } from "react"
 import { usePathname } from "next/navigation"
-
-const ITEM = "font-display text-[11px] tracking-[0.15em] uppercase transition-colors py-1 cursor-pointer"
-const INACTIVE = "text-text-dim hover:text-text"
-const ACTIVE = "text-accent"
+import { NAV_ACTIVE, NAV_INACTIVE, NAV_ITEM, NavSep } from "./YearDropdown"
 
 export type ScopeItem = { href: string; label: string; match: (pathname: string) => boolean }
 
@@ -18,12 +15,12 @@ export default function ScopeNav({ items, fallback }: { items: ScopeItem[]; fall
         const active = item.match(pathname)
         return (
           <Fragment key={item.href}>
-            {i > 0 && <Sep />}
+            {i > 0 && <NavSep />}
             <Link
               href={item.href}
               prefetch
               aria-current={active ? "page" : undefined}
-              className={`${ITEM} ${active ? ACTIVE : INACTIVE}`}
+              className={`${NAV_ITEM} ${active ? NAV_ACTIVE : NAV_INACTIVE}`}
             >
               {item.label}
             </Link>
@@ -32,8 +29,4 @@ export default function ScopeNav({ items, fallback }: { items: ScopeItem[]; fall
       })}
     </div>
   )
-}
-
-function Sep() {
-  return <span aria-hidden className="text-border text-[10px] leading-none select-none">·</span>
 }

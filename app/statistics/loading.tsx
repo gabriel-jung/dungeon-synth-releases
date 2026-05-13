@@ -1,5 +1,5 @@
 import StatsSkeleton from "@/components/StatsSkeleton"
 
 export default function Loading() {
-  return <StatsSkeleton />
+  return <StatsSkeleton headKind="year" />
 }

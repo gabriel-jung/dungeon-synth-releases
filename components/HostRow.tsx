@@ -23,7 +23,7 @@ export default function HostRow({
       className="relative h-7 flex items-center shrink-0 cursor-pointer group hover:[--bar-bg:var(--color-plot-bar-hover)]"
     >
       <div
-        className="absolute inset-y-0 left-0 rounded-sm transition-colors"
+        className="absolute inset-y-0 left-0 transition-colors"
         style={{ width: `${widthPct}%`, opacity: 0.7, background: "var(--bar-bg)" }}
       />
       <span className="relative font-sans text-sm text-text group-hover:text-text-bright pl-2 truncate min-w-0 flex-1 transition-colors">

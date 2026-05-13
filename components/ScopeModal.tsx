@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { AlbumListItem, coverUrl, hostImageUrl, releaseCount, safeExternalHref } from "@/lib/types"
+import { AlbumListItem, coverUrl, formatCount, hostImageUrl, releaseCount, safeExternalHref } from "@/lib/types"
 import { closeModal, openModal, pushModalUrl, toQueryString } from "@/lib/modalUrl"
 import { useModalSearchParams } from "@/lib/useModalUrl"
 import { useResetOnChange } from "@/lib/useResetOnChange"
@@ -279,11 +279,11 @@ function ScopeHeader({
 
   const subtitle =
     count === null ? `${kind} releases` :
-    pairPartner ? `${count.toLocaleString()} releases sharing both` :
+    pairPartner ? `${formatCount(count)} releases sharing both` :
     `${releaseCount(count)}`
 
   return (
-    <div className="pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex items-center gap-4">
+    <div className="pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex flex-wrap items-center gap-x-4 gap-y-2">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {imgSrc ? (
           <BandcampImg
@@ -329,7 +329,7 @@ function ScopeHeader({
         </div>
       </div>
       {filters.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap justify-end shrink min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap basis-full sm:basis-auto sm:justify-end shrink min-w-0 order-3 sm:order-none">
           {filters.map((f) => (
             <FilterPill key={f.id} kind={f.kind} label={f.label} onClear={f.onClear} />
           ))}

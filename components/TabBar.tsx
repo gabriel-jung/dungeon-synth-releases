@@ -30,7 +30,7 @@ export default function TabBar() {
             className={`font-display text-xs tracking-[0.1em] uppercase transition-colors py-2 border-b ${
               active
                 ? "text-accent border-accent"
-                : "text-text-dim hover:text-text active:text-accent-hover border-transparent"
+                : "text-text hover:text-text-bright active:text-accent-hover border-transparent"
             }`}
           >
             {tab.label}

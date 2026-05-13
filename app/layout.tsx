@@ -77,6 +77,7 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${cinzel.variable} ${crimsonText.variable} antialiased`}
+      suppressHydrationWarning
     >
       <head>
         {/* Stamp data-theme + texture-opacity from localStorage *before* the
@@ -106,8 +107,10 @@ export default async function RootLayout({
               <span className="font-display text-2xl sm:text-4xl font-bold text-accent group-hover:text-accent-hover transition-colors tracking-[0.1em] leading-tight">
                 Dungeon Synth
               </span>
-              <span className="font-display text-[10px] sm:text-xs tracking-[0.2em] uppercase text-text-dim mt-1">
-                — Releases from Bandcamp —
+              <span className="hidden sm:inline font-display text-xs tracking-[0.2em] uppercase text-text-dim mt-1">
+                <span aria-hidden className="text-accent/60 mr-2">·</span>
+                From Bandcamp
+                <span aria-hidden className="text-accent/60 ml-2">·</span>
               </span>
             </Link>
             <div className="flex items-center gap-3 sm:gap-4 shrink-0 pt-1">

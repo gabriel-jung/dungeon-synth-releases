@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { MONTH_NAMES, formatDateShort, localDateStr, releaseCount } from "@/lib/types"
+import { emptyMsg } from "@/lib/stats"
 import { useOpenModal } from "@/lib/useModalUrl"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -33,7 +34,17 @@ const PALETTE_NAMES = Object.keys(PALETTES) as PaletteName[]
 type Day = { date: string; n: number }
 type Cell = { key: string; dateStr: string; count: number; weekIdx: number; dow: number; inRange: boolean; isFuture: boolean; month: number; colorIdx: number }
 
-export default function CalendarHeatmap({ days, year, today: todayStr }: { days: Day[]; year: number; today: string }) {
+export default function CalendarHeatmap({
+  days,
+  year,
+  today: todayStr,
+  emptyLabel,
+}: {
+  days: Day[]
+  year: number
+  today: string
+  emptyLabel?: string
+}) {
   const [hover, setHover] = useState<Cell | null>(null)
   const [palette, setPalette] = useState<PaletteName>("theme")
   const openModal = useOpenModal()
@@ -114,15 +125,27 @@ export default function CalendarHeatmap({ days, year, today: todayStr }: { days:
     return colorStops[Math.min(c.colorIdx, colorStops.length - 1)]
   }
 
+  const hasAny = useMemo(() => days.some((d) => d.n > 0), [days])
+
+  if (!hasAny) {
+    return (
+      <div className="w-full h-32 flex items-center justify-center">
+        <span className="font-display text-xs tracking-[0.2em] uppercase text-text-dim">
+          {emptyLabel ?? emptyMsg(false)}
+        </span>
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-x-auto relative">
       <div className="h-6 mb-2 font-display text-sm tracking-wide text-text-bright flex items-center justify-between gap-4">
         <div className="min-w-0 truncate">
           {hover?.inRange && (
             <>
               <span className="text-text-bright">{formatDateShort(hover.dateStr, true)}</span>
               <span className="text-text-dim">
-                {" — "}
+                {", "}
                 {releaseCount(hover.count)}
                 {hover.isFuture && hover.count > 0 ? " (upcoming)" : ""}
               </span>

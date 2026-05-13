@@ -48,6 +48,23 @@ Host tag vectors + cosine similarity → "similar to" suggestions. Surface insid
 
 Deferred — not needed before geo map work.
 
+**Tag denormalisation (consider in conjunction):**
+When the vector layer lands, also evaluate adding a denormalised `albums.tag_ids int[]` column + GIN index. The two are orthogonal tools, not alternatives:
+
+- Tag vector / pgvector solves **similarity ranking**: cosine over host (or album) tag-profile vectors. Powers "similar to" + clustering.
+- `tag_ids[]` + GIN solves **set membership**: `@>` for "must contain ALL", `&&` for "intersects ANY". Powers the existing tag filter on `/statistics`, `/releases/[year]`, and `list_filtered_albums`.
+
+The current filter path (`album_tags` junction + `IN (SELECT … GROUP BY HAVING count(DISTINCT) = …)`) hits Supabase's `statement_timeout` under heavy filters (e.g. all-time `host_counts` with one+ include tags), which is why filtered stats can degrade to empty rows. A vector index won't fix that — wrong operator. A GIN over `tag_ids[]` would (typical 10-100× speedup on set-membership queries).
+
+Cost is modest (~1 day total):
+1. SQL: add column, GIN index, backfill from `album_tags`.
+2. Scraper (`bandcamp-explorer-data/scripts/sync_to_supabase.py`): attach `tag_ids` to album rows during the existing upsert (junction table stays authoritative; the array is a denormalised read-mirror). No trigger needed if Python writes it explicitly.
+3. Rewrite the 8 filtered RPCs in `docs/rpc.sql` to use `tag_ids @> inc_ids` / `tag_ids && exc_ids` instead of the aggregating subquery. Signatures unchanged; site code untouched.
+
+Order: SQL migration first (forward-compatible — column with empty default), then scraper change (populates new rows), then RPC rewrites (reads switch over). Each step independently reversible.
+
+Skip until the reco engine work brings the vector layer into scope or filtered stats become a primary UX path (today they're a power-user surface and the `unwrapSafe` fallback keeps the page functional).
+
 ## Undecided
 
 ### Site shell

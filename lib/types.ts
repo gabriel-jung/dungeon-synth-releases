@@ -5,8 +5,12 @@ export function localDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
+export function formatCount(n: number): string {
+  return n.toLocaleString("en-US")
+}
+
 export function releaseCount(n: number): string {
-  return `${n.toLocaleString()} release${n === 1 ? "" : "s"}`
+  return `${formatCount(n)} release${n === 1 ? "" : "s"}`
 }
 
 type TagParamsInput = { tag?: string | string[]; xtag?: string | string[] }

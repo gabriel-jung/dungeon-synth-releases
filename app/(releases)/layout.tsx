@@ -24,7 +24,7 @@ export default async function ReleasesLayout({ children }: { children: React.Rea
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="shrink-0 relative px-4 sm:px-6 flex items-start justify-between gap-4 pt-1 pb-2">
+      <div className="shrink-0 relative px-4 sm:px-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 pt-1 pb-2">
         <div className="flex flex-col items-start min-w-0">
           <Suspense>
             <ReleasesScopeNav pastYears={pastYears} />
