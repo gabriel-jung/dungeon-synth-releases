@@ -14,6 +14,22 @@ export function unwrap<T>(name: string, res: { data: T | null; error: { message:
   return (res.data ?? ([] as unknown as T))
 }
 
+// Same as `unwrap` but degrades to `fallback` (default empty array) when the
+// RPC errors. Use for non-essential sections so one slow query doesn't take
+// the whole stats page down. `host_counts` under a heavy tag filter is the
+// concrete case that motivated this.
+export function unwrapSafe<T>(
+  name: string,
+  res: { data: T | null; error: { message: string } | null },
+  fallback?: T,
+): T {
+  if (res.error) {
+    console.error(`${name} RPC failed: ${res.error.message}`)
+    return fallback ?? ([] as unknown as T)
+  }
+  return res.data ?? (fallback ?? ([] as unknown as T))
+}
+
 export function toHostCounts(data: HostRow[] | null, limit = 50): HostCount[] {
   return (data ?? []).slice(0, limit).map((r) => ({
     host_id: r.host_id,

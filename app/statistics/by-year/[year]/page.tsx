@@ -8,7 +8,7 @@ import {
   toBins,
   toHostCounts,
   toTagCounts,
-  unwrap,
+  unwrapSafe,
   type DayRow,
 } from "@/lib/stats"
 import CalendarHeatmap from "@/components/CalendarHeatmap"
@@ -45,19 +45,19 @@ async function fetchYearStats(year: number, includeTags: string[], excludeTags: 
     supabase.rpc("month_counts", yearArgs),
   ])
 
-  const days: { date: string; n: number }[] = unwrap<DayRow[]>("daily_counts", dailyRes).map((r) => ({
+  const days: { date: string; n: number }[] = unwrapSafe<DayRow[]>("daily_counts", dailyRes).map((r) => ({
     date: r.date,
     n: Number(r.n),
   }))
 
   return {
-    rows: toHostCounts(unwrap("host_counts", hostRes)),
-    genres: toTagCounts(unwrap("tag_counts_by_category(genre)", genreRes)),
-    themes: toTagCounts(unwrap("tag_counts_by_category(theme)", themeRes)),
-    trackBins: toBins(unwrap("tracks_per_album_hist", tracksHistRes)),
-    durationBins: toBins(unwrap("album_duration_hist", durationHistRes)),
-    dowBins: toBins(unwrap("dow_counts", dowRes)),
-    monthBins: toBins(unwrap("month_counts", monthRes)),
+    rows: toHostCounts(unwrapSafe("host_counts", hostRes)),
+    genres: toTagCounts(unwrapSafe("tag_counts_by_category(genre)", genreRes)),
+    themes: toTagCounts(unwrapSafe("tag_counts_by_category(theme)", themeRes)),
+    trackBins: toBins(unwrapSafe("tracks_per_album_hist", tracksHistRes)),
+    durationBins: toBins(unwrapSafe("album_duration_hist", durationHistRes)),
+    dowBins: toBins(unwrapSafe("dow_counts", dowRes)),
+    monthBins: toBins(unwrapSafe("month_counts", monthRes)),
     days,
   }
 }

@@ -7,7 +7,7 @@ import {
   toBins,
   toHostCounts,
   toTagCounts,
-  unwrap,
+  unwrapSafe,
   type HostCount,
   type YearRow,
 } from "@/lib/stats"
@@ -52,18 +52,18 @@ async function fetchStatsData(
   ])
 
   const yearCounts = new Map<number, number>(
-    unwrap<YearRow[]>("year_counts", yearRes).map((r) => [Number(r.year), Number(r.n)]),
+    unwrapSafe<YearRow[]>("year_counts", yearRes).map((r) => [Number(r.year), Number(r.n)]),
   )
 
   return {
-    rows: toHostCounts(unwrap("host_counts", hostRes)),
-    genres: toTagCounts(unwrap("tag_counts_by_category(genre)", genreRes)),
-    themes: toTagCounts(unwrap("tag_counts_by_category(theme)", themeRes)),
+    rows: toHostCounts(unwrapSafe("host_counts", hostRes)),
+    genres: toTagCounts(unwrapSafe("tag_counts_by_category(genre)", genreRes)),
+    themes: toTagCounts(unwrapSafe("tag_counts_by_category(theme)", themeRes)),
     yearCounts,
-    trackBins: toBins(unwrap("tracks_per_album_hist", tracksHistRes)),
-    durationBins: toBins(unwrap("album_duration_hist", durationHistRes)),
-    dowBins: toBins(unwrap("dow_counts", dowRes)),
-    monthBins: toBins(unwrap("month_counts", monthRes)),
+    trackBins: toBins(unwrapSafe("tracks_per_album_hist", tracksHistRes)),
+    durationBins: toBins(unwrapSafe("album_duration_hist", durationHistRes)),
+    dowBins: toBins(unwrapSafe("dow_counts", dowRes)),
+    monthBins: toBins(unwrapSafe("month_counts", monthRes)),
   }
 }
 
