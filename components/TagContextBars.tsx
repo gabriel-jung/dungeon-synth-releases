@@ -34,8 +34,8 @@ export default function TagContextBars({
 
   const leftIsGenre = category !== "theme"
   const [left, right] = leftIsGenre
-    ? [{ title: "Related Genres", items: visibleGenres }, { title: "Related Themes", items: visibleThemes }]
-    : [{ title: "Related Themes", items: visibleThemes }, { title: "Related Genres", items: visibleGenres }]
+    ? [{ title: "Genres", items: visibleGenres }, { title: "Themes", items: visibleThemes }]
+    : [{ title: "Themes", items: visibleThemes }, { title: "Genres", items: visibleGenres }]
 
   return (
     <>
@@ -74,6 +74,46 @@ function SkeletonColumn({ rowHeights }: { rowHeights: string }) {
         {Array.from({ length: BAR_ROWS }).map((_, i) => (
           <div key={i} className="h-7 bg-bg-card/60 rounded-sm" style={{ width: `${100 - i * 12}%` }} />
         ))}
+      </div>
+    </section>
+  )
+}
+
+// Failure fallback matching the bars' footprint. Centred "(no data)" plus a
+// retry button, same chrome as the stats page's ChunkDegraded.
+export function TagContextBarsDegraded({ onRetry }: { onRetry: () => void }) {
+  const rowHeights = `calc(${BAR_ROWS} * 1.75rem + ${BAR_ROWS - 1} * 0.125rem)`
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+        <DegradedColumn rowHeights={rowHeights} onRetry={onRetry} />
+        <DegradedColumn rowHeights={rowHeights} onRetry={onRetry} />
+      </div>
+      <div className="modal-rule my-5" />
+    </>
+  )
+}
+
+function DegradedColumn({ rowHeights, onRetry }: { rowHeights: string; onRetry: () => void }) {
+  return (
+    <section>
+      <div className="font-display text-[10px] tracking-[0.2em] uppercase text-accent/60 mb-3">
+        <span className="invisible">Related</span>
+      </div>
+      <div
+        className="flex flex-col items-center justify-center gap-2"
+        style={{ height: rowHeights }}
+      >
+        <span className="font-display text-xs tracking-[0.2em] uppercase text-text-dim">
+          (no data) ✧
+        </span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="font-display text-[10px] tracking-[0.2em] uppercase text-accent hover:text-accent-hover transition-colors cursor-pointer"
+        >
+          Retry
+        </button>
       </div>
     </section>
   )

@@ -17,7 +17,7 @@ import ModalCloseButton from "./ModalCloseButton"
 import ModalIconButton from "./ModalIconButton"
 import ModalCountSubtitle from "./ModalCountSubtitle"
 import ViewToggle, { type ViewMode } from "./ViewToggle"
-import TagContextBars, { TagContextBarsSkeleton } from "./TagContextBars"
+import TagContextBars, { TagContextBarsSkeleton, TagContextBarsDegraded } from "./TagContextBars"
 import FilterPill from "./FilterPill"
 import BandcampImg from "./BandcampImg"
 
@@ -77,6 +77,14 @@ export default function ScopeModal({
   const [view, setView] = useState<ViewMode>("grid")
   const autoSwitchedRef = useRef(false)
   const [tagContextState, setTagContextState] = useState<{ key: string; data: TagContext } | null>(null)
+  // Error tracked per contextKey so a failure on an earlier filter combo
+  // does not bleed into the degraded UI when the user changes filters or
+  // re-opens the section.
+  const [tagContextError, setTagContextError] = useState<string | null>(null)
+  const [tagContextRetry, setTagContextRetry] = useState(0)
+  // Bars hidden by default so opening a genre modal stays fast — fetch
+  // only fires once the user expands the related-tags section.
+  const [tagContextOpen, setTagContextOpen] = useState(false)
 
   // Artist art comes from the click source. No fetch-time dependency.
   const seededArtistArt = kind === "artist" ? getArtistArt(value) : null
@@ -130,7 +138,7 @@ export default function ScopeModal({
     [contextIncludeTags, contextExcludeTags],
   )
   useEffect(() => {
-    if (kind !== "genre" || contextIncludeTags.length === 0) return
+    if (kind !== "genre" || !tagContextOpen || contextIncludeTags.length === 0) return
     const ctrl = new AbortController()
     const parts = [
       ...contextIncludeTags.map((t) => `tag=${encodeURIComponent(t)}`),
@@ -138,10 +146,15 @@ export default function ScopeModal({
     ]
     fetch(`/api/albums/tag-context?${parts.join("&")}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) setTagContextState({ key: contextKey, data: d }) })
-      .catch(() => {})
+      .then((d) => {
+        if (d) setTagContextState({ key: contextKey, data: d })
+        else setTagContextError(contextKey)
+      })
+      .catch((e) => {
+        if (e?.name !== "AbortError") setTagContextError(contextKey)
+      })
     return () => ctrl.abort()
-  }, [kind, contextKey, contextIncludeTags, contextExcludeTags])
+  }, [kind, tagContextOpen, contextKey, contextIncludeTags, contextExcludeTags, tagContextRetry])
   const tagContext = tagContextState?.key === contextKey ? tagContextState.data : null
 
   // Reset the one-shot auto-switch when the scope value changes, so moving
@@ -217,17 +230,47 @@ export default function ScopeModal({
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-4" style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}>
-        {kind === "genre" && (tagContext ? (
-          <TagContextBars
-            category={tagContext.category}
-            total={tagContext.total}
-            genres={tagContext.genres}
-            themes={tagContext.themes}
-            excludeTags={[...pageTags, ...pageXtags, ...chipGenres, ...innerXgenres]}
-          />
-        ) : (
-          <TagContextBarsSkeleton />
-        ))}
+        {kind === "genre" && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !tagContextOpen
+                setTagContextOpen(next)
+                if (next) setTagContextError(null)
+              }}
+              aria-expanded={tagContextOpen}
+              className="flex items-center gap-2 font-display text-[10px] tracking-[0.2em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer"
+            >
+              <span aria-hidden className="text-accent/60 w-3 inline-block">
+                {tagContextOpen ? "▾" : "▸"}
+              </span>
+              <span>See related tags</span>
+            </button>
+            {tagContextOpen && (
+              <div className="mt-3">
+                {tagContext ? (
+                  <TagContextBars
+                    category={tagContext.category}
+                    total={tagContext.total}
+                    genres={tagContext.genres}
+                    themes={tagContext.themes}
+                    excludeTags={[...pageTags, ...pageXtags, ...chipGenres, ...innerXgenres]}
+                  />
+                ) : tagContextError === contextKey ? (
+                  <TagContextBarsDegraded
+                    onRetry={() => {
+                      setTagContextError(null)
+                      setTagContextRetry((k) => k + 1)
+                    }}
+                  />
+                ) : (
+                  <TagContextBarsSkeleton />
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {error ? (
           <FetchError onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !albums ? (
