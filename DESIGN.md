@@ -95,7 +95,7 @@ Two families, loaded via `next/font/google` in `app/layout.tsx`:
 | Masthead title | display | `text-2xl sm:text-4xl` / `font-bold` | `text-accent`, `tracking-[0.1em]`, lowercase preserved |
 | Masthead tagline | display | `text-[10px] sm:text-xs` / 400 | `tracking-[0.2em]`, uppercase, `text-text-dim` |
 | Page header (`PageHeader`) | display | `text-base sm:text-lg` / 400 | `tracking-[0.15em]`, uppercase, `text-text-bright` |
-| Modal title (`<h2>`) | sans | `text-lg`–`text-xl` / `font-bold` | not italic, `text-text-bright`, `leading-tight` |
+| Modal title (`<h2>`) | display | `text-base sm:text-lg` / 400 | `tracking-[0.02em]`, `text-text-bright`, `truncate`. Rendered by `ModalHeader`. |
 | Album title in cover grid | sans | `text-[0.8rem]` / `font-medium` | `text-text-bright` (no italic, title sits below the cover, italic would clash with the host caption) |
 | Album title in list row / detail modal | sans | `text-sm` (`0.875rem`) | `italic`, `text-text-bright` |
 | Body copy | sans | `text-base` / 400 | `text-text` |
@@ -103,6 +103,8 @@ Two families, loaded via `next/font/google` in `app/layout.tsx`:
 | Eyebrow / caption | display | `text-[10px]` / 400 | `tracking-[0.15em]`–`tracking-[0.2em]`, uppercase, `text-text-dim` |
 | Tag chip / filter pill | display | `text-[10px]` / 400 | `tracking-wide`, lowercase preserved |
 | Numeric counts | display | `text-xs` / 400 | `tabular-nums`, `text-text-bright` |
+| Bracketed count | inherits row | inherits row size | `[ N ]` with brackets in `text-accent/60`, digits `tabular-nums`. See `ReleaseCountText`, `ModalCountSubtitle`. |
+| Chapter numeral | display | matches `SectionHeader` | Roman numeral, `text-accent/60 mr-2 tabular-nums`, prefixed by `SectionHeader`. |
 | Footnote / micro | display | `text-[9px]`–`text-[10px]` | `tracking-[0.1em]`, uppercase or `tabular-nums` |
 
 ### Rules
@@ -126,7 +128,8 @@ Three flavours:
 
 - **Ghost** (default in this site): no background, text-only, hover swaps `text-text-dim` → `text-accent` with `transition-colors`. Includes `cursor-pointer`. Used for nav, filter close (`×`), reset (`↺`), close, back. Almost every button is ghost.
 - **Border-pill**: `border border-border/50 hover:border-accent/50 cursor-pointer`, `font-display text-[10px] tracking-[0.2em] uppercase`, `px-4 py-1.5`. Used for "Show more", load-more triggers.
-- **Icon ghost**: `w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright border border-border/50 transition-colors cursor-pointer`. Used for modal back/close, calendar popover toggle.
+- **Icon ghost**: `w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright border border-border transition-colors cursor-pointer text-base leading-none`. Canonical implementation is `ModalIconButton` (back, calendar popover toggle) and the `ModalCloseButton` thin wrapper. Use those, don't hand-roll.
+- **Retry (form-status text)**: `font-display text-[10px] tracking-[0.2em] uppercase text-accent hover:text-accent-hover disabled:opacity-50 disabled:cursor-wait cursor-pointer`. Submits a `<form action={…}>`; the button reads `useFormStatus` to swap label to `Retrying…` during the pending state. Used inside `ChunkDegraded`.
 
 Disabled / inactive buttons drop opacity to ~40% and lose `cursor-pointer`.
 
@@ -158,18 +161,20 @@ Backdrop: `fixed inset-0` + `backdrop-blur-xs` + `rgba(0,0,0,0.55)`. Dialog: `bg
 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)
 ```
 
-Modal headers carry: cover/avatar tile (10×10) · title block (`<h2>` + dim subtitle) · filter pills cluster · ViewToggle · back arrow (`←`) · close (`×`). Close is always top-right. Back is always immediately left of the view toggle.
+Header always goes through `ModalHeader`. Slots: `leading` (10×10 cover/avatar) · `title` + optional `subtitle` (usually `<ModalCountSubtitle count={…} />`) · `chips` (filter pills, wrap to a second row on mobile) · `actions` (ViewToggle, back `←`, close `×`). Close is always last, back is always immediately left of the view toggle. Use `ModalIconButton` for back and `ModalCloseButton` for close, don't hand-roll either.
 
 `AlbumDetail` is the documented exception, it rolls its own portal because its layout is a side-by-side cover + metadata pane (`max-w-2xl`, `sm:flex-row`) that the size-bucketed `ModalShell` can't host without contortion. Backdrop, animations, and z-index match `ModalShell`; only the dialog frame differs. `DeepAlbumSkeleton` mirrors the same frame and renders while a deep-linked album fetches.
 
 ### Skeletons
 
-While data loads, modals render skeletons rather than blank frames or spinners.
+While data loads, surfaces render skeletons rather than blank frames or spinners. Rule for all of them: match the real layout one-for-one (zero CLS on swap).
 
-- `GridSkeleton` / `ListSkeleton` (`components/ModalSkeletons.tsx`): for `ScopeModal`, `DayModal`, `UpcomingModal` body content. `animate-pulse` on the wrapper, placeholder bars sized to match the loaded card heights one-for-one (zero CLS on swap).
-- `DeepAlbumSkeleton`: full modal frame with cover placeholder + text-bar stack. Pulse only on the inner placeholder column so the modal-in entrance animation isn't doubled.
-- `CalendarHeatmapSkeleton` (inside `HeatmapPopoverButton`): 53×7 grid placeholder using the same grid template as the real calendar so popover height stays stable.
-- `TagContextBarsSkeleton`: used inside genre `ScopeModal` while the tag-context fetch is in flight.
+- `GridSkeleton` / `ListSkeleton` (`components/ModalSkeletons.tsx`): `ScopeModal`, `DayModal`, `UpcomingModal` body content. `animate-pulse` wrapper.
+- `DeepAlbumSkeleton`: full modal frame, pulse only on the inner placeholder column so the modal-in entrance animation isn't doubled.
+- `CalendarHeatmapSkeleton` (inside `HeatmapPopoverButton`): 53×7 grid placeholder using the calendar's real grid template.
+- `TagContextBarsSkeleton`: inside genre `ScopeModal` while tag-context fetch is in flight.
+- `StatsSkeleton` (`components/StatsSkeleton.tsx`): per-chapter Suspense fallbacks for `/statistics` + `/statistics/by-year/[year]`. Each one reuses `SectionHeader` so only the bars/rows pulse (`animate-skeleton-step`, staggered by index). Ranked-row skeletons reserve `HOST_LIST_MAX_HEIGHT` to match the real list.
+- `ChunkDegraded` (`components/ChunkDegraded.tsx`): RPC-failure fallback. Same `SectionHeader` chrome, dim "(no data) ✧", and a `Retry` form-status button calling `lib/stats-actions.ts → retryStatsChunk(tag)`. Every stats chapter's `tryOrNull` null-branch returns this.
 
 ### Navigation feedback
 
@@ -188,10 +193,11 @@ Absolute background fill (`absolute inset-y-0 left-0 rounded-sm`), name span on 
 ### Ornamental dividers
 
 - `.masthead-rule`: header separator, accent-fades-into-border-fades-into-accent gradient with a centered `⟡` crest.
-- `.modal-rule`: softer version inside modals, centered `·` glyph.
+- `.modal-rule`: softer version inside modals, centered `·` glyph on `bg-bg-card` (must match the surface it sits on).
 - `.ornamental-divider`: collapsible day section header, italic serif label flanked by gradient lines into `--color-border`.
+- Plain section hairline (`h-px bg-gradient-to-r from-transparent via-border/60 to-transparent`): between `StatsLayout` chapters. No glyph, no class, just the gradient. Use this where a glyph would compete with the chapter numeral.
 
-These three carry the design's "this is a fresh chapter" feel. Don't replace with plain `<hr>`.
+The named three carry the design's "this is a fresh chapter" feel. Don't replace with plain `<hr>`.
 
 ### Iconography (sigils)
 
@@ -269,6 +275,10 @@ The page must read as a chronicle, not a feed. Days separated by ornamental rule
 
 `FilterChipsSlot` renders absolute on the right of each sub-nav row (`absolute top-1 right-4 sm:right-6 max-w-[60%] overflow-x-auto`) so adding chips never resizes the row.
 
+### Sub-nav dropdowns
+
+`YearDropdown` is the shared `▾` year picker (`Past years ▾` on releases nav, `By year ▾` on stats nav). Hover- or focus-opens with a 140ms close grace, menu is `bg-bg-card border border-border shadow-lg`, year cells `font-display text-[11px] tracking-[0.1em] tabular-nums` in a ≤5-col grid, active year in `text-accent bg-bg-hover`. The file also exports `NAV_ITEM` / `NAV_INACTIVE` / `NAV_ACTIVE` constants and a `NavSep` `·` component, those are the canonical sub-nav atoms.
+
 ---
 
 ## 6. Depth & Elevation
@@ -302,7 +312,29 @@ Border opacity mod (`/50`, `/60`) is normal: `border-border/50` softens an outli
 
 ---
 
-## 7. Do's and Don'ts
+## 7. Shape & Artwork
+
+### Border radius
+
+The site is intentionally close to zero radius. Sharp corners read as broadsheet/zine; rounded corners read as SaaS.
+
+| Token | Where it appears |
+|-------|------------------|
+| `rounded-sm` (2px) | Plot bar fills (`HostRow`, `TagRow`, `Histogram`) and their skeleton equivalents. The only place. |
+| `rounded-full` | Status dots only (e.g. `success` indicator in `CalendarHeatmap`). Never on buttons, badges, or avatars. |
+| Sharp (default) | Everything else: cards, modals, inputs, pills, popovers, dropdowns, cover tiles. Don't introduce `rounded-md`/`-lg`/`-xl` anywhere. |
+
+### Artwork
+
+- **Cover art**: plain `<img>` hotlinked from Bandcamp. No `next/image`, no proxy, no fallback host. If Bandcamp blocks hotlinks the placeholder sigil takes over (see §4 Cards).
+- **Avatars / host images**: same rule, hotlinked direct.
+- **No photography, no marketing illustration.** The site IS the catalogue; covers carry the visual weight.
+- **No SVG icon libraries.** Unicode sigils only (§4 Iconography).
+- **Decorative chrome** comes from the paper-grain overlay, vignette, and ornamental dividers, not from per-surface ornament.
+
+---
+
+## 8. Do's and Don'ts
 
 ### Do
 
@@ -320,14 +352,15 @@ Border opacity mod (`/50`, `/60`) is normal: `border-border/50` softens an outli
 - Don't write hex / rgb / oklch colours in components. If you need a transparent overlay, use `color-mix(in srgb, var(--color-…) 30%, transparent)`.
 - Don't introduce a third font family. Two is the budget.
 - Don't import an SVG icon library. Sigils only.
-- Animations live in the `0.25s`–`0.4s` range. Backdrops fade at `0.25s`, modal-in at `0.35s`, fade-slide-in at `0.4s`. Snap-scale hover (`hover-candlelight`) at `0.3s`. Anything longer reads as sluggish.
+- Animations live in the `0.25s`–`0.4s` range. Backdrops fade at `0.25s`, modal-in at `0.35s`, fade-slide-in at `0.4s`. Snap-scale hover (`hover-candlelight`) at `0.3s`. Anything longer reads as sluggish. Two exceptions live in stats-skeleton land: `animate-bar-grow` (600ms ease-out, one-shot on mount) and `animate-skeleton-step` (1.4s infinite pulse). All keyframed animations are killed under `@media (prefers-reduced-motion: reduce)`, don't bypass that block.
 - Don't centre empty space inside modals. If content is loading, render a skeleton (`GridSkeleton`, `ListSkeleton`).
 - Don't put filter logic on the client. Every filter is URL-driven (`?tag=` / `?xtag=` / modal `?genre=`); the server does the intersection.
 - Don't add per-theme conditional rendering. If something looks wrong on a light theme, fix the token, don't branch.
+- Don't soften corners. Sharp is the rule (see §7). `rounded-sm` on plot bars and `rounded-full` on status dots are the only exceptions.
 
 ---
 
-## 8. Responsive Behavior
+## 9. Responsive Behavior
 
 Two breakpoints carry the lift:
 
@@ -354,7 +387,7 @@ Headings use `text-[base] sm:text-[step-up]` to avoid mobile clipping. Body copy
 
 ---
 
-## 9. Agent Prompt Guide
+## 10. Agent Prompt Guide
 
 When asking an AI to build / modify a UI surface in this project, use this skeleton:
 
@@ -392,10 +425,25 @@ Fonts:         font-display          Cinzel, uppercase, tracked
 
 ### Sample component prompt
 
-> New modal showing a ranked list. Wrap content in `<ModalShell titleId="…" size="md" onClose={…}>`. Header: `pl-6 pr-4 pt-4 pb-3 shrink-0 border-b border-border flex items-center gap-4`, title block left, ViewToggle + back (`←`) + close (`×`) right. Body: `flex-1 overflow-y-auto px-6 py-4`. Each row matches `HostRow` / `TagRow` (`relative h-7 flex items-center cursor-pointer group hover:[--bar-bg:var(--color-plot-bar-hover)]`, absolute fill bar, `tabular-nums` count). Use `GridSkeleton` / `ListSkeleton` while loading and `FetchError` on failure. Open downstream scopes via `useOpenModal`.
+> New modal with a ranked list. Wrap content in `<ModalShell size="md" onClose={…}>`, render the header via `<ModalHeader leading={…} title={…} subtitle={<ModalCountSubtitle count={n} />} chips={…} actions={<>…<ModalIconButton onClick={back} label="Back">←</ModalIconButton><ModalCloseButton onClose={…}/></>} />`. Body: `flex-1 overflow-y-auto px-6 py-4`. Rows follow `HostRow` / `TagRow`. Skeleton: `GridSkeleton` / `ListSkeleton`. Failure: `FetchError`. Open downstream scopes via `useOpenModal`.
+
+> New `/statistics` chapter. Add a Server Component to `StatsChapters.tsx` that fetches inside `"use cache"` + `cacheLife("days")` + `cacheTag("stats", "stats:<chunk>")` via `tryOrNull`. On null return `<ChunkDegraded chapter="N" title="…" tag="stats:<chunk>" />`, else `<Histogram chapter="N" …/>` or `<TagBarScroll chapter="N" headingStyle="section" …/>`. Add a matching skeleton to `StatsSkeleton.tsx` reusing `SectionHeader chapter="N"`, slot both into `StatsLayout` between the existing dividers.
 
 For new charts: use the `--color-plot-bar-min` / `-max` / `-hover` tokens, `tabular-nums` for counts, `font-display tracking-[0.15em] uppercase` for axis labels. No grid lines.
 
 ---
 
-*See `app/globals.css` for the full theme registry, `app/layout.tsx` for the masthead layout, and `components/FilterPill.tsx`, `components/ModalShell.tsx`, `components/HostRow.tsx`, `components/TagRow.tsx`, `components/PageHeader.tsx` for canonical implementations.*
+## 11. Known Gaps
+
+This file is the visual contract. It deliberately defers in a few places:
+
+- **TagGraph internals.** Layout math (weights, edge filtering, force constants, `TAG_GRAPH_TOP_K`) and the canvas interaction model live in [`docs/graphs.md`](./docs/graphs.md). Only the empty-state glyph (`❧`) and the z-index slot for fullscreen mode are spelled out here.
+- **Stats RPC contracts.** Shape, signature changes, and `cacheTag` topology for the `/statistics` chunks live in [`docs/statistics.md`](./docs/statistics.md) + [`docs/rpc.sql`](./docs/rpc.sql). This file covers the visual chrome (chapter numerals, skeletons, `ChunkDegraded`), not the data flow.
+- **Per-theme edge cases.** No theme-specific overrides in components. If a theme breaks something, fix the token in `app/globals.css`, never branch on `data-theme`.
+- **Micro-animations.** The animation budget in §8 is binding for cross-cutting motion. One-off timings inside `CalendarHeatmap`, `TagGraphCanvas`, and `NavigationProgress` live in their source files and aren't promoted to tokens.
+- **Entity pages.** Artist/host/label detail surfaces are explicitly out of scope, see [`CLAUDE.md`](./CLAUDE.md) "no entity pages" rule. The day all that changes is when stable IDs land.
+- **Roadmap surfaces** (geo map `/map`, recommendations, tag-category curation): tracked in [`docs/roadmap.md`](./docs/roadmap.md). Add their tokens here once they ship, not before.
+
+---
+
+*See `app/globals.css` for the full theme registry, `app/layout.tsx` for the masthead layout, and `components/FilterPill.tsx`, `components/ModalShell.tsx`, `components/ModalHeader.tsx`, `components/HostRow.tsx`, `components/TagRow.tsx`, `components/SectionHeader.tsx`, `components/StatsSkeleton.tsx` for canonical implementations.*

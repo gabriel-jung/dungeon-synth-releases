@@ -2,31 +2,35 @@ import { cacheLife, cacheTag } from "next/cache"
 import { supabase } from "./supabase"
 import type { TagCount, TagPair } from "@/lib/tagGraphLogic"
 
-// Server-side cap on tags included in the graph. Both counts and pairs are
-// restricted to the top K tags by count, so pair payload is bounded by
-// C(K,2) and the self-join in `tag_pairs` stays small. Hard cap of 300
-// keeps the SQL self-join under Supabase's 8s statement timeout, going
-// unbounded blew the build prerender on /graphs/genres at corpus scale.
-export const TAG_GRAPH_TOP_K: number | null = 300
+// `p_top_k = null` on the tag_pairs self-join blows Supabase's 8s
+// statement timeout, so we always pass a finite K. For per-category
+// graphs (`genre`, `theme`) K = the actual tag count in the category, so
+// every tag in the category is eligible without the slow null-K plan. For
+// `all` (no category filter) K is hard-capped — `ALL_TOP_K` keeps the
+// pair-join bounded at C(K,2) and the layout legible.
 
-// Lazy-regenerated on visit. Zero traffic = zero Supabase queries. Cron
-// calls /api/revalidate?tag=genres to push a new version when new data
-// is ingested upstream.
-//
-// Both RPCs return a single jsonb row, so one HTTP call fetches the full
-// result, PostgREST's 1000-row cap does not bound pagination.
+export type GraphCategory = "genre" | "theme" | "all"
+
+const ALL_TOP_K = 1000
+
 export async function fetchTagGraph(
-  category: "genre" | "theme",
-  topK: number | null = TAG_GRAPH_TOP_K,
+  category: GraphCategory,
 ): Promise<{ counts: TagCount[]; pairs: TagPair[] }> {
   "use cache"
   cacheLife("days")
   cacheTag("genres")
   cacheTag(`tag-graph-${category}`)
 
+  const countQuery = supabase.from("tags").select("*", { count: "exact", head: true })
+  const countRes = category === "all" ? await countQuery : await countQuery.eq("category", category)
+  if (countRes.error) throw new Error(`tags count failed: ${countRes.error.message}`)
+  const totalTags = countRes.count ?? 0
+  const topK = category === "all" ? Math.min(totalTags, ALL_TOP_K) : totalTags
+  const rpcCategory = category === "all" ? null : category
+
   const [countsRes, pairsRes] = await Promise.all([
-    supabase.rpc("tag_counts", { p_category: category, p_top_k: topK }),
-    supabase.rpc("tag_pairs", { p_category: category, p_top_k: topK }),
+    supabase.rpc("tag_counts", { p_category: rpcCategory, p_top_k: topK }),
+    supabase.rpc("tag_pairs", { p_category: rpcCategory, p_top_k: topK }),
   ])
   if (countsRes.error) throw new Error(`tag_counts RPC failed: ${countsRes.error.message}`)
   if (pairsRes.error) throw new Error(`tag_pairs RPC failed: ${pairsRes.error.message}`)

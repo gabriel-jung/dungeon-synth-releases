@@ -15,6 +15,8 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
+  forceX,
+  forceY,
 } from "d3-force"
 import { polygonHull, polygonArea } from "d3-polygon"
 import { readFileSync } from "node:fs"
@@ -22,7 +24,11 @@ import { scaleSqrt } from "d3-scale"
 // Node 25's native TS loader conflicts with tsx for static imports of .ts —
 // use a dynamic import so tsx's hook is in control.
 const logicMod = await import("../lib/tagGraphLogic.ts")
+const defaultsMod = await import("../lib/tagGraphDefaults.ts")
 const buildTagGraph = logicMod.buildTagGraph as typeof import("../lib/tagGraphLogic.ts").buildTagGraph
+const DEFAULTS = defaultsMod.DEFAULTS as typeof import("../lib/tagGraphDefaults.ts").DEFAULTS
+const clusterSepFromLinkDistance =
+  defaultsMod.clusterSepFromLinkDistance as typeof import("../lib/tagGraphDefaults.ts").clusterSepFromLinkDistance
 type TagNode = import("../lib/tagGraphLogic.ts").TagNode
 type TagEdge = import("../lib/tagGraphLogic.ts").TagEdge
 
@@ -67,12 +73,26 @@ async function fetchData(category: "genre" | "theme", topK = 300) {
   return { counts, pairs: pairs.map((p) => ({ a: p.tag_a, b: p.tag_b, n: Number(p.n) })) }
 }
 
+// Sweep params mirror the new canvas force vocabulary (repel, linkForce,
+// linkDistance, center, cohesion, clusterSep) so both surfaces agree on
+// what each knob means.
 type Params = {
-  repulsion: number
-  cohesion: number
+  repel: number
+  linkForce: number
+  linkDistance: number
+  center: number
   clusterSep: number
-  linkStiffness: number
-  gravity: number
+}
+
+// Tune script keeps link force + cluster sep as independent knobs even
+// though the live canvas has merged them away; lets sweeps probe each
+// axis in isolation.
+const DEFAULT_PARAMS: Params = {
+  repel: DEFAULTS.repel,
+  linkForce: 0.5,
+  linkDistance: DEFAULTS.linkDistance,
+  center: DEFAULTS.center,
+  clusterSep: clusterSepFromLinkDistance(DEFAULTS.linkDistance),
 }
 
 function settle(
@@ -92,22 +112,6 @@ function settle(
     n.vy = 0
     n.fx = undefined
     n.fy = undefined
-  }
-
-  const clusterForce = (alpha: number) => {
-    if (p.cohesion === 0) return
-    const cen = new Map<number, { x: number; y: number; c: number }>()
-    for (const n of nodes) {
-      const e = cen.get(n.cluster) ?? { x: 0, y: 0, c: 0 }
-      e.x += n.x ?? 0; e.y += n.y ?? 0; e.c++
-      cen.set(n.cluster, e)
-    }
-    for (const e of cen.values()) { e.x /= e.c; e.y /= e.c }
-    for (const n of nodes) {
-      const c = cen.get(n.cluster)!
-      n.vx = (n.vx ?? 0) + (c.x - (n.x ?? 0)) * alpha * p.cohesion
-      n.vy = (n.vy ?? 0) + (c.y - (n.y ?? 0)) * alpha * p.cohesion
-    }
   }
 
   const clusterRepulsionForce = (alpha: number) => {
@@ -150,6 +154,8 @@ function settle(
     }
   }
 
+  const density = Math.sqrt(Math.max(1, nodes.length) / 50)
+
   const sim = forceSimulation<TagNode>(nodes)
     .force(
       "link",
@@ -159,22 +165,24 @@ function settle(
           const s = d.source as TagNode
           const t = d.target as TagNode
           const same = s.cluster === t.cluster
-          return (same ? 30 : 120) + 40 / (1 + d.weight * 3)
+          const base = (same ? 30 : 30 * p.linkDistance) * density
+          return base + 40 / (1 + d.weight * 3)
         })
         .strength((d) => {
           const s = d.source as TagNode
           const t = d.target as TagNode
           const base = s.cluster === t.cluster ? 0.7 : 0.1
-          return base * p.linkStiffness
+          return base * p.linkForce
         }),
     )
-    .force("charge", forceManyBody().strength(-p.repulsion).distanceMax(300))
-    .force("center", forceCenter(w / 2, h / 2).strength(p.gravity))
+    .force("charge", forceManyBody().strength(-p.repel).distanceMax(300))
+    .force("center", forceCenter(w / 2, h / 2))
+    .force("x", forceX(w / 2).strength(p.center))
+    .force("y", forceY(h / 2).strength(p.center))
     .force(
       "collision",
       forceCollide<TagNode>().radius((d) => rScale(d.count) + 6).strength(0.7),
     )
-    .force("cluster", clusterForce)
     .force("clusterRepulsion", clusterRepulsionForce)
     .alphaDecay(0.02)
     .stop()
@@ -187,7 +195,7 @@ type Metrics = {
   meanNodeRadius: number
   linkToRadiusRatio: number
   meanClusterRadius: number
-  clusterOverlapRatio: number // fraction of cluster pairs whose expanded hulls overlap
+  clusterOverlapRatio: number
   bboxArea: number
   nodes: number
   clusters: number
@@ -197,7 +205,6 @@ function measure(nodes: TagNode[], edges: TagEdge[]): Metrics {
   const maxCount = Math.max(1, ...nodes.map((n) => n.count))
   const rScale = scaleSqrt().domain([1, maxCount]).range([6, 28])
 
-  // Link lengths (Euclidean between node positions).
   let linkLenSum = 0
   for (const e of edges) {
     const s = e.source as TagNode
@@ -210,7 +217,6 @@ function measure(nodes: TagNode[], edges: TagEdge[]): Metrics {
   const meanNodeRadius =
     nodes.reduce((s, n) => s + rScale(n.count), 0) / Math.max(1, nodes.length)
 
-  // Per-cluster bounding hull + centroid.
   const byCluster = new Map<number, TagNode[]>()
   for (const n of nodes) {
     if (!byCluster.has(n.cluster)) byCluster.set(n.cluster, [])
@@ -247,7 +253,6 @@ function measure(nodes: TagNode[], edges: TagEdge[]): Metrics {
   }
   const clusterOverlapRatio = pairs ? overlaps / pairs : 0
 
-  // Bounding box of positions (cheaper than full polygonHull).
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const n of nodes) {
     const x = n.x ?? 0, y = n.y ?? 0
@@ -268,7 +273,6 @@ function measure(nodes: TagNode[], edges: TagEdge[]): Metrics {
   }
 }
 
-// Silence polygonArea — unused import warning if we remove, keep for future.
 void polygonArea
 void polygonHull
 
@@ -305,62 +309,51 @@ async function main() {
     return seed / 0xffffffff
   }
 
-  const defaults: Params = {
-    repulsion: 80,
-    cohesion: 0.08,
-    clusterSep: 0.15,
-    linkStiffness: 1,
-    gravity: 0.05,
-  }
-
   const runOnce = (label: string, p: Params) => {
-    const { nodes, edges } = buildTagGraph(counts, pairs, "jaccard", topK)
+    const { nodes, edges } = buildTagGraph(counts, pairs, "jaccard", topK, true)
     settle(nodes, edges, p)
     const m = measure(nodes, edges)
     console.log(row(label, m))
   }
 
   console.log("\n== Defaults ==")
-  runOnce("defaults", defaults)
+  runOnce("defaults", DEFAULT_PARAMS)
 
-  console.log("\n== Sweep: node repulsion ==")
+  console.log("\n== Sweep: repel ==")
   for (const v of [0, 40, 80, 150, 300, 500, 800, 1000]) {
-    runOnce(`repulsion=${v}`, { ...defaults, repulsion: v })
+    runOnce(`repel=${v}`, { ...DEFAULT_PARAMS, repel: v })
   }
 
-  console.log("\n== Sweep: cluster cohesion ==")
-  for (const v of [0, 0.05, 0.1, 0.2, 0.4, 0.7, 1]) {
-    runOnce(`cohesion=${v}`, { ...defaults, cohesion: v })
-  }
-
-  console.log("\n== Sweep: cluster separation ==")
+  console.log("\n== Sweep: clusterSep ==")
   for (const v of [0, 0.15, 0.3, 0.6, 1, 1.5, 2]) {
-    runOnce(`clusterSep=${v}`, { ...defaults, clusterSep: v })
+    runOnce(`clusterSep=${v}`, { ...DEFAULT_PARAMS, clusterSep: v })
   }
 
-  console.log("\n== Sweep: link stiffness ==")
+  console.log("\n== Sweep: linkForce ==")
   for (const v of [0, 0.3, 0.7, 1, 1.5, 2.5, 4]) {
-    runOnce(`linkStiffness=${v}`, { ...defaults, linkStiffness: v })
+    runOnce(`linkForce=${v}`, { ...DEFAULT_PARAMS, linkForce: v })
   }
 
-  console.log("\n== Sweep: gravity ==")
+  console.log("\n== Sweep: linkDistance ==")
+  for (const v of [1, 1.5, 2, 3, 4, 6, 8]) {
+    runOnce(`linkDistance=${v}`, { ...DEFAULT_PARAMS, linkDistance: v })
+  }
+
+  console.log("\n== Sweep: center ==")
   for (const v of [0, 0.02, 0.05, 0.1, 0.2, 0.5, 1]) {
-    runOnce(`gravity=${v}`, { ...defaults, gravity: v })
+    runOnce(`center=${v}`, { ...DEFAULT_PARAMS, center: v })
   }
 
-  // Targeted: low overlap + readable L/r. Weaker link springs + stronger
-  // cluster separation should let communities spread apart.
-  console.log("\n== Combined: lower link stiffness + stronger clusterSep ==")
-  for (const ls of [0.2, 0.35, 0.5]) {
+  console.log("\n== Combined: lower linkForce + stronger clusterSep ==")
+  for (const lf of [0.2, 0.35, 0.5]) {
     for (const cs of [0.5, 1, 1.5, 2]) {
       runOnce(
-        `linkStiffness=${ls}, clusterSep=${cs}`,
-        { ...defaults, linkStiffness: ls, clusterSep: cs },
+        `linkForce=${lf}, clusterSep=${cs}`,
+        { ...DEFAULT_PARAMS, linkForce: lf, clusterSep: cs },
       )
     }
   }
 
-  // Restore original RNG.
   Math.random = baseRandom
 }
 

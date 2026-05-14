@@ -19,7 +19,7 @@ Two RPCs aggregate from the filtered category set. Both **return `jsonb` in a si
 - **`tag_counts(p_category default 'genre', p_top_k)`** — jsonb array of `{ name, n }`, where `n` is how many albums carry that tag. `p_top_k` caps to the K most-used tags; `NULL` = unbounded.
 - **`tag_pairs(p_category default 'genre', p_top_k)`** — jsonb array of `{ tag_a, tag_b, n }` for each unordered pair of tags in the category that co-occur on at least one album. When `p_top_k` is set, pairs are restricted to those where both tags are among the top K — bounds the result at C(K,2) and keeps the self-join over a small tag set.
 
-`fetchTagGraph` passes `p_top_k = TAG_GRAPH_TOP_K` (currently `300` — the unbounded variant blows Supabase's 8s statement timeout on the `tag_pairs` self-join at corpus scale; `scripts/tune-taggraph.mts` overrides) to both and parses the single jsonb row client-side. Cached with `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")`.
+`fetchTagGraph` first queries `count(*) from tags where category = ...` (HEAD with `count=exact`), then passes that count as `p_top_k` to both RPCs so they cover every tag while still hitting the bounded query plan. The unbounded (`p_top_k = NULL`) path triggers a slower plan that blows Supabase's 8s statement timeout on the `tag_pairs` self-join at corpus scale — never use it. All three calls are wrapped in `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")`, so the extra count round-trip is paid once per revalidation, not per visit.
 
 ### 4. Graph construction (client, shared logic)
 
@@ -55,23 +55,35 @@ Graph construction, metrics, edge filtering, and Louvain clustering live in `lib
 
 ## Controls panel
 
-Grouped Data / Physics / Edges / Display, with per-control **↺** reset, a global **Reset**, and a **↻ recompute-layout** button. A live read-out shows the measured cluster-separation for the current layout.
+Grouped **Filters / Display / Forces / Clustering / Advanced** to match the de-facto Obsidian graph-view vocabulary. Per-control **↺** reset, a global **Reset**, and a **↻ recompute-layout** button. A live read-out next to Link distance shows the measured inter/intra cluster-separation for the current layout.
 
 | Group | Controls |
 |-------|----------|
-| **Data** | Metric (Jaccard / Raw / PMI / Cosine), Top-N |
-| **Physics** | Cluster spacing, Overall scale, Centring, Edge stiffness |
-| **Edges** | Density %, Min-links |
-| **Display** | Node scale, Node opacity, Label size, Label min size, Label limit, Label position |
+| **Filters** | Top-N, Min links / node, Edge density |
+| **Display** | Node size, Node opacity, Label size, Label placement, Text fade, Focus on hover |
+| **Forces** | Repel, Link force, Link distance, Center, Cohesion, Cluster repulsion |
+| **Clustering** | Clustering on/off, Show hulls |
+| **Advanced** (collapsed) | Metric (Jaccard / Raw / PMI / Cosine) |
 
-State is URL-driven (`?metric=…&n=…&d=…&ml=…&lp=…`) so views are shareable.
+Defaults live in `lib/tagGraphDefaults.ts` and are shared with `scripts/tune-taggraph.mts`, so the canvas and the param-sweep CLI agree on the same baseline.
+
+State is URL-driven (`?m=…&n=…&d=…&ml=…&lp=…&c=…&sh=…&fh=…&lf=…&ld=…`) so views are shareable. Each param is omitted at its default so unshared URLs stay clean.
+
+**Clustering toggle** — when off, Louvain is skipped, hulls are not drawn, and the cluster-cohesion / cluster-repulsion forces are inert. Useful for seeing the raw co-occurrence graph without community coloring.
+
+**Text fade** — drives a zoom-opacity curve (Foam pattern): labels are invisible below the lower fade bound, smoothly interpolate to full opacity at the upper bound. Higher slider values shift both bounds down so labels appear at lower zoom levels.
+
+**Focus on hover** — when on, hovering a node dims non-neighbours so the local neighbourhood pops. Toggle off for a static read of the whole graph.
 
 ## Performance notes
 
 - Moving from SVG (`components/TagGraph.tsx`, removed) to canvas (`TagGraphCanvas.tsx`) was the main win — SVG was hitting layout + paint on every tick at 200+ nodes.
 - Hull geometry and font strings are cached per settle; pan/zoom allocates nothing.
 - `d3` imports are by subpackage (`d3-force`, `d3-polygon`, `d3-scale`, `d3-array`) so only the used modules land in the bundle.
-- Shared logic extraction into `lib/tagGraphLogic.ts` lets the param-sweep tool (`scripts/tune-taggraph.mts`) reuse the exact same graph-construction / metric code as the page.
+- Settled positions + hull geometry are written to `sessionStorage` keyed by the graph-shape signature (`lib/useGraphPositionCache.ts`). Back-nav from a `ScopeModal` rehydrates instantly without re-settling.
+- Clustering=off skips Louvain, hull build, and the two cluster forces, dropping ~30% of settle cost when the user only wants the raw graph.
+- Zoom-driven label fade replaces a static per-frame px threshold — labels still cull below a fade lower-bound but interpolate smoothly through the band instead of popping in.
+- Shared logic in `lib/tagGraphLogic.ts` lets `scripts/tune-taggraph.mts` reuse the exact same graph-construction / metric code as the page, and shared defaults in `lib/tagGraphDefaults.ts` keep both surfaces aligned.
 
 ## Files
 
@@ -80,10 +92,17 @@ State is URL-driven (`?metric=…&n=…&d=…&ml=…&lp=…`) so views are share
 | `app/graphs/genres/page.tsx` | Server component: fetches counts + pairs for `category='genre'`, renders `<TagGraphCanvas>` inside `<Suspense>` |
 | `app/graphs/themes/page.tsx` | Same as above but `category='theme'` and `itemLabel="theme"` |
 | `lib/tagGraph.ts` | `fetchTagGraph(category)` — single-call `tag_counts` + `tag_pairs` (jsonb), cached under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")` |
-| `lib/tagGraphLogic.ts` | Shared graph construction: metrics, edge filter, Louvain, endpoint resolution, node/edge types |
-| `components/TagGraphCanvas.tsx` | Canvas-2D renderer (react-force-graph-2d), controls, interactions, PNG export, fullscreen |
+| `lib/tagGraphLogic.ts` | Pure graph construction: metrics, edge filter, Louvain (gated by `clustering` arg), endpoint resolution, node/edge types |
+| `lib/tagGraphDefaults.ts` | Shared `DEFAULTS` + URL param key map; imported by canvas and tune script |
+| `lib/useTagGraphState.ts` | All control state + URL ↔ state sync (debounced `history.replaceState`) |
+| `lib/useForceLayout.ts` | d3-force settle, hull cache, cluster forces; skips Louvain work when `clustering=false` |
+| `lib/useGraphPositionCache.ts` | `sessionStorage` cache of settled positions + hulls, keyed by graph-shape signature |
+| `components/TagGraphCanvas.tsx` | Orchestrator: composes hooks, renders sub-components + the search / zoom / fullscreen / PNG / share chrome |
+| `components/TagGraphControls.tsx` | Settings overlay (Filters / Display / Forces / Clustering / Advanced groups) |
+| `components/TagGraphRenderer.tsx` | `react-force-graph-2d` wrapper, paint callbacks, tooltips, zoom-fade, focus-on-hover, click-vs-drag |
+| `components/TagGraphAbout.tsx` | About overlay + metric formulas (lazy-loads katex) |
 | `components/ScopeModal.tsx` | Scope modal rendered when `?genre=<name>` is set (also handles themes) |
-| `scripts/tune-taggraph.mts` | CLI param-sweep tool against the live data |
+| `scripts/tune-taggraph.mts` | CLI param-sweep tool against the live data; uses `DEFAULTS` from `tagGraphDefaults` |
 
 ## Supabase RPCs
 

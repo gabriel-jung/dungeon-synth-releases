@@ -293,6 +293,9 @@ $$;
 -- When p_top_k is set, returns only the K most-used tags (by count desc,
 -- name asc for deterministic ties). NULL = unbounded.
 --
+-- `p_category = NULL` skips the category filter entirely so the /graphs/all
+-- route can pull every tag across categories.
+--
 -- Returns a jsonb array in a single row so PostgREST's 1000-row cap does
 -- not bound the result. Caller does one HTTP call, no pagination.
 -- ---------------------------------------------------------------------------
@@ -307,7 +310,7 @@ as $$
     SELECT t.name, count(*)::bigint AS n
     FROM album_tags at
     JOIN tags t ON t.id = at.tag_id
-    WHERE t.category = p_category
+    WHERE p_category IS NULL OR t.category = p_category
     GROUP BY t.name
     ORDER BY n DESC, t.name ASC
     LIMIT p_top_k
@@ -324,6 +327,10 @@ $$;
 -- both tags are among the K most-used tags in the category — caps result
 -- at C(K,2) pairs and keeps the self-join over a small tag set.
 --
+-- `p_category = NULL` skips the category filter (every tag eligible). The
+-- caller MUST pass a sensible `p_top_k` in that case — unbounded across
+-- the full tag set blows Supabase's 8s statement timeout.
+--
 -- Returns a jsonb array in a single row (see tag_counts note). One HTTP
 -- call regardless of pair count.
 -- ---------------------------------------------------------------------------
@@ -338,7 +345,7 @@ as $$
     SELECT t.id, t.name
     FROM tags t
     JOIN album_tags at ON at.tag_id = t.id
-    WHERE t.category = p_category
+    WHERE p_category IS NULL OR t.category = p_category
     GROUP BY t.id, t.name
     ORDER BY count(*) DESC, t.name ASC
     LIMIT p_top_k

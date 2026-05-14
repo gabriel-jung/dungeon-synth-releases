@@ -77,6 +77,11 @@ export function parseNumber(v: string | null, fallback: number, min: number, max
   return Math.min(max, Math.max(min, n))
 }
 
+export function parseBool(v: string | null, fallback: boolean): boolean {
+  if (v == null) return fallback
+  return v === "1" || v === "true"
+}
+
 // ---------------------------------------------------------------------------
 // Palette
 // ---------------------------------------------------------------------------
@@ -327,6 +332,7 @@ export function buildTagGraph(
   pairs: TagPair[],
   metric: Metric,
   topN: number,
+  clustering: boolean = true,
 ): { nodes: TagNode[]; edges: TagEdge[] } {
   const active = new Set(
     [...counts].sort((x, y) => y.n - x.n).slice(0, topN).map((c) => c.name),
@@ -355,8 +361,10 @@ export function buildTagGraph(
     count: tagCounts.get(t) ?? 0,
     cluster: 0,
   }))
-  const rawComms = detectCommunities(ns, all)
-  const comms = stabilizeClusters(rawComms, tagCounts)
-  for (const n of ns) n.cluster = comms[n.id] ?? 0
+  if (clustering) {
+    const rawComms = detectCommunities(ns, all)
+    const comms = stabilizeClusters(rawComms, tagCounts)
+    for (const n of ns) n.cluster = comms[n.id] ?? 0
+  }
   return { nodes: ns, edges: all }
 }
