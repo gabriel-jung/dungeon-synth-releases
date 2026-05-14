@@ -169,6 +169,16 @@ export default function TagGraphRenderer({
     [maxCount, labelSize, fontFamily],
   )
 
+  // Label-width cache: each `ctx.measureText(label)` triggers a CSS-layout
+  // pass. Width depends on (label text, font), and font is a pure function
+  // of count + labelSize + fontFamily — same invalidation deps as the
+  // fontStringCache above.
+  const labelWidthCache = useMemo(
+    () => new Map<string, number>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [maxCount, labelSize, fontFamily],
+  )
+
   const maxWeight = useMemo(() => {
     let m = 1
     for (const e of edges) if (e.weight > m) m = e.weight
@@ -178,6 +188,13 @@ export default function TagGraphRenderer({
   const graphData = useMemo(
     () => ({ nodes: [...nodes], links: [...visibleEdges] }),
     [nodes, visibleEdges],
+  )
+
+  // Count-priority order for the label paint pass: bigger tags win the
+  // bbox first, smaller ones drop out on overlap.
+  const nodesByCountDesc = useMemo(
+    () => [...nodes].sort((a, b) => b.count - a.count),
+    [nodes],
   )
 
   // Nullify the lib's internal d3-force engine — we run our own settle
@@ -307,12 +324,7 @@ export default function TagGraphRenderer({
             const isHiTag = hiTags.has(n.id)
             const dim = anyHi && !isHiTag && !isNeighbor
             const baseR = rScale(n.count)
-            // Pop the hovered node and its neighbours so the focus is
-            // unmistakable: hovered gets 1.4×, direct neighbours 1.15×.
             const r = isHovered ? baseR * 1.4 : isNeighbor ? baseR * 1.15 : baseR
-            // Neutral fill when clustering is off — no group hue is
-            // meaningful. Falls back to the theme's dim text colour, which
-            // reads as muted grey on every theme.
             const color = clustering ? clusterColor(n.cluster) : (textDimColor || "#9ca3af")
             ctx.beginPath()
             ctx.arc(n.x ?? 0, n.y ?? 0, r, 0, Math.PI * 2)
@@ -327,32 +339,6 @@ export default function TagGraphRenderer({
                 ? clusterColor(n.cluster, 0.2)
                 : (textColor || "#cbd5e1")
             ctx.stroke()
-            ctx.globalAlpha = 1
-
-            // Zoom-driven label fade. Below fadeLo: invisible. Above fadeHi:
-            // full alpha. In between: smoothly interpolated. Replaces the
-            // old hard cutoff `fs * globalScale < labelThreshold`.
-            const labelAlpha = Math.min(1, Math.max(0, (globalScale - fadeLo) / (fadeHi - fadeLo)))
-            if (labelAlpha <= 0) return
-            const fs = fontScale(n.count)
-            ctx.globalAlpha = dim ? labelAlpha * 0.3 : labelAlpha
-            let fontStr = fontStringCache.get(n.count)
-            if (!fontStr) {
-              fontStr = `${fs}px ${fontFamily}`
-              fontStringCache.set(n.count, fontStr)
-            }
-            ctx.font = fontStr
-            ctx.textAlign = "center"
-            ctx.textBaseline = labelBaseline()
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ;(ctx as any).letterSpacing = `${fs * 0.04}px`
-            ctx.lineWidth = 2.5 / globalScale
-            ctx.strokeStyle = hexToRgba(bgColor, 0.7)
-            ctx.lineJoin = "round"
-            const ty = (n.y ?? 0) + labelYOffset(r)
-            ctx.strokeText(n.id, n.x ?? 0, ty)
-            ctx.fillStyle = textColor
-            ctx.fillText(n.id, n.x ?? 0, ty)
             ctx.globalAlpha = 1
           }}
           onRenderFramePre={(ctx, globalScale) => {
@@ -385,6 +371,99 @@ export default function TagGraphRenderer({
               ctx.stroke()
               ctx.globalAlpha = 1
             }
+          }}
+          onRenderFramePost={(ctx, globalScale) => {
+            // Labels render after circles + edges. Iterate nodes in
+            // count-descending order so the biggest tags get their natural
+            // position (centred on the circle). Smaller tags whose bbox
+            // would intersect a label already drawn get nudged vertically
+            // by up to ~2 line-heights; if no clear slot is found, the
+            // label is dropped (the bubble is still visible). Hovered +
+            // its direct neighbours always draw at the natural position.
+            const labelAlpha = Math.min(1, Math.max(0, (globalScale - fadeLo) / (fadeHi - fadeLo)))
+            if (labelAlpha <= 0) return
+            const anyHi = hiTags.size > 0
+            ctx.textAlign = "center"
+            ctx.textBaseline = labelBaseline()
+            ctx.lineJoin = "round"
+            const strokeColor = hexToRgba(bgColor, 0.7)
+            const drawn: Array<[number, number, number, number]> = []
+            const hits = (l: number, right: number, top: number, bottom: number) => {
+              // Touching edges (>= / <=) treated as non-overlap so labels
+               // can sit flush against each other at the chosen step.
+              for (const [dl, dr, dt, db] of drawn) {
+                if (!(right <= dl || l >= dr || bottom <= dt || top >= db)) return true
+              }
+              return false
+            }
+            for (const n of nodesByCountDesc) {
+              if (banTags.has(n.id)) continue
+              const isHovered = hoveredId === n.id
+              const isNeighbor = hiNeighbors.has(n.id)
+              const isHiTag = hiTags.has(n.id)
+              const dim = anyHi && !isHiTag && !isNeighbor
+              const baseR = rScale(n.count)
+              const r = isHovered ? baseR * 1.4 : isNeighbor ? baseR * 1.15 : baseR
+              const fs = fontScale(n.count)
+              let fontStr = fontStringCache.get(n.count)
+              if (!fontStr) {
+                fontStr = `${fs}px ${fontFamily}`
+                fontStringCache.set(n.count, fontStr)
+              }
+              ctx.font = fontStr
+              let w = labelWidthCache.get(n.id)
+              if (w === undefined) {
+                w = ctx.measureText(n.id).width
+                labelWidthCache.set(n.id, w)
+              }
+              const cx = n.x ?? 0
+              const baseTy = (n.y ?? 0) + labelYOffset(r)
+              // Tight bbox: halfH ≈ visible cap height + descender; labels
+              // can stack flush against each other (pad = 0).
+              const halfH = fs * 0.45
+              const l = cx - w / 2
+              const right = cx + w / 2
+              const force = isHovered || (anyHi && (isHiTag || isNeighbor))
+              let chosenTy = baseTy
+              let chosenTop = baseTy - halfH
+              let chosenBottom = baseTy + halfH
+              // Try natural first, then alternate ±k × step until clear.
+              // Cap at the distance that lands the label just above or
+              // below the bubble (centre offset = r + halfH).
+              if (hits(l, right, chosenTop, chosenBottom) && !force) {
+                const stepSize = fs * 0.1
+                const numSteps = Math.max(1, Math.ceil((r + halfH) / stepSize))
+                for (let k = 1; k <= numSteps; k++) {
+                  const dy = k * stepSize
+                  const upTop = baseTy - dy - halfH
+                  const upBottom = baseTy - dy + halfH
+                  if (!hits(l, right, upTop, upBottom)) {
+                    chosenTy = baseTy - dy
+                    chosenTop = upTop
+                    chosenBottom = upBottom
+                    break
+                  }
+                  const downTop = baseTy + dy - halfH
+                  const downBottom = baseTy + dy + halfH
+                  if (!hits(l, right, downTop, downBottom)) {
+                    chosenTy = baseTy + dy
+                    chosenTop = downTop
+                    chosenBottom = downBottom
+                    break
+                  }
+                }
+              }
+              ctx.globalAlpha = dim ? labelAlpha * 0.3 : labelAlpha
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ;(ctx as any).letterSpacing = `${fs * 0.04}px`
+              ctx.lineWidth = 2.5 / globalScale
+              ctx.strokeStyle = strokeColor
+              ctx.strokeText(n.id, cx, chosenTy)
+              ctx.fillStyle = textColor
+              ctx.fillText(n.id, cx, chosenTy)
+              drawn.push([l, right, chosenTop, chosenBottom])
+            }
+            ctx.globalAlpha = 1
           }}
           linkVisibility={linkVisibility}
           linkColor={linkColor}
