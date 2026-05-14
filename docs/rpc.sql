@@ -9,6 +9,13 @@
 --   p_year int default null    — null = all-time, int = restrict to that year
 --   p_include_tags text[]      — album must have ALL these tag names
 --   p_exclude_tags text[]      — album must have NONE of these tag names
+--
+-- Year filter is sargable: a.date >= make_date(p_year, 1, 1)
+--                           AND a.date < make_date(p_year + 1, 1, 1)
+-- Do NOT use `extract(year FROM a.date) = p_year` in a WHERE clause —
+-- it disables the btree on albums.date and forces a seq scan.
+-- Required index (verify with `\d albums` in Supabase SQL editor):
+--   CREATE INDEX IF NOT EXISTS idx_albums_date ON albums(date);
 
 
 -- ---------------------------------------------------------------------------
@@ -61,7 +68,7 @@ as $$
   WITH matching_albums AS (
     SELECT a.id
     FROM albums a
-    WHERE (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+    WHERE (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
       AND (cardinality(p_include_tags) = 0 OR a.id IN (
         SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
         WHERE t.name = ANY(p_include_tags)
@@ -110,7 +117,7 @@ as $$
   SELECT h.id, h.name, h.image_id, h.url, count(*)::bigint
   FROM albums a
   JOIN hosts h ON h.id = a.host_id
-  WHERE (p_year IS NULL OR extract(year FROM a.date) = p_year)
+  WHERE (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
     AND (cardinality(p_include_tags) = 0 OR a.id IN (
       SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
       WHERE t.name = ANY(p_include_tags)
@@ -142,7 +149,7 @@ language sql stable
 as $$
   SELECT a.date, count(*)::bigint
   FROM albums a
-  WHERE (p_year IS NULL OR extract(year FROM a.date) = p_year)
+  WHERE (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
     AND (cardinality(p_include_tags) = 0 OR a.id IN (
       SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
       WHERE t.name = ANY(p_include_tags)
@@ -201,7 +208,7 @@ as $$
         ELSE                          30
       END AS bucket_width
     FROM albums a
-    WHERE (p_year IS NULL OR extract(year FROM a.date) = p_year)
+    WHERE (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
       AND duration_sec IS NOT NULL AND duration_sec > 0
       AND (cardinality(p_include_tags) = 0 OR a.id IN (
         SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
@@ -258,7 +265,7 @@ as $$
         WHEN num_tracks > 20 THEN 10
       END AS bucket_width
     FROM albums a
-    WHERE (p_year IS NULL OR extract(year FROM a.date) = p_year)
+    WHERE (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
       AND num_tracks IS NOT NULL AND num_tracks > 0
       AND (cardinality(p_include_tags) = 0 OR a.id IN (
         SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
@@ -436,7 +443,8 @@ language sql stable
 as $$
   SELECT count(*)::bigint
   FROM albums a
-  WHERE extract(year FROM a.date)::int = p_year
+  WHERE a.date >= make_date(p_year, 1, 1)
+    AND a.date < make_date(p_year + 1, 1, 1)
     AND (p_up_to IS NULL OR a.date <= p_up_to)
     AND (cardinality(p_include_tags) = 0 OR a.id IN (
       SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
@@ -506,7 +514,7 @@ as $$
     SELECT CASE extract(dow FROM a.date)::int WHEN 0 THEN 6 ELSE extract(dow FROM a.date)::int - 1 END AS idx
     FROM albums a
     WHERE a.date IS NOT NULL
-      AND (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+      AND (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
       AND (cardinality(p_include_tags) = 0 OR a.id IN (
         SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
         WHERE t.name = ANY(p_include_tags)
@@ -546,7 +554,7 @@ as $$
     SELECT extract(month FROM a.date)::int AS m
     FROM albums a
     WHERE a.date IS NOT NULL
-      AND (p_year IS NULL OR extract(year FROM a.date)::int = p_year)
+      AND (p_year IS NULL OR (a.date >= make_date(p_year, 1, 1) AND a.date < make_date(p_year + 1, 1, 1)))
       AND (cardinality(p_include_tags) = 0 OR a.id IN (
         SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
         WHERE t.name = ANY(p_include_tags)

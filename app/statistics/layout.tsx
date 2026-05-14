@@ -3,23 +3,15 @@ import StatsScopeNav from "@/components/StatsScopeNav"
 import FilterChipsSlot from "@/components/FilterChipsSlot"
 import YearReleaseCount from "@/components/YearReleaseCount"
 import { fetchPastYears, fetchTotalCount } from "@/lib/supabase"
+import { tryOrNull } from "@/lib/stats"
 import { Suspense } from "react"
-
-async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await fn()
-  } catch (e) {
-    console.error(`${label} failed:`, e)
-    return fallback
-  }
-}
 
 export default async function StatsLayout({ children }: { children: React.ReactNode }) {
   await connection()
   const currentYear = new Date().getUTCFullYear()
   const [pastYears, totalCount] = await Promise.all([
-    safe("fetchPastYears", fetchPastYears, [] as number[]),
-    safe<number | null>("fetchTotalCount", fetchTotalCount, null),
+    tryOrNull("fetchPastYears", fetchPastYears).then((v) => v ?? ([] as number[])),
+    tryOrNull("fetchTotalCount", fetchTotalCount),
   ])
   const years = [currentYear, ...pastYears]
 
