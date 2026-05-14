@@ -11,13 +11,12 @@ import type { TagCount, TagPair } from "@/lib/tagGraphLogic"
 
 export type GraphCategory = "genre" | "theme" | "all"
 
-// Tag pairs is a self-join over the top-K tag set; cost ~ C(K, 2). On
-// the prod 8s statement timeout the unfiltered (`p_category = null`)
-// query starts failing around K = 500-700 because the join touches the
-// full album_tags table with no category constraint. K = 300 leaves
-// enough headroom for the build prerender while still surfacing the
-// most-used 300 tags across every category.
-const ALL_TOP_K = 300
+// Tag pairs is a self-join over the top-K tag set; cost ~ C(K, 2). The
+// unfiltered (`p_category = null`) plan touches the full album_tags
+// table with no category constraint, so K must stay under the 8s
+// Supabase statement timeout. 500 is the empirical ceiling on the
+// current corpus; bump cautiously if the prerender ever fails again.
+const ALL_TOP_K = 500
 
 export async function fetchTagGraph(
   category: GraphCategory,
