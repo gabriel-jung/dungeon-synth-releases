@@ -310,7 +310,12 @@ as $$
     SELECT t.name, count(*)::bigint AS n
     FROM album_tags at
     JOIN tags t ON t.id = at.tag_id
-    WHERE p_category IS NULL OR t.category = p_category
+    -- COALESCE keeps the predicate sargable: when `p_category` is given,
+    -- this reduces to `t.category = p_category` and the prepared-statement
+    -- planner can still use the index on `tags.category`. When NULL it
+    -- becomes the tautology `t.category = t.category` (always true), so
+    -- /graphs/all gets every tag.
+    WHERE t.category = COALESCE(p_category, t.category)
     GROUP BY t.name
     ORDER BY n DESC, t.name ASC
     LIMIT p_top_k
@@ -345,7 +350,9 @@ as $$
     SELECT t.id, t.name
     FROM tags t
     JOIN album_tags at ON at.tag_id = t.id
-    WHERE p_category IS NULL OR t.category = p_category
+    -- Same COALESCE trick as tag_counts so the index path is kept for
+    -- the per-category callers; NULL = all tags eligible.
+    WHERE t.category = COALESCE(p_category, t.category)
     GROUP BY t.id, t.name
     ORDER BY count(*) DESC, t.name ASC
     LIMIT p_top_k
