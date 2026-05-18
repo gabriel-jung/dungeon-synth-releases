@@ -394,13 +394,26 @@ $$;
 -- Paginated album listing with tag filters and date-keyset pagination.
 -- `p_before` / `p_after` are open bounds (strict <, >). Sorted newest-first.
 -- Drives the filtered-path of the home release list and /api/albums/by-scope.
+--
+-- `p_artist`, `p_host_id`, `p_year` push the scope-modal entity filters into
+-- SQL so we no longer fetch 200 tag-matched rows just to keep the 3 that
+-- match a given artist. NULL on any of them means "no filter on this axis".
+--
+-- Signature change (added p_artist/p_host_id/p_year). Must DROP first
+-- because `create or replace` only matches identical signatures; adding
+-- params creates an overload PostgREST refuses to disambiguate.
 -- ---------------------------------------------------------------------------
+drop function if exists list_filtered_albums(text[], text[], date, date, int);
+
 create or replace function list_filtered_albums(
   p_include_tags text[] default array[]::text[],
   p_exclude_tags text[] default array[]::text[],
   p_before date default null,
   p_after date default null,
-  p_limit int default 500
+  p_limit int default 500,
+  p_artist text default null,
+  p_host_id int8 default null,
+  p_year int default null
 )
 returns table(
   id int8,
@@ -422,8 +435,12 @@ as $$
   FROM albums a
   JOIN hosts h ON h.id = a.host_id
   WHERE
-    (p_before IS NULL OR a.date < p_before)
-    AND (p_after IS NULL OR a.date > p_after)
+    (p_before  IS NULL OR a.date < p_before)
+    AND (p_after   IS NULL OR a.date > p_after)
+    AND (p_artist  IS NULL OR a.artist = p_artist)
+    AND (p_host_id IS NULL OR a.host_id = p_host_id)
+    AND (p_year    IS NULL OR (a.date >= make_date(p_year, 1, 1)
+                               AND a.date < make_date(p_year + 1, 1, 1)))
     AND (cardinality(p_include_tags) = 0 OR a.id IN (
       SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
       WHERE t.name = ANY(p_include_tags)
@@ -481,9 +498,22 @@ $$;
 --
 -- No title-dedupe: the same release may legitimately exist as multiple rows
 -- when an album is uploaded both to the artist's self-host and to a label's
--- host (common in the scene — usually different art, tracklist, or physical
+-- host (common in the scene, usually different art, tracklist, or physical
 -- edition). Each is a distinct bandcamp release, and search should surface
 -- all of them so users can pick the specific edition they want.
+--
+-- Required indexes for sub-linear `ILIKE '%q%'` (without these, Postgres
+-- falls back to a sequential scan; fine at small corpus, painful past ~30k
+-- rows). pg_trgm builds a GIN of overlapping 3-grams that the planner uses
+-- automatically for substring matches:
+--   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+--   CREATE INDEX IF NOT EXISTS idx_albums_artist_trgm
+--     ON albums USING gin (artist gin_trgm_ops);
+--   CREATE INDEX IF NOT EXISTS idx_albums_title_trgm
+--     ON albums USING gin (title  gin_trgm_ops);
+--   CREATE INDEX IF NOT EXISTS idx_hosts_name_trgm
+--     ON hosts  USING gin (name   gin_trgm_ops);
+-- Verify with `EXPLAIN ANALYZE` (expect Bitmap Index Scan, not Seq Scan).
 -- ---------------------------------------------------------------------------
 create or replace function search_all(
   p_q text,
