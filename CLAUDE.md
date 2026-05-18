@@ -75,6 +75,7 @@ Parked, don't propose: Louvain cluster browser, TagGraph polish (search-to-focus
 ## Deferred infra triggers
 
 - **Hosting upgrade**: revisit if Supabase DB > ~300MB or egress > ~3GB/month.
+- **Compute upgrade**: free-tier shared vCPU is the latency ceiling. Any full-corpus scan (~40k `albums` rows) costs ~700ms regardless of SQL, so query rewrites can't push past it. Trigger: uncached stats RPCs regularly exceed ~1s, or statement timeouts recur after a fresh `ANALYZE`. Fix is the Supabase Pro plan plus a dedicated compute add-on (~$25/mo plan, ~+$10/mo small compute), not more indexes.
 - **Artwork fallback**: defer until Bandcamp hotlink-blocks. Placeholder tile is the fallback.
 - **Artist/label entity pages**: only when artist identity is stable (alias table or upstream IDs).
 
