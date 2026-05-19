@@ -26,7 +26,7 @@ export function AlbumGrid({
   )
 }
 
-export function ReleaseCard({
+function ReleaseCard({
   album,
   hideHost = false,
   showDate = false,

@@ -14,30 +14,12 @@ export const ALBUM_LIST_SELECT = "id, date, artist, title, url, art_id, hosts!in
 // Shared Cache-Control header for JSON API routes. 1h CDN cache + 1d SWR.
 export const HTTP_CACHE_1H = "public, s-maxage=3600, stale-while-revalidate=86400"
 
-export function yearCountQuery(year: number, upTo: string) {
+function yearCountQuery(year: number, upTo: string) {
   return supabase
     .from("albums")
     .select("*", { count: "exact", head: true })
     .gte("date", `${year}-01-01`)
     .lte("date", upTo)
-}
-
-// Page through a Supabase select, 1000 rows at a time, until exhausted.
-// `fetchPage` returns the rows for a given [from, to] window.
-export async function paginateAll<T>(
-  fetchPage: (from: number, to: number) => Promise<T[] | null>,
-  pageSize = 1000,
-): Promise<T[]> {
-  const out: T[] = []
-  let from = 0
-  while (true) {
-    const data = await fetchPage(from, from + pageSize - 1)
-    if (!data || data.length === 0) break
-    out.push(...data)
-    if (data.length < pageSize) break
-    from += pageSize
-  }
-  return out
 }
 
 export async function fetchTagsByCategory(category: string): Promise<string[]> {

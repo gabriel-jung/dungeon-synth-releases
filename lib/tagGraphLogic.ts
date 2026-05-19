@@ -112,7 +112,7 @@ export function edgeEndpoints(e: TagEdge): [string, string] {
 // Laplace smoothing for PMI so log₂ stays defined when counts are tiny.
 const PMI_ALPHA = 1
 
-export function weightFor(
+function weightFor(
   metric: Metric,
   countA: number,
   countB: number,
@@ -262,7 +262,7 @@ function louvainAggregate(g: LouvainGraph, partition: Map<string, number>): {
   }
 }
 
-export function detectCommunities(nodes: TagNode[], edges: TagEdge[]): Record<string, number> {
+function detectCommunities(nodes: TagNode[], edges: TagEdge[]): Record<string, number> {
   const originalIds = nodes.map((n) => n.id)
   const adj = new Map<string, Map<string, number>>()
   for (const id of originalIds) adj.set(id, new Map())
@@ -300,7 +300,7 @@ export function detectCommunities(nodes: TagNode[], edges: TagEdge[]): Record<st
 // Louvain numbers communities by discovery order; reassign so cluster 0 is
 // the community that contains the highest-count tag, etc. Keeps colors stable
 // across re-renders since the palette is indexed.
-export function stabilizeClusters(
+function stabilizeClusters(
   comms: Record<string, number>,
   counts: Map<string, number>,
 ): Record<string, number> {

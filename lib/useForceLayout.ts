@@ -25,7 +25,7 @@ import { clusterSepFromLinkDistance, CLUSTER_COHESION_EPSILON } from "@/lib/tagG
 
 export type SpacingStats = { intra: number; inter: number; ratio: number }
 
-export type Forces = {
+type Forces = {
   repel: number
   linkDistance: number
   center: number
