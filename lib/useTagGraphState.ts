@@ -55,6 +55,7 @@ export function useTagGraphState(maxTopN: number) {
   const [nodeScale, setNodeScale] = useState<number>(DEFAULTS.nodeScale)
   const [nodeOpacity, setNodeOpacity] = useState<number>(DEFAULTS.nodeOpacity)
   const [labelSize, setLabelSize] = useState<number>(DEFAULTS.labelSize)
+  const [labelAutoSize, setLabelAutoSize] = useState<boolean>(DEFAULTS.labelAutoSize)
   const [labelPos, setLabelPos] = useState<LabelPos>(initial.labelPos)
   const [textFade, setTextFade] = useState<number>(initial.textFade)
   const [focusOnHover, setFocusOnHover] = useState<boolean>(initial.focusOnHover)
@@ -126,6 +127,7 @@ export function useTagGraphState(maxTopN: number) {
     setNodeScale(DEFAULTS.nodeScale)
     setNodeOpacity(DEFAULTS.nodeOpacity)
     setLabelSize(DEFAULTS.labelSize)
+    setLabelAutoSize(DEFAULTS.labelAutoSize)
     setLabelPos(DEFAULTS.labelPos)
     setTextFade(DEFAULTS.textFade)
     setFocusOnHover(DEFAULTS.focusOnHover)
@@ -147,6 +149,7 @@ export function useTagGraphState(maxTopN: number) {
     nodeScale, setNodeScale,
     nodeOpacity, setNodeOpacity,
     labelSize, setLabelSize,
+    labelAutoSize, setLabelAutoSize,
     labelPos, setLabelPos,
     textFade, setTextFade,
     focusOnHover, setFocusOnHover,

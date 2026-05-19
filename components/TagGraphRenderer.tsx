@@ -22,7 +22,7 @@ type FgMethods = ForceGraphMethods<any, any>
 
 export type HoverInfo =
   | { kind: "node"; name: string; count: number; conns: number }
-  | { kind: "edge"; a: string; b: string; inter: number; weight: number }
+  | { kind: "edge"; a: string; b: string; inter: number }
 
 // Canvas ctx.fillStyle won't evaluate CSS custom-property strings, so we
 // resolve the active theme's hex once and convert to rgba() with alpha
@@ -47,6 +47,18 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export type ThemeColors = { font: string; text: string; textDim: string; bg: string }
+
+// Label fade is driven by on-screen circle size: a label appears once its
+// circle is at least LABEL_MIN_R px on screen and reaches full opacity
+// LABEL_FADE_R px above that. Canvas fonts are world-space, so without this
+// a label rendered while zoomed out is unreadably tiny. Tying it to circle
+// screen size also gives level-of-detail for free: big circles cross the
+// threshold while zoomed out, small ones only once zoomed in.
+// A shown label ramps from LABEL_MIN_ALPHA (not 0) to 1, so it is never
+// near-invisible and same-size labels do not drift far apart in opacity.
+const LABEL_MIN_R = 9
+const LABEL_FADE_R = 9
+const LABEL_MIN_ALPHA = 0.6
 
 function readThemeColors(): ThemeColors {
   if (typeof document === "undefined") {
@@ -85,6 +97,7 @@ type Props = {
   nodeScale: number
   nodeOpacity: number
   labelSize: number
+  labelAutoSize: boolean
   labelPos: LabelPos
   textFade: number
   focusOnHover: boolean
@@ -117,6 +130,7 @@ export default function TagGraphRenderer({
   nodeScale,
   nodeOpacity,
   labelSize,
+  labelAutoSize,
   labelPos,
   textFade,
   focusOnHover,
@@ -160,17 +174,34 @@ export default function TagGraphRenderer({
     [maxCount, nodeScale],
   )
 
-  const fontScale = useMemo(
-    () => scaleLinear().domain([1, maxCount]).range([6.5 * labelSize, 10.5 * labelSize]),
-    [maxCount, labelSize],
-  )
+  // labelAutoSize off: every label flat at the [7, 12] range midpoint, so
+  // toggling the mode does not jump the average label size.
+  const fontScale = useMemo(() => {
+    if (!labelAutoSize) {
+      const flat = 9.5 * labelSize
+      return () => flat
+    }
+    // Linear (not sqrt): sqrt is concave and pulled every high-count tag up
+    // near the ceiling, so the 2nd-biggest looked almost as big as the
+    // biggest. Linear spreads them. The on-screen fade keeps the low floor
+    // readable: small labels only render once zoomed in.
+    return scaleLinear().domain([1, maxCount]).range([7 * labelSize, 12 * labelSize])
+  }, [maxCount, labelSize, labelAutoSize])
 
   // Font strings are parsed by the Canvas API each time `ctx.font = …` is
   // assigned. At 1000 nodes/frame that's 60k parses/sec. Cache per count.
   const fontStringCache = useMemo(
     () => new Map<number, string>(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [maxCount, labelSize, fontFamily],
+    [maxCount, labelSize, labelAutoSize, fontFamily],
+  )
+
+  // letterSpacing string, set per node per frame; cache per count, same
+  // parse-avoidance rationale as fontStringCache.
+  const letterSpacingCache = useMemo(
+    () => new Map<number, string>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [maxCount, labelSize, labelAutoSize, fontFamily],
   )
 
   // Label-width cache: each `ctx.measureText(label)` triggers a CSS-layout
@@ -180,7 +211,7 @@ export default function TagGraphRenderer({
   const labelWidthCache = useMemo(
     () => new Map<string, number>(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [maxCount, labelSize, fontFamily],
+    [maxCount, labelSize, labelAutoSize, fontFamily],
   )
 
   const maxWeight = useMemo(() => {
@@ -246,11 +277,10 @@ export default function TagGraphRenderer({
     return l === hoveredEdge ? base * 2.5 : base
   }, [maxWeight, hoveredEdge])
 
-  // Foam-style zoom-driven label fade. Higher `textFade` = labels appear at
-  // lower zoom. Smoothly interpolates label alpha through the fade band
-  // instead of the previous hard-cutoff threshold.
-  const fadeLo = useMemo(() => 1.2 - textFade * 0.5, [textFade])
-  const fadeHi = useMemo(() => 2.0 - textFade * 0.5, [textFade])
+  // "Label visibility" slider scales the on-screen circle size the label
+  // fade sees. Higher = labels appear at lower zoom. Default (textFade 0.5)
+  // lands at 1.0, the few biggest tags show, the rest wait for zoom-in.
+  const visGain = useMemo(() => textFade * 2, [textFade])
 
   const labelYOffset = (r: number) => {
     if (labelPos === "above") return -(r + 4)
@@ -307,7 +337,7 @@ export default function TagGraphRenderer({
             if (!l) { setHover(null); setHoveredEdge(null); return }
             const le = l as TagEdge
             const [a, b] = edgeEndpoints(le)
-            setHover({ kind: "edge", a, b, inter: le.inter, weight: le.weight })
+            setHover({ kind: "edge", a, b, inter: le.inter })
             setHoveredEdge(le)
           }}
           onZoomEnd={(t) => {
@@ -389,8 +419,6 @@ export default function TagGraphRenderer({
             // by up to ~2 line-heights; if no clear slot is found, the
             // label is dropped (the bubble is still visible). Hovered +
             // its direct neighbours always draw at the natural position.
-            const labelAlpha = Math.min(1, Math.max(0, (globalScale - fadeLo) / (fadeHi - fadeLo)))
-            if (labelAlpha <= 0) return
             const anyHi = hiTags.size > 0
             ctx.textAlign = "center"
             ctx.textBaseline = labelBaseline()
@@ -411,7 +439,13 @@ export default function TagGraphRenderer({
               const isNeighbor = hiNeighbors.has(n.id)
               const isHiTag = hiTags.has(n.id)
               const dim = anyHi && !isHiTag && !isNeighbor
+              const force = isHovered || (anyHi && (isHiTag || isNeighbor))
               const baseR = rScale(n.count)
+              const fadeRaw = (baseR * globalScale * visGain - LABEL_MIN_R) / LABEL_FADE_R
+              const nodeAlpha = fadeRaw <= 0
+                ? 0
+                : LABEL_MIN_ALPHA + Math.min(1, fadeRaw) * (1 - LABEL_MIN_ALPHA)
+              if (nodeAlpha <= 0 && !force) continue
               const r = isHovered ? baseR * 1.4 : isNeighbor ? baseR * 1.15 : baseR
               const fs = fontScale(n.count)
               let fontStr = fontStringCache.get(n.count)
@@ -420,6 +454,11 @@ export default function TagGraphRenderer({
                 fontStringCache.set(n.count, fontStr)
               }
               ctx.font = fontStr
+              let letterSp = letterSpacingCache.get(n.count)
+              if (letterSp === undefined) {
+                letterSp = `${fs * 0.04}px`
+                letterSpacingCache.set(n.count, letterSp)
+              }
               let w = labelWidthCache.get(n.id)
               if (w === undefined) {
                 w = ctx.measureText(n.id).width
@@ -432,7 +471,6 @@ export default function TagGraphRenderer({
               const halfH = fs * 0.45
               const l = cx - w / 2
               const right = cx + w / 2
-              const force = isHovered || (anyHi && (isHiTag || isNeighbor))
               let chosenTy = baseTy
               let chosenTop = baseTy - halfH
               let chosenBottom = baseTy + halfH
@@ -462,9 +500,9 @@ export default function TagGraphRenderer({
                   }
                 }
               }
-              ctx.globalAlpha = dim ? labelAlpha * 0.3 : labelAlpha
+              ctx.globalAlpha = force ? 1 : dim ? nodeAlpha * 0.3 : nodeAlpha
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ;(ctx as any).letterSpacing = `${fs * 0.04}px`
+              ;(ctx as any).letterSpacing = letterSp
               ctx.lineWidth = 2.5 / globalScale
               ctx.strokeStyle = strokeColor
               ctx.strokeText(n.id, cx, chosenTy)
@@ -520,7 +558,7 @@ function HoverTooltip({ hover }: { hover: HoverInfo }) {
             {hover.a} <span className="text-text-dim">×</span> {hover.b}
           </div>
           <div className="text-text-dim font-display tracking-wide text-[10px] uppercase mt-0.5">
-            {hover.inter} shared albums · strength {hover.weight.toFixed(2)}
+            {hover.inter} shared albums
           </div>
         </>
       )}

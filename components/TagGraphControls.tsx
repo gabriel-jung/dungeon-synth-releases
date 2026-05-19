@@ -475,6 +475,14 @@ export default function TagGraphSettingsPanel({
             />
           </SliderRow>
 
+          <Toggle
+            checked={state.labelAutoSize}
+            onChange={state.setLabelAutoSize}
+            title="On: bigger tags get bigger labels. Off: every label the same size."
+          >
+            Scale labels by node size
+          </Toggle>
+
           <SliderRow
             label="Label size"
             title="Font-size multiplier."

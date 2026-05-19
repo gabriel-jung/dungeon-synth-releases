@@ -13,6 +13,7 @@ export const DEFAULTS = {
   nodeScale: 1,
   nodeOpacity: 0.9,
   labelSize: 1,
+  labelAutoSize: true,
   labelPos: "inside" as LabelPos,
   textFade: 0.5,
   focusOnHover: true,
@@ -26,7 +27,7 @@ export const DEFAULTS = {
   clusterCohesion: 1,
 } as const
 
-export const FALLBACK_TOP_N = 100
+const FALLBACK_TOP_N = 100
 
 export function defaultTopN(maxTopN: number): number {
   return Math.min(FALLBACK_TOP_N, maxTopN)

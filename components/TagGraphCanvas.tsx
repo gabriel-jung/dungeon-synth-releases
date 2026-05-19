@@ -313,6 +313,7 @@ export default function TagGraphCanvas({
         nodeScale={state.nodeScale}
         nodeOpacity={state.nodeOpacity}
         labelSize={state.labelSize}
+        labelAutoSize={state.labelAutoSize}
         labelPos={state.labelPos}
         textFade={state.textFade}
         focusOnHover={state.focusOnHover}
