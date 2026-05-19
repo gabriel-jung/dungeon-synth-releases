@@ -132,6 +132,10 @@ export default function TagGraphRenderer({
   const { font: fontFamily, text: textColor, textDim: textDimColor, bg: bgColor } = themeColors
 
   const [hover, setHover] = useState<HoverInfo | null>(null)
+  // Hovered edge gets a visual lift (brighter + thicker), the link-side
+  // equivalent of the node hover enlarge. Local-only: edges have no stable
+  // id to route through the parent's focus state.
+  const [hoveredEdge, setHoveredEdge] = useState<TagEdge | null>(null)
 
   // Touch devices fire onNodeHover on tap but never onMouseMove, so the
   // tooltip would land at (0,0). Skip hover UI on coarse pointers.
@@ -221,6 +225,7 @@ export default function TagGraphRenderer({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkColor = useCallback((l: any) => {
+    if (l === hoveredEdge) return hexToRgba(textColor, 0.95)
     const s = l.source as TagNode
     const t = l.target as TagNode
     const same = s.cluster === t.cluster
@@ -233,10 +238,13 @@ export default function TagGraphRenderer({
     return same
       ? hexToRgba(textColor, alpha)
       : hexToRgba(textDimColor, alpha)
-  }, [hiTags, hiNeighbors, textColor, textDimColor])
+  }, [hiTags, hiNeighbors, textColor, textDimColor, hoveredEdge])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const linkWidth = useCallback((l: any) => 0.5 + ((l as TagEdge).weight / maxWeight) * 2, [maxWeight])
+  const linkWidth = useCallback((l: any) => {
+    const base = 0.5 + ((l as TagEdge).weight / maxWeight) * 2
+    return l === hoveredEdge ? base * 2.5 : base
+  }, [maxWeight, hoveredEdge])
 
   // Foam-style zoom-driven label fade. Higher `textFade` = labels appear at
   // lower zoom. Smoothly interpolates label alpha through the fade band
@@ -296,10 +304,11 @@ export default function TagGraphRenderer({
           }}
           onLinkHover={(l) => {
             if (coarsePointerRef.current) return
-            if (!l) { setHover(null); return }
+            if (!l) { setHover(null); setHoveredEdge(null); return }
             const le = l as TagEdge
             const [a, b] = edgeEndpoints(le)
             setHover({ kind: "edge", a, b, inter: le.inter, weight: le.weight })
+            setHoveredEdge(le)
           }}
           onZoomEnd={(t) => {
             // ForceGraph fires this synchronously inside its render path;
@@ -469,8 +478,8 @@ export default function TagGraphRenderer({
           linkColor={linkColor}
           linkWidth={linkWidth}
           backgroundColor="transparent"
-          minZoom={0.2}
-          maxZoom={8}
+          minZoom={0.1}
+          maxZoom={16}
         />
       )}
 

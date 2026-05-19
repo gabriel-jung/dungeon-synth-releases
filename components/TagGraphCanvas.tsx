@@ -21,6 +21,17 @@ import type { ForceGraphMethods } from "react-force-graph-2d"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FgMethods = ForceGraphMethods<any, any>
 
+// Zoom slider bounds. The slider track is log-mapped so 1x sits near the
+// middle and a step feels equal whether you zoom in or out. Keep these in
+// sync with minZoom/maxZoom on the ForceGraph2D in TagGraphRenderer.
+const ZOOM_MIN = 0.1
+const ZOOM_MAX = 16
+const ZOOM_SPAN = ZOOM_MAX / ZOOM_MIN
+// Slider position (0..1) <-> zoom factor.
+const posToZoom = (p: number) => ZOOM_MIN * ZOOM_SPAN ** p
+const zoomToPos = (k: number) =>
+  Math.log(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k)) / ZOOM_MIN) / Math.log(ZOOM_SPAN)
+
 export default function TagGraphCanvas({
   counts,
   pairs,
@@ -386,8 +397,8 @@ export default function TagGraphCanvas({
                     </button>
                   </div>
                   <input
-                    type="range" min={0.3} max={5} step={0.05} value={zoomLevel}
-                    onChange={(e) => setZoomFromSlider(Number(e.target.value))}
+                    type="range" min={0} max={1} step={0.005} value={zoomToPos(zoomLevel)}
+                    onChange={(e) => setZoomFromSlider(posToZoom(Number(e.target.value)))}
                     aria-label="Zoom"
                     className="w-full accent-accent"
                   />
