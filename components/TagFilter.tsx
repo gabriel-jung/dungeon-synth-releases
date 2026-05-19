@@ -37,9 +37,14 @@ function TagButton({
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
+        aria-label="Tag Filter"
         className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-text transition-colors cursor-pointer flex items-center gap-1.5"
       >
-        <span aria-hidden="true">{open ? "▾" : "▸"}</span> Tag Filter
+        <span aria-hidden="true" className="hidden sm:inline">{open ? "▾" : "▸"}</span>
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="sm:hidden w-3.5 h-3.5 fill-current">
+          <path d="M1 2h14l-5 6v6l-4-2V8z" />
+        </svg>
+        <span className="hidden sm:inline">Tag Filter</span>
         {activeCount > 0 && (
           <span className="bg-accent/20 text-accent text-[10px] px-1.5 rounded-full">
             {activeCount}
@@ -49,7 +54,7 @@ function TagButton({
       <span
         title="Tags scraped from Bandcamp release pages"
         aria-label="Tags scraped from Bandcamp release pages"
-        className="font-display text-[10px] text-text-dim/60 hover:text-text-dim cursor-help border border-text-dim/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none"
+        className="hidden sm:flex font-display text-[10px] text-text-dim/60 hover:text-text-dim cursor-help border border-text-dim/30 rounded-full w-3.5 h-3.5 items-center justify-center leading-none"
       >
         ?
       </span>
