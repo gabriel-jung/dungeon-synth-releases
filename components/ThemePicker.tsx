@@ -69,7 +69,7 @@ export default function ThemePicker() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-8 h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
+        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
         style={{
           background: `linear-gradient(135deg, ${current.bg} 50%, ${current.accent} 50%)`,
         }}
