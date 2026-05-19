@@ -396,13 +396,15 @@ $$;
 -- Drives the filtered-path of the home release list and /api/albums/by-scope.
 --
 -- `p_artist`, `p_host_id`, `p_year` push the scope-modal entity filters into
--- SQL so we no longer fetch 200 tag-matched rows just to keep the 3 that
--- match a given artist. NULL on any of them means "no filter on this axis".
+-- SQL. NULL on any of them means "no filter on this axis".
 --
--- Signature change (added p_artist/p_host_id/p_year). Must DROP first
--- because `create or replace` only matches identical signatures; adding
--- params creates an overload PostgREST refuses to disambiguate.
+-- plpgsql with a branch on p_include_tags. With an include filter, the query
+-- drives FROM the tag-match set and nested-loops into albums by PK; a plain
+-- `WHERE a.id IN (subquery)` made the planner seq-scan all ~40k albums,
+-- since it cannot estimate a subquery's cardinality. The no-include branch
+-- is a plain scan, nothing selective to drive from.
 -- ---------------------------------------------------------------------------
+-- drop clears the original 5-arg signature; no-op once migrated.
 drop function if exists list_filtered_albums(text[], text[], date, date, int);
 
 create or replace function list_filtered_albums(
@@ -427,32 +429,63 @@ returns table(
   host_image_id int8,
   host_url text
 )
-language sql stable
+language plpgsql stable
 as $$
-  SELECT
-    a.id, a.artist, a.title, a.url, a.date, a.art_id,
-    h.id AS host_id, h.name AS host_name, h.image_id AS host_image_id, h.url AS host_url
-  FROM albums a
-  JOIN hosts h ON h.id = a.host_id
-  WHERE
-    (p_before  IS NULL OR a.date < p_before)
-    AND (p_after   IS NULL OR a.date > p_after)
-    AND (p_artist  IS NULL OR a.artist = p_artist)
-    AND (p_host_id IS NULL OR a.host_id = p_host_id)
-    AND (p_year    IS NULL OR (a.date >= make_date(p_year, 1, 1)
-                               AND a.date < make_date(p_year + 1, 1, 1)))
-    AND (cardinality(p_include_tags) = 0 OR a.id IN (
-      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
-      WHERE t.name = ANY(p_include_tags)
-      GROUP BY at.album_id
-      HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
-    ))
-    AND (cardinality(p_exclude_tags) = 0 OR a.id NOT IN (
-      SELECT at.album_id FROM album_tags at JOIN tags t ON t.id = at.tag_id
-      WHERE t.name = ANY(p_exclude_tags)
-    ))
-  ORDER BY a.date DESC
-  LIMIT p_limit;
+-- #variable_conflict use_column: output-column names (id, date, url, ...)
+-- collide with albums column names; resolve any bare reference to the column.
+#variable_conflict use_column
+begin
+  -- Both branches share SELECT columns, WHERE, ORDER BY and LIMIT; only the
+  -- FROM driver differs. Edit them in lockstep.
+  if cardinality(p_include_tags) > 0 then
+    return query
+      SELECT
+        a.id, a.artist, a.title, a.url, a.date, a.art_id,
+        h.id AS host_id, h.name AS host_name, h.image_id AS host_image_id, h.url AS host_url
+      FROM (
+        SELECT at.album_id
+        FROM album_tags at JOIN tags t ON t.id = at.tag_id
+        WHERE t.name = ANY(p_include_tags)
+        GROUP BY at.album_id
+        HAVING count(DISTINCT t.name) = cardinality(p_include_tags)
+      ) inc
+      JOIN albums a ON a.id = inc.album_id
+      JOIN hosts h ON h.id = a.host_id
+      WHERE
+        (p_before  IS NULL OR a.date < p_before)
+        AND (p_after   IS NULL OR a.date > p_after)
+        AND (p_artist  IS NULL OR a.artist = p_artist)
+        AND (p_host_id IS NULL OR a.host_id = p_host_id)
+        AND (p_year    IS NULL OR (a.date >= make_date(p_year, 1, 1)
+                                   AND a.date < make_date(p_year + 1, 1, 1)))
+        AND (cardinality(p_exclude_tags) = 0 OR NOT EXISTS (
+          SELECT 1 FROM album_tags at JOIN tags t ON t.id = at.tag_id
+          WHERE at.album_id = a.id AND t.name = ANY(p_exclude_tags)
+        ))
+      ORDER BY a.date DESC
+      LIMIT p_limit;
+  else
+    return query
+      SELECT
+        a.id, a.artist, a.title, a.url, a.date, a.art_id,
+        h.id AS host_id, h.name AS host_name, h.image_id AS host_image_id, h.url AS host_url
+      FROM albums a
+      JOIN hosts h ON h.id = a.host_id
+      WHERE
+        (p_before  IS NULL OR a.date < p_before)
+        AND (p_after   IS NULL OR a.date > p_after)
+        AND (p_artist  IS NULL OR a.artist = p_artist)
+        AND (p_host_id IS NULL OR a.host_id = p_host_id)
+        AND (p_year    IS NULL OR (a.date >= make_date(p_year, 1, 1)
+                                   AND a.date < make_date(p_year + 1, 1, 1)))
+        AND (cardinality(p_exclude_tags) = 0 OR NOT EXISTS (
+          SELECT 1 FROM album_tags at JOIN tags t ON t.id = at.tag_id
+          WHERE at.album_id = a.id AND t.name = ANY(p_exclude_tags)
+        ))
+      ORDER BY a.date DESC
+      LIMIT p_limit;
+  end if;
+end;
 $$;
 
 

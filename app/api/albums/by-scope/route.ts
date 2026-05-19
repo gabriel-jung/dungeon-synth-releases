@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server"
 import { supabase, HTTP_CACHE_1H, rpcRowToAlbumListItem } from "@/lib/supabase"
-import { dedupeById } from "@/lib/types"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
 import { logger } from "@/lib/logger"
 
@@ -37,6 +36,21 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // host_id / year arrive as raw query strings. Coerce up front so a
+  // malformed value is a clean 400, not a NaN that JSON-serialises to null
+  // and silently drops the filter.
+  const hostIdNum = hostId ? Number(hostId) : null
+  const yearNum = year ? Number(year) : null
+  if (
+    (hostIdNum !== null && !Number.isInteger(hostIdNum)) ||
+    (yearNum !== null && !Number.isInteger(yearNum))
+  ) {
+    return Response.json(
+      { error: "host_id and year must be integers" },
+      { status: 400 },
+    )
+  }
+
   const allInclude = [...tags, ...genres]
   const allExclude = [...xtags, ...xgenres]
   // Entity-scoped catalogues are bounded (one artist / one host), so 500 is
@@ -44,8 +58,8 @@ export async function GET(request: NextRequest) {
   // the cover-grid payload tight (modal pages further if needed).
   const limit = artist || hostId ? 500 : 100
 
-  const hostMetaPromise = hostId
-    ? supabase.from("hosts").select("id, name, image_id, url").eq("id", hostId).maybeSingle()
+  const hostMetaPromise = hostIdNum !== null
+    ? supabase.from("hosts").select("id, name, image_id, url").eq("id", hostIdNum).maybeSingle()
     : null
 
   const [rpcRes, hostMeta] = await Promise.all([
@@ -56,8 +70,8 @@ export async function GET(request: NextRequest) {
       p_after: null,
       p_limit: limit,
       p_artist: artist,
-      p_host_id: hostId ? Number(hostId) : null,
-      p_year: year ? Number(year) : null,
+      p_host_id: hostIdNum,
+      p_year: yearNum,
     }),
     hostMetaPromise,
   ])
@@ -72,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   return Response.json(
     {
-      albums: dedupeById((rpcRes.data ?? []).map(rpcRowToAlbumListItem)),
+      albums: (rpcRes.data ?? []).map(rpcRowToAlbumListItem),
       host: hostMeta?.data ?? null,
     },
     { headers: { "Cache-Control": HTTP_CACHE_1H } },
