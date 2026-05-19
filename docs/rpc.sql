@@ -325,19 +325,70 @@ $$;
 
 
 -- ---------------------------------------------------------------------------
+-- tag_pair_counts  (materialized view)
+-- Full tag co-occurrence: every unordered pair of tag ids sharing at least one
+-- album, with the shared-album count `n`. Stores FK ids, not names (names stay
+-- canonical in `tags`); tag_pairs joins back for display. `at1.tag_id <
+-- at2.tag_id` guarantees tag_a_id < tag_b_id, so each pair appears once.
+-- Precomputes the album_tags self-join that timed out per-request for
+-- /graphs/all on the free-tier vCPU. Refreshed daily by refresh_tag_graph()
+-- via pg_cron (below); reads are a plain indexed scan. MVs have no
+-- create-or-replace: to change the definition run
+-- `drop materialized view if exists tag_pair_counts;` then recreate.
+-- ---------------------------------------------------------------------------
+create materialized view if not exists tag_pair_counts as
+  SELECT
+    at1.tag_id    AS tag_a_id,
+    at2.tag_id    AS tag_b_id,
+    count(*)::int AS n
+  FROM album_tags at1
+  JOIN album_tags at2 ON at1.album_id = at2.album_id AND at1.tag_id < at2.tag_id
+  GROUP BY 1, 2;
+
+create index if not exists tag_pair_counts_a_idx on tag_pair_counts (tag_a_id);
+create index if not exists tag_pair_counts_b_idx on tag_pair_counts (tag_b_id);
+
+
+-- ---------------------------------------------------------------------------
+-- refresh_tag_graph()
+-- Rebuilds the tag_pair_counts MV. SECURITY DEFINER + a local statement_timeout
+-- bump: the underlying self-join far exceeds the anon role's timeout. Plain
+-- (non-CONCURRENT) refresh, since CONCURRENTLY cannot run inside a function
+-- transaction; it takes a brief ACCESS EXCLUSIVE lock, scheduled off-peak.
+-- ---------------------------------------------------------------------------
+create or replace function refresh_tag_graph()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  set local statement_timeout = '180s';
+  refresh materialized view tag_pair_counts;
+end;
+$$;
+
+-- Daily in-database refresh at 00:00 UTC. pg_cron runs inside Postgres, so the
+-- multi-minute refresh is not bound by any Vercel function timeout. The Vercel
+-- `revalidate?tag=genres` cron is scheduled at 00:15 to bust the page cache
+-- after this completes.
+create extension if not exists pg_cron;
+select cron.schedule('refresh-tag-graph', '0 0 * * *', $$select refresh_tag_graph()$$);
+
+
+-- ---------------------------------------------------------------------------
 -- tag_pairs
--- Unordered co-occurrence pairs of tags in a given category on the same
--- album, with the shared album count. Default category is 'genre'. Feeds
--- the /genres map edges. When p_top_k is set, only considers pairs where
--- both tags are among the K most-used tags in the category — caps result
--- at C(K,2) pairs and keeps the self-join over a small tag set.
+-- Unordered co-occurrence pairs of tags in a given category, with the shared
+-- album count. Default category is 'genre'. Feeds the /graphs edges. When
+-- p_top_k is set, only pairs where both tags are among the K most-used tags
+-- in the category are returned (caps the result at C(K,2)).
 --
--- `p_category = NULL` skips the category filter (every tag eligible). The
--- caller MUST pass a sensible `p_top_k` in that case — unbounded across
--- the full tag set blows Supabase's 8s statement timeout.
+-- Reads the precomputed tag_pair_counts MV instead of self-joining album_tags
+-- live, so /graphs/all (p_category = NULL) no longer risks the statement
+-- timeout. SECURITY DEFINER so anon needs no direct grant on the MV.
 --
--- Returns a jsonb array in a single row (see tag_counts note). One HTTP
--- call regardless of pair count.
+-- Returns a jsonb array in a single row (see tag_counts note). One HTTP call
+-- regardless of pair count.
 -- ---------------------------------------------------------------------------
 create or replace function tag_pairs(
   p_category text default 'genre',
@@ -345,28 +396,28 @@ create or replace function tag_pairs(
 )
 returns jsonb
 language sql stable
+security definer
+set search_path = public
 as $$
   WITH top_tags AS (
-    SELECT t.id, t.name
+    SELECT t.id
     FROM tags t
     JOIN album_tags at ON at.tag_id = t.id
-    -- Same COALESCE trick as tag_counts so the index path is kept for
-    -- the per-category callers; NULL = all tags eligible.
+    -- COALESCE keeps the predicate sargable for per-category callers;
+    -- NULL = every tag eligible (the /graphs/all path).
     WHERE t.category = COALESCE(p_category, t.category)
-    GROUP BY t.id, t.name
-    ORDER BY count(*) DESC, t.name ASC
+    GROUP BY t.id
+    ORDER BY count(*) DESC, t.id ASC
     LIMIT p_top_k
   ),
   pairs AS (
-    SELECT
-      LEAST(t1.name, t2.name)    AS tag_a,
-      GREATEST(t1.name, t2.name) AS tag_b,
-      count(*)::bigint           AS n
-    FROM album_tags at1
-    JOIN album_tags at2 ON at1.album_id = at2.album_id AND at1.tag_id < at2.tag_id
-    JOIN top_tags t1 ON t1.id = at1.tag_id
-    JOIN top_tags t2 ON t2.id = at2.tag_id
-    GROUP BY tag_a, tag_b
+    -- Join tags twice to resolve the MV's FK ids back to display names.
+    SELECT ta.name AS tag_a, tb.name AS tag_b, tpc.n::bigint AS n
+    FROM tag_pair_counts tpc
+    JOIN tags ta ON ta.id = tpc.tag_a_id
+    JOIN tags tb ON tb.id = tpc.tag_b_id
+    WHERE tpc.tag_a_id IN (SELECT id FROM top_tags)
+      AND tpc.tag_b_id IN (SELECT id FROM top_tags)
   )
   SELECT coalesce(jsonb_agg(to_jsonb(pairs) ORDER BY n DESC, tag_a ASC, tag_b ASC), '[]'::jsonb) FROM pairs;
 $$;

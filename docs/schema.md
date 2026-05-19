@@ -1,6 +1,6 @@
 # Supabase Schema
 
-> Snapshot as of 2026-04-27. Source of truth is the live Supabase project; this file mirrors it. Update the date and the affected sections when tables or RPCs change.
+> Snapshot as of 2026-05-19. Source of truth is the live Supabase project; this file mirrors it. Update the date and the affected sections when tables or RPCs change.
 
 ## Tables
 
@@ -38,6 +38,14 @@
 | `album_id` | `int8` | FK → `albums.id` |
 | `tag_id` | `int4` | FK → `tags.id` |
 
+### `tag_pair_counts` (materialized view)
+Precomputed tag co-occurrence; drives the `/graphs` edges via `tag_pairs`. Rebuilt daily by `refresh_tag_graph()` (pg_cron, 00:00 UTC). Indexed on `tag_a_id` and `tag_b_id`. Stores tag FK ids, not names; `tag_pairs` joins `tags` to resolve names on read.
+| Column | Type | Notes |
+|--------|------|-------|
+| `tag_a_id` | `int4` | FK → `tags.id`, smaller id of the pair |
+| `tag_b_id` | `int4` | FK → `tags.id`, larger id of the pair |
+| `n` | `int4` | Albums carrying both tags |
+
 ## RPCs
 
 Bodies live in [`docs/rpc.sql`](./rpc.sql) — table below is a signature index.
@@ -47,7 +55,8 @@ All tag-filtered RPCs accept `p_include_tags text[]` (album must have ALL) and `
 | Function | Args | Returns |
 |----------|------|---------|
 | `tag_counts(p_category, p_top_k)` | category default `'genre'`; optional top-K cap | **`jsonb`** — array of `{ name, n }` in a single row (bypasses PostgREST 1000-row cap) |
-| `tag_pairs(p_category, p_top_k)` | category default `'genre'`; optional top-K cap restricts pairing to top-K tags | **`jsonb`** — array of `{ tag_a, tag_b, n }` unordered co-occurrence pairs in a single row |
+| `tag_pairs(p_category, p_top_k)` | category default `'genre'`; optional top-K cap restricts pairing to top-K tags | **`jsonb`** — array of `{ tag_a, tag_b, n }` unordered co-occurrence pairs in a single row. Reads the `tag_pair_counts` MV (SECURITY DEFINER) |
+| `refresh_tag_graph()` | — | `void` — rebuilds the `tag_pair_counts` MV (SECURITY DEFINER; called daily by pg_cron) |
 | `distinct_years()` | — | `year, n` — every year with releases + count (callers ignore `n`) |
 | `year_counts(p_include_tags, p_exclude_tags)` | tag filters | `year, n` — per-year release counts |
 | `host_counts(p_year, p_include_tags, p_exclude_tags, p_top_k)` | year-scoped; `p_top_k` default 50 | `host_id, name, image_id, url, n` |
