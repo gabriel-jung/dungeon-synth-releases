@@ -87,7 +87,9 @@ as $$
   WHERE t.category = p_category
   GROUP BY t.name
   ORDER BY n DESC
-  LIMIT p_top_k;
+  -- Server-side clamp: callers reach this directly via PostgREST, so the cap
+  -- can't live in the route handler. NULL = default cap, never unbounded.
+  LIMIT least(coalesce(p_top_k, 1000), 1000);
 $$;
 
 
@@ -130,7 +132,7 @@ as $$
     ))
   GROUP BY h.id, h.name, h.image_id, h.url
   ORDER BY count(*) DESC
-  LIMIT p_top_k;
+  LIMIT least(coalesce(p_top_k, 1000), 1000);
 $$;
 
 
@@ -318,7 +320,9 @@ as $$
     WHERE t.category = COALESCE(p_category, t.category)
     GROUP BY t.name
     ORDER BY n DESC, t.name ASC
-    LIMIT p_top_k
+    -- Server-side clamp (NULL = default cap, never unbounded). Direct
+    -- PostgREST callers bypass the route handler, so the bound lives here.
+    LIMIT least(coalesce(p_top_k, 1000), 1000)
   )
   SELECT coalesce(jsonb_agg(to_jsonb(ranked) ORDER BY n DESC, name ASC), '[]'::jsonb) FROM ranked;
 $$;
@@ -408,7 +412,9 @@ as $$
     WHERE t.category = COALESCE(p_category, t.category)
     GROUP BY t.id
     ORDER BY count(*) DESC, t.id ASC
-    LIMIT p_top_k
+    -- Server-side clamp: bounds the co-occurrence self-join at C(K,2) even
+    -- for direct PostgREST callers. NULL = default cap, never unbounded.
+    LIMIT least(coalesce(p_top_k, 1000), 1000)
   ),
   pairs AS (
     -- Join tags twice to resolve the MV's FK ids back to display names.
@@ -486,6 +492,9 @@ as $$
 -- collide with albums column names; resolve any bare reference to the column.
 #variable_conflict use_column
 begin
+  -- Server-side clamp: direct PostgREST callers bypass the route handler's
+  -- Math.min cap, so bound the page size here too. NULL = default 500.
+  p_limit := least(coalesce(p_limit, 500), 1000);
   -- Both branches share SELECT columns, WHERE, ORDER BY and LIMIT; only the
   -- FROM driver differs. Edit them in lockstep.
   if cardinality(p_include_tags) > 0 then
@@ -617,7 +626,9 @@ as $$
        or a.title  ilike '%' || p_q || '%'
        or h.name   ilike '%' || p_q || '%'
     order by a.date desc nulls last
-    limit p_limit
+    -- Server-side clamp (NULL = default 50). The route also caps, but direct
+    -- PostgREST callers don't go through it.
+    limit least(coalesce(p_limit, 50), 100)
   ) x;
 $$;
 
@@ -703,3 +714,30 @@ as $$
   GROUP BY s.m
   ORDER BY s.m;
 $$;
+
+
+-- ===========================================================================
+-- Privileges (security hardening, applied 2026-06-10)
+-- See docs/security-hardening.sql for the runnable migration + rationale.
+-- This block is the source-of-truth record of the EXECUTE / SELECT grants
+-- that must hold on the live database.
+-- ===========================================================================
+
+-- refresh_tag_graph(): owner-only. The pg_cron job runs as the table owner,
+-- so the daily refresh keeps working. anon must NOT be able to trigger the
+-- full album_tags self-join (up to 180s under an ACCESS EXCLUSIVE lock on
+-- tag_pair_counts): that is the worst single DoS / amplification primitive.
+revoke execute on function public.refresh_tag_graph() from anon, authenticated, public;
+
+-- tag_pair_counts (materialized view): MVs cannot carry RLS. All reads go
+-- through tag_pairs() (SECURITY DEFINER), so anon needs no direct SELECT.
+-- Revoke it explicitly so a future Supabase default-grant change can't expose
+-- an unbounded direct scan of the view.
+revoke select on tag_pair_counts from anon, authenticated, public;
+
+-- Every other RPC in this file is intentionally anon-callable: the site's
+-- server components and API routes all use the publishable (anon) key, so the
+-- read RPCs (search_all, list_filtered_albums, the stats aggregates, etc.)
+-- must stay executable by anon. Their per-call cost is bounded by the LIMIT
+-- clamps above; abuse beyond that is handled by the route rate limiter and
+-- Supabase's platform-level limits, not by revoking EXECUTE.
