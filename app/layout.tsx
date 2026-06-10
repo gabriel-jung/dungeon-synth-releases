@@ -13,6 +13,7 @@ import TagFilter from "@/components/TagFilter"
 import { fetchTagsByCategory } from "@/lib/supabase"
 import { SITE_URL } from "@/lib/site"
 import { Suspense } from "react"
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 const cinzel = Cinzel({
@@ -151,6 +152,7 @@ export default async function RootLayout({
           <SearchPalette />
         </Suspense>
         <footer className="shrink-0" />
+        <Analytics />
       </body>
     </html>
   )
