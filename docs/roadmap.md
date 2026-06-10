@@ -2,6 +2,10 @@
 
 Loose backlog of planned work. Not a commitment, not ordered strictly by priority.
 
+## Shipped
+
+- **`/list` builder** — Topsters-style shareable list builder (grid + ranked-list layouts, shapes, PNG export via `next/og`, `?d=` share links). Covers the old "share cards" idea. See [list.md](./list.md). Follow-ups parked: CSV import, per-item ratings/notes, touch drag-and-drop, per-list social unfurl.
+
 ## Planned
 
 ### Geographic map (`/map`)

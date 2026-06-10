@@ -11,6 +11,7 @@ This file is the agent on-ramp for **dungeon-synth-releases**. AGENTS.md covers 
 - [docs/schema.md](./docs/schema.md) + [docs/rpc.sql](./docs/rpc.sql): Supabase tables + RPCs (read before writing SQL)
 - [docs/graphs.md](./docs/graphs.md): TagGraph pipeline (covers `/graphs/genres` + `/graphs/themes`)
 - [docs/statistics.md](./docs/statistics.md): `/statistics` dashboard
+- [docs/list.md](./docs/list.md): `/list` shareable list builder (URL-encoded chart, PNG export, shared preview/export layout math)
 - [docs/roadmap.md](./docs/roadmap.md): planned, undecided, parked
 - [docs/rls-migration.sql](./docs/rls-migration.sql): applied; kept as the source-of-truth record of the policies in production
 
@@ -36,7 +37,8 @@ The data scraper lives in a separate repo (`bandcamp-explorer-data`). **Don't** 
 app/(releases)/         /  and /releases/[year]
 app/graphs/             /graphs (all + genres + themes sub-routes)
 app/statistics/              /statistics (overall + by-year sub-routes)
-app/api/                album, albums/{by-scope,tag-context}, daily, revalidate, search, upcoming, year-count, ...
+app/list/               /list shareable list builder (see docs/list.md)
+app/api/                album, albums/{by-scope,by-ids,tag-context}, daily, list/image, revalidate, search, upcoming, year-count, ...
 components/             flat, no subdirs by feature
 lib/
   modalUrl.ts           open/close/href helpers, canonical modal entry point

@@ -116,10 +116,10 @@ export function formatDateShort(date: string, includeYear = false): string {
   return new Date(date + "T00:00:00").toLocaleDateString("en-US", fmt)
 }
 
-export function coverUrl(artId: string | null | undefined, size: "thumb" | "full" = "full"): string | null {
+export function coverUrl(artId: string | null | undefined, size: "thumb" | "full" | "xl" = "full"): string | null {
   if (!artId) return null
-  // _7 = 150px thumb (grid), _2 = 350px (detail)
-  const suffix = size === "thumb" ? "_7.jpg" : "_2.jpg"
+  // _7 = 150px thumb (grid), _2 = 350px (detail), _16 = 700px (export / 1-col)
+  const suffix = size === "thumb" ? "_7.jpg" : size === "xl" ? "_16.jpg" : "_2.jpg"
   return `https://f4.bcbits.com/img/a${artId}${suffix}`
 }
 

@@ -114,4 +114,16 @@ export async function fetchRecentAlbums(today: string): Promise<AlbumListItem[]>
   return (data ?? []).map(toAlbumListItem)
 }
 
+// Fetch a set of albums by id, returned in the requested order (PostgREST does
+// not preserve `in()` order). Uncached: id sets are arbitrary per chart, so a
+// cache boundary would never hit. Used by the /list builder page + image route.
+export async function fetchAlbumsByIds(ids: string[]): Promise<AlbumListItem[]> {
+  const clean = ids.filter((id) => /^\d+$/.test(id)).slice(0, 100)
+  if (clean.length === 0) return []
+  const { data, error } = await supabase.from("albums").select(ALBUM_LIST_SELECT).in("id", clean)
+  if (error) throw new Error(`by-ids query failed: ${error.message}`)
+  const byId = new Map((data ?? []).map((r) => { const a = toAlbumListItem(r); return [a.id, a] as const }))
+  return clean.map((id) => byId.get(id)).filter((a): a is AlbumListItem => a != null)
+}
+
 export { toAlbumListItem, rpcRowToAlbumListItem } from "./types"

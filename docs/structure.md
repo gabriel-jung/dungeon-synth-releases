@@ -31,10 +31,11 @@ This framing is load-bearing. It means:
 /statistics                → overall stats dashboard
 /statistics/by-year        → redirects to /statistics/by-year/[current year]
 /statistics/by-year/[year] → per-year stats
+/list                      → Topsters-style shareable list builder (state in ?d=, see docs/list.md)
 /about                     → static methodology page (source + how the views work)
 ```
 
-Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · about · TabBar (Releases / Statistics / Tag Graphs) · tag filter button (with `?` tooltip). Per-page sub-nav rows ((Recent / Past Years / Upcoming), (Overall / By Year), (All / Genres / Themes)) live in the page-specific layouts. Filter chips render absolute on the sub-nav row right side for `/` and `/statistics`; hidden on `/graphs/*`.
+Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · about · TabBar (Releases / Statistics / Tag Graphs / Lists) · tag filter button (with `?` tooltip). Per-page sub-nav rows ((Recent / Past Years / Upcoming), (Overall / By Year), (All / Genres / Themes)) live in the page-specific layouts. Filter chips render absolute on the sub-nav row right side for `/` and `/statistics`; hidden on `/graphs/*`.
 
 Past-years and upcoming-releases navigation live inside the releases area:
 - `ReleasesScopeNav` renders **Recent · Past Years ▾ · Upcoming**.
