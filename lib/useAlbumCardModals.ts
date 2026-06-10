@@ -45,13 +45,15 @@ export function useAlbumCardModals(
     if (album.host_id) push("host", album.host_id)
   }, [push, album.host_id])
 
-  // When the host is inline (visible as separate "on X" text), the artist
-  // button opens the artist modal. When it isn't (the artist IS the host),
-  // opening the artist actually means "see the label's releases".
+  // The artist line opens the host/label only in the normal feed, and only
+  // for a self-hosted release (artist IS the host), where the artist line
+  // stands in for the label. Inside a host scope modal (hideHost) we're
+  // already viewing that label, so the artist line always opens the artist
+  // instead of re-opening the same host (which looked clickable but no-op'd).
   const onArtistClick = useCallback(() => {
-    if (!showHostInline && album.host_id) openHost()
+    if (!hideHost && !isHostedRelease(album) && album.host_id) openHost()
     else openArtist()
-  }, [showHostInline, album.host_id, openArtist, openHost])
+  }, [hideHost, album, openArtist, openHost])
 
   return { showHostInline, onArtistClick, openArtist, openHost, push }
 }
