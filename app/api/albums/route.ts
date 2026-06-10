@@ -22,7 +22,17 @@ export async function GET(request: NextRequest) {
   const xtags = params.getAll("xtag")
   const clampStart = params.get("clamp_start")
   const clampEnd = params.get("clamp_end")
-  const limit = Math.min(Number(params.get("limit") ?? 500), 1000)
+  const limitRaw = Number(params.get("limit") ?? 500)
+  // Guard NaN / negative / zero: those reach .limit()/p_limit and surface a
+  // raw Postgres error otherwise.
+  const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 500
+
+  // YYYY-MM-DD. clamp_start/clamp_end feed addOneDay() (new Date(...) throws
+  // on garbage) and the date param feeds .eq("date", ...).
+  const isYmd = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s)
+  if (clampStart && !isYmd(clampStart)) return Response.json({ error: "Invalid clamp_start" }, { status: 400 })
+  if (clampEnd && !isYmd(clampEnd)) return Response.json({ error: "Invalid clamp_end" }, { status: 400 })
+  if (date && !isYmd(date)) return Response.json({ error: "Invalid date" }, { status: 400 })
 
   if (week) {
     const range = parseWeekKey(week)
@@ -40,7 +50,7 @@ export async function GET(request: NextRequest) {
       })
       if (error) {
         logger.error({ route: "api/albums", rpc: "list_filtered_albums", week, err: error.message }, "RPC failed")
-        return Response.json({ error: error.message }, { status: 500 })
+        return Response.json({ error: "query failed" }, { status: 500 })
       }
       return Response.json(
         { albums: (data ?? []).map(rpcRowToAlbumListItem) },
@@ -56,7 +66,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
     if (error) {
       logger.error({ route: "api/albums", week, err: error.message }, "week query failed")
-      return Response.json({ error: error.message }, { status: 500 })
+      return Response.json({ error: "query failed" }, { status: 500 })
     }
     return Response.json(
       { albums: (data ?? []).map(toAlbumListItem) },
@@ -73,7 +83,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
     if (error) {
       logger.error({ route: "api/albums", date, err: error.message }, "date query failed")
-      return Response.json({ error: error.message }, { status: 500 })
+      return Response.json({ error: "query failed" }, { status: 500 })
     }
     return Response.json(
       { albums: (data ?? []).map(toAlbumListItem) },

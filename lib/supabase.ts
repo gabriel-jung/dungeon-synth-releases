@@ -1,3 +1,7 @@
+// Server-only: importing this from a Client Component is a build-time error.
+// SUPABASE_SECRET_KEY (the service-role fallback below) must never reach the
+// browser bundle; this guard fails loudly instead of silently leaking it.
+import "server-only"
 import { createClient } from "@supabase/supabase-js"
 import { cacheLife, cacheTag } from "next/cache"
 import { type AlbumListItem, toAlbumListItem } from "./types"

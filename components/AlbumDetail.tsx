@@ -127,7 +127,7 @@ export default function AlbumDetail({
       return
     }
     const ctrl = new AbortController()
-    fetch(`/api/album?id=${albumStub.id}`, { signal: ctrl.signal })
+    fetch(`/api/album?id=${encodeURIComponent(albumStub.id)}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()

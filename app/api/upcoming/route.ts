@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     logger.error({ route: "api/upcoming", err: error.message }, "query failed")
-    return Response.json({ error: error.message }, { status: 500 })
+    return Response.json({ error: "query failed" }, { status: 500 })
   }
 
   return Response.json(

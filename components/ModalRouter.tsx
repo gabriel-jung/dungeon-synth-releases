@@ -61,7 +61,7 @@ export default function ModalRouter() {
           onClose={closeAll}
         />
       )}
-      {state.day && (
+      {state.day && /^\d{4}-\d{2}-\d{2}$/.test(state.day) && (
         <DayModal
           key={state.day}
           date={state.day}
@@ -88,7 +88,7 @@ function DeepAlbum({ id, onClose }: { id: string; onClose: () => void }) {
   useEffect(() => {
     if (getAlbumStub(id)) return
     const ctrl = new AbortController()
-    fetch(`/api/album?id=${id}`, { signal: ctrl.signal })
+    fetch(`/api/album?id=${encodeURIComponent(id)}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setStub(rpcRowToAlbumListItem(data)) })
       .catch(() => {})

@@ -20,6 +20,6 @@ export async function GET(request: NextRequest) {
     return Response.json(ctx, { headers: { "Cache-Control": HTTP_CACHE_1H } })
   } catch (err) {
     logger.error({ route: "api/albums/tag-context", err: (err as Error).message }, "fetch failed")
-    return Response.json({ error: (err as Error).message }, { status: 500 })
+    return Response.json({ error: "query failed" }, { status: 500 })
   }
 }

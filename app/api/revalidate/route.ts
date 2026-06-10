@@ -1,5 +1,15 @@
 import { type NextRequest } from "next/server"
 import { revalidatePath, revalidateTag } from "next/cache"
+import { timingSafeEqual } from "node:crypto"
+
+// Constant-time bearer-token check. Returns false on any length mismatch
+// before the timing-safe compare (timingSafeEqual throws on unequal lengths).
+function authorized(header: string | null, secret: string): boolean {
+  const expected = `Bearer ${secret}`
+  const a = Buffer.from(header ?? "")
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 // Surgical cache invalidation. Cron (or another trusted upstream) calls:
 //   GET /api/revalidate?tag=genres
@@ -9,7 +19,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization")
   const secret = process.env.CRON_SECRET
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!secret || !authorized(auth, secret)) {
     return new Response("Unauthorized", { status: 401 })
   }
 

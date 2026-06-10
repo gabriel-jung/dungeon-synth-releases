@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server"
 import { supabase, HTTP_CACHE_1H } from "@/lib/supabase"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 // Daily release counts for a given year. Backs the collapsible heatmap on
 // release-list pages. Cheap RPC, long SWR cache so repeat opens are free.
@@ -17,7 +18,10 @@ export async function GET(request: NextRequest) {
     p_include_tags: includeTags,
     p_exclude_tags: excludeTags,
   })
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error) {
+    logger.error({ route: "api/daily", err: error.message }, "daily_counts RPC failed")
+    return Response.json({ error: "query failed" }, { status: 500 })
+  }
 
   const days = (data ?? []).map(
     (r: { date: string; n: number | string }) => ({ date: r.date, n: Number(r.n) }),
