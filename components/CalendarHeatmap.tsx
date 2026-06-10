@@ -140,7 +140,7 @@ export default function CalendarHeatmap({
   return (
     <div className="w-full overflow-x-auto relative">
       <div className="h-6 mb-2 flex items-center justify-between gap-4">
-        <div className="font-display text-xs tracking-wide text-text-dim truncate shrink min-w-0">
+        <div aria-live="polite" className="font-display text-xs tracking-wide text-text-dim truncate shrink min-w-0">
           {hover?.inRange && (
             <>
               <span className="text-text-bright">{formatDateShort(hover.dateStr, true)}</span>
@@ -201,21 +201,44 @@ export default function CalendarHeatmap({
 
         {cells.map((c) => {
           const clickable = c.inRange && c.count > 0
+          const cellStyle = { gridColumnStart: c.weekIdx + 2, gridRowStart: c.dow + 2 }
+          const tile = (
+            <div
+              className={`aspect-square rounded-[2px] border transition-transform ${
+                clickable
+                  ? "group-hover:scale-150 group-hover:z-10 group-focus-visible:scale-150 group-focus-visible:z-10"
+                  : c.inRange ? "group-hover:scale-125 group-hover:z-10" : ""
+              } ${hover?.key === c.key ? "border-text-bright" : "border-bg/60"}`}
+              style={{ background: cellColor(c) }}
+            />
+          )
+          if (clickable) {
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onMouseEnter={() => setHover(c)}
+                onMouseLeave={() => setHover((h) => (h?.key === c.key ? null : h))}
+                onFocus={() => setHover(c)}
+                onBlur={() => setHover((h) => (h?.key === c.key ? null : h))}
+                onClick={() => selectDay(c)}
+                aria-label={`${formatDateShort(c.dateStr, true)}, ${releaseCount(c.count)}`}
+                className="group p-[1.5px] cursor-pointer rounded-[2px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/70"
+                style={cellStyle}
+              >
+                {tile}
+              </button>
+            )
+          }
           return (
             <div
               key={c.key}
               onMouseEnter={() => c.inRange && setHover(c)}
               onMouseLeave={() => setHover((h) => (h?.key === c.key ? null : h))}
-              onClick={() => clickable && selectDay(c)}
-              className={`group p-[1.5px] ${clickable ? "cursor-pointer" : ""}`}
-              style={{ gridColumnStart: c.weekIdx + 2, gridRowStart: c.dow + 2 }}
+              className="group p-[1.5px]"
+              style={cellStyle}
             >
-              <div
-                className={`aspect-square rounded-[2px] border transition-transform ${
-                  clickable ? "group-hover:scale-150 group-hover:z-10" : c.inRange ? "group-hover:scale-125 group-hover:z-10" : ""
-                } ${hover?.key === c.key ? "border-text-bright" : "border-bg/60"}`}
-                style={{ background: cellColor(c) }}
-              />
+              {tile}
             </div>
           )
         })}

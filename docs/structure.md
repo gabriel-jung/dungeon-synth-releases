@@ -1,6 +1,6 @@
 # Site structure
 
-> **Status: reflects the shipped site as of 2026-05.**
+> **Status: reflects the shipped site as of 2026-06.**
 
 ## What this site is
 
@@ -22,16 +22,19 @@ This framing is load-bearing. It means:
 ## Routes
 
 ```
-/                    → Recent: current year, newest first
-/releases/[year]     → year archive (list mode)
-/graphs              → redirects to /graphs/genres
-/graphs/genres       → all-time genre graph
-/graphs/themes       → all-time theme graph (same component as /graphs/genres)
-/statistics               → overall stats dashboard
-/statistics/by-year       → per-year stats (placeholder)
+/                          → Recent: current year, newest first
+/releases/[year]           → year archive (list mode)
+/graphs                    → redirects to /graphs/genres
+/graphs/all                → all-time graph over every tag category (itemLabel="tag")
+/graphs/genres             → all-time genre graph
+/graphs/themes             → all-time theme graph (same component as /graphs/genres)
+/statistics                → overall stats dashboard
+/statistics/by-year        → redirects to /statistics/by-year/[current year]
+/statistics/by-year/[year] → per-year stats
+/about                     → static methodology page (source + how the views work)
 ```
 
-Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · about · TabBar (Releases / Statistics / Tag Graphs) · tag filter button (with `?` tooltip). Per-page sub-nav rows ((Recent / Past Years / Upcoming), (Overall / By Year), (Genres / Themes)) live in the page-specific layouts. Filter chips render absolute on the sub-nav row right side for `/` and `/statistics`; hidden on `/graphs/*`.
+Header: logo · search trigger (`SearchPalette` via ⌘K / `/` / click) · theme picker · about · TabBar (Releases / Statistics / Tag Graphs) · tag filter button (with `?` tooltip). Per-page sub-nav rows ((Recent / Past Years / Upcoming), (Overall / By Year), (All / Genres / Themes)) live in the page-specific layouts. Filter chips render absolute on the sub-nav row right side for `/` and `/statistics`; hidden on `/graphs/*`.
 
 Past-years and upcoming-releases navigation live inside the releases area:
 - `ReleasesScopeNav` renders **Recent · Past Years ▾ · Upcoming**.
@@ -72,13 +75,21 @@ Main page under `app/(releases)/`. The release list scopes to the current year w
 
 Same `ReleaseList` component as `/`, but every day starts collapsed. `lowerBound={yearStart}` caps the scroll at Jan 1 of that year; the release list loads the first 500 rows descending from yearEnd to stay responsive on sparse pre-Bandcamp years.
 
-### `/graphs/genres`, `/graphs/themes` — TagGraphs
+### `/graphs/all`, `/graphs/genres`, `/graphs/themes` — TagGraphs
 
-Canvas-rendered force graphs over tag co-occurrence. Same `TagGraphCanvas` component, swapped between `category='genre'` and `category='theme'`. All-time only — per-year maps are too sparse to be meaningful. See [`docs/graphs.md`](./graphs.md).
+Canvas-rendered force graphs over tag co-occurrence. Same `TagGraphCanvas` component, swapped between scopes via `fetchTagGraph(scope)`: `all` (every category, `itemLabel="tag"`), `genre`, `theme`. Sub-nav (`GraphsScopeNav`) is All / Genres / Themes; `/graphs` redirects to `/graphs/genres`. All-time only — per-year maps are too sparse to be meaningful. See [`docs/graphs.md`](./graphs.md).
 
 ### `/statistics` — stats dashboard
 
 All-time aggregates — year bar, top hosts, tracks/duration histograms, popular genres + themes. See [`docs/statistics.md`](./statistics.md).
+
+### `/statistics/by-year/[year]` — per-year stats
+
+Same dashboard scoped to one year (RPCs take `p_year`). `/statistics/by-year` redirects to the current year; `StatsScopeNav` carries the Overall / By Year toggle with a year picker.
+
+### `/about` — methodology
+
+Static page (`PageHeader` + prose): what the site is, where the data comes from, how the views work. The only non-feed content route; not an entity page.
 
 ## Search
 
@@ -128,6 +139,5 @@ Artwork is hotlinked directly from Bandcamp — no egress cost to us, no storage
 ## Deferred decisions
 
 - **Artist/label entity pages**: only once identity is stable.
-- **Yearly filter on /statistics**: RPC args (`p_year`) are already nullable; missing piece is a year-picker UI component.
 - **Hosting upgrade**: revisit if DB size crosses ~300MB or egress trends above ~3GB/month.
 - **Artwork fallback strategy**: defer until Bandcamp hotlinking actually breaks.

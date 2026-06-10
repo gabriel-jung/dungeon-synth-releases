@@ -20,7 +20,7 @@ export default function Error({
         A scroll went missing in the archive
       </h1>
       <p className="text-text-dim mb-8 italic">
-        {error.message || "The page you sought has slipped from the catalogue."}
+        The page you sought has slipped from the catalogue.
       </p>
       <button
         type="button"

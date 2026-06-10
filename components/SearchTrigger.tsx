@@ -12,7 +12,7 @@ export default function SearchTrigger() {
       type="button"
       onClick={open}
       aria-label="Search the archive"
-      className="flex items-center gap-3 border border-border/60 hover:border-accent/60 px-0 py-0 sm:px-3 sm:py-2 text-text-dim hover:text-text transition-colors cursor-pointer w-7 h-7 sm:w-64 sm:h-auto justify-center sm:justify-between"
+      className="tap-target flex items-center gap-3 border border-border/60 hover:border-accent/60 px-0 py-0 sm:px-3 sm:py-2 text-text-dim hover:text-text transition-colors cursor-pointer w-7 h-7 sm:w-64 sm:h-auto justify-center sm:justify-between"
     >
       <span className="flex items-center gap-2 min-w-0">
         <span aria-hidden="true" className="font-display text-base leading-none">⌕</span>
@@ -21,7 +21,7 @@ export default function SearchTrigger() {
         </span>
       </span>
       <kbd className="hidden sm:inline-flex items-center h-5 px-1.5 border border-border/50 text-[10px] font-display tracking-wide select-none shrink-0">
-        ⌘K
+        ⌘&nbsp;K
       </kbd>
     </button>
   )

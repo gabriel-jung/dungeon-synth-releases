@@ -16,7 +16,7 @@ export default function DeepAlbumSkeleton({ onClose }: { onClose: () => void }) 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center animate-backdrop-in backdrop-blur-xs bg-backdrop"
+      className="fixed inset-0 z-[10000] flex items-center justify-center backdrop-blur-xs bg-backdrop"
       onClick={onClose}
     >
       <div
@@ -25,7 +25,7 @@ export default function DeepAlbumSkeleton({ onClose }: { onClose: () => void }) 
         aria-modal="true"
         aria-label="Loading album"
         tabIndex={-1}
-        className="relative bg-bg max-w-2xl w-full mx-4 max-h-[90vh] sm:overflow-visible animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
+        className="relative bg-bg-card max-w-2xl w-full mx-4 max-h-[90vh] sm:overflow-visible animate-modal-in flex flex-col sm:flex-row border border-border outline-none"
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >

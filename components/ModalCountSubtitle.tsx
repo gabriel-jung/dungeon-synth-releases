@@ -3,7 +3,7 @@ import { formatCount } from "@/lib/types"
 export default function ModalCountSubtitle({
   count,
   suffix,
-  loadingLabel = "loading",
+  loadingLabel = "Loading…",
 }: {
   count: number | null
   suffix?: string

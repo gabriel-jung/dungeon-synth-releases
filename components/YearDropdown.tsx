@@ -50,12 +50,13 @@ export default function YearDropdown({
       onMouseLeave={scheduleHide}
       onFocus={show}
       onBlur={scheduleHide}
+      onKeyDown={(e) => { if (e.key === "Escape") setOpen(false) }}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         className={`${NAV_ITEM} ${active ? NAV_ACTIVE : NAV_INACTIVE}`}
       >
         {active && activeYear ? activeYear : idleLabel}
@@ -63,7 +64,6 @@ export default function YearDropdown({
       </button>
       {open && (
         <div
-          role="menu"
           className="absolute left-0 top-full mt-1 z-40 bg-bg-card border border-border shadow-lg p-1.5"
         >
           <div
@@ -75,7 +75,6 @@ export default function YearDropdown({
                 key={y}
                 href={hrefFor(y)}
                 prefetch
-                role="menuitem"
                 onClick={() => setOpen(false)}
                 className={`px-2 py-1 font-display text-[11px] tracking-[0.1em] tabular-nums text-center transition-colors ${
                   y === activeYear

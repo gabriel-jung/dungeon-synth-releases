@@ -41,8 +41,15 @@ export default function ThemePicker() {
         setOpen(false)
       }
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false)
+    }
     document.addEventListener("click", handler, true)
-    return () => document.removeEventListener("click", handler, true)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("click", handler, true)
+      document.removeEventListener("keydown", onKey)
+    }
   }, [open])
 
   function pick(id: string) {
@@ -69,7 +76,7 @@ export default function ThemePicker() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
+        className="tap-target w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
         style={{
           background: `linear-gradient(135deg, ${current.bg} 50%, ${current.accent} 50%)`,
         }}
@@ -112,6 +119,8 @@ export default function ThemePicker() {
               step="0.01"
               value={textureOpacity}
               onChange={(e) => handleTextureChange(parseFloat(e.target.value))}
+              aria-label="Texture overlay opacity"
+              aria-valuetext={`${Math.round((textureOpacity / 0.15) * 100)}%`}
               className="w-24 h-1 accent-accent cursor-pointer"
             />
           </div>

@@ -5,6 +5,21 @@ type Entry = { close: () => void; dialogRef?: RefObject<HTMLElement | null> }
 // Stack so nested modals only close the topmost on ESC.
 const stack: Entry[] = []
 
+// While any modal is open, mark the rest of the app `inert` so a screen
+// reader's virtual cursor (and Tab) cannot wander into the backgrounded feed.
+// `aria-modal` alone is advisory; modern SRs honour real `inert`. The modal
+// portals mount on document.body OUTSIDE this root, so they stay reachable.
+function backgroundRoot(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("[data-app-root]")
+}
+
+function setBackgroundInert(on: boolean) {
+  const root = backgroundRoot()
+  if (!root) return
+  if (on) root.setAttribute("inert", "")
+  else root.removeAttribute("inert")
+}
+
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -49,7 +64,10 @@ export function useModal(onClose: () => void, dialogRef?: RefObject<HTMLElement 
 
   useEffect(() => {
     const entry: Entry = { close: () => onCloseRef.current(), dialogRef }
-    if (stack.length === 0) window.addEventListener("keydown", onKey)
+    if (stack.length === 0) {
+      window.addEventListener("keydown", onKey)
+      setBackgroundInert(true)
+    }
     stack.push(entry)
     const prevOverflow = document.body.style.overflow
     const prevPaddingRight = document.body.style.paddingRight
@@ -62,7 +80,10 @@ export function useModal(onClose: () => void, dialogRef?: RefObject<HTMLElement 
     return () => {
       const i = stack.lastIndexOf(entry)
       if (i !== -1) stack.splice(i, 1)
-      if (stack.length === 0) window.removeEventListener("keydown", onKey)
+      if (stack.length === 0) {
+        window.removeEventListener("keydown", onKey)
+        setBackgroundInert(false)
+      }
       document.body.style.overflow = prevOverflow
       document.body.style.paddingRight = prevPaddingRight
       prevFocus?.focus?.()

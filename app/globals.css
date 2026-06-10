@@ -134,9 +134,10 @@
   --color-bg-hover: #cec9c2;
   --color-border: #b8b3aa;
   --color-text: #3a3832;
-  --color-text-dim: #6e6b62;
+  /* Darkened from #6e6b62 / #4a7a5a to clear WCAG AA 4.5:1 on the light bg. */
+  --color-text-dim: #545148;
   --color-text-bright: #1a1810;
-  --color-accent: #4a7a5a;
+  --color-accent: #40704e;
   --color-accent-hover: #5a8e6a;
   --color-tag-include: #4a7a4a;
   --color-tag-exclude: #8a4a4a;
@@ -150,7 +151,8 @@
   --color-bg-hover: #d8ccb8;
   --color-border: #c4b8a0;
   --color-text: #3a3020;
-  --color-text-dim: #7a6e58;
+  /* Darkened from #7a6e58 to clear WCAG AA 4.5:1 on the light bg. */
+  --color-text-dim: #635944;
   --color-text-bright: #1a1408;
   --color-accent: #8b2e20;
   --color-accent-hover: #a83828;
@@ -182,7 +184,8 @@
   --color-bg-hover: #dfd8cc;
   --color-border: #ccc4b4;
   --color-text: #44403a;
-  --color-text-dim: #8a8478;
+  /* Darkened from #8a8478 to clear WCAG AA 4.5:1 on the light bg. */
+  --color-text-dim: #6b6459;
   --color-text-bright: #1c1a14;
   --color-accent: #6a5040;
   --color-accent-hover: #806050;
@@ -240,9 +243,11 @@
   background: linear-gradient(to left, transparent 5%, var(--color-border));
 }
 
-/* Candlelight hover glow */
+/* Candlelight hover glow. Only `transform` is transitioned (compositor-only,
+   no per-frame repaint); the box-shadow glow + border snap in so the hover
+   stays fluid on the cover grid. */
 .hover-candlelight {
-  transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+  transition: transform 0.3s ease;
 }
 .hover-candlelight:hover {
   box-shadow: 0 0 15px -3px color-mix(in srgb, var(--color-accent) 30%, transparent);
@@ -287,13 +292,27 @@
 .animate-skeleton-step {
   animation: skeletonStep 1.4s ease-in-out infinite;
 }
+/* Coarse-pointer (touch) hit-area floor. Keeps the compact ~28px visual on
+   desktop but guarantees a 44px tap target on touch devices for the small
+   header + modal icon buttons. */
+@media (pointer: coarse) {
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-bar-grow,
-  .animate-skeleton-step,
-  .animate-fade-slide-in,
-  .animate-modal-in,
-  .animate-backdrop-in {
-    animation: none !important;
+  /* Universal guard: also neutralizes Tailwind animate-pulse, the
+     hover-candlelight box-shadow/scale, every transition-* utility, and
+     smooth scrolling, none of which the per-class list above covered. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

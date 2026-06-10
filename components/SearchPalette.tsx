@@ -111,7 +111,7 @@ export default function SearchPalette() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-start justify-center pt-[10vh] sm:pt-[14vh] animate-backdrop-in backdrop-blur-xs bg-backdrop"
+      className="fixed inset-0 z-[10050] flex items-start justify-center pt-[10vh] sm:pt-[14vh] backdrop-blur-xs bg-backdrop"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
@@ -121,7 +121,7 @@ export default function SearchPalette() {
         className="bg-bg-card border border-border w-[min(32rem,calc(100vw-1.5rem))] max-h-[70vh] flex flex-col animate-modal-in shadow-[0_0_80px_-10px_rgba(0,0,0,0.8)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border transition-colors focus-within:border-accent/60">
           <span aria-hidden="true" className="font-display text-text-dim select-none">⌕</span>
           <input
             ref={inputRef}
@@ -131,13 +131,25 @@ export default function SearchPalette() {
             onKeyDown={handleKeyDown}
             placeholder="Search the archive…"
             aria-label="Search archive"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="flex-1 min-w-0 bg-transparent py-1 text-base text-text placeholder:text-text-dim focus:outline-none font-sans"
           />
           <kbd className="hidden sm:inline-flex items-center h-5 px-1.5 border border-border/60 text-[10px] font-display tracking-wide text-text-dim select-none">
             Esc
           </kbd>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+        <div aria-live="polite" role="status" className="sr-only">
+          {query.trim().length < 2
+            ? ""
+            : loading && !results
+              ? "Searching"
+              : results
+                ? `${results.length} ${results.length === 1 ? "result" : "results"}`
+                : ""}
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin", overscrollBehavior: "contain" }}>
           {query.trim().length < 2 ? (
             <div className="px-4 py-3 font-display text-xs tracking-[0.1em] text-text-dim italic">
               Type 2+ characters to consult the archive.
