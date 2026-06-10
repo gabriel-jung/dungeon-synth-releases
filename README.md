@@ -13,6 +13,7 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 - **/graphs/all**: Same component over every tag category at once (`itemLabel="tag"`).
 - **/statistics**: All-time aggregate dashboard: releases-per-year bar, top hosts, track-count and duration histograms, popular genres + popular themes. See [docs/statistics.md](docs/statistics.md).
 - **/statistics/by-year/[year]**: The same dashboard scoped to one year (chapter I becomes a daily-activity calendar heatmap).
+- **/list**: Topsters-style builder, search releases, arrange them in a grid or ranked list, download as a PNG or share by link. See [docs/list.md](docs/list.md).
 - **/about**: Static methodology page, what the site is, where the data comes from, how the views work.
 
 Past years, upcoming releases, and album / artist / host / day / tag detail views are **modal overlays driven by URL params**, no routed pages. See [docs/structure.md](docs/structure.md) for the routing model.

@@ -9,6 +9,7 @@ const tabs = [
   { href: "/", label: "Releases", match: (p: string) => p === "/" || p.startsWith("/releases") },
   { href: "/statistics", label: "Statistics", match: (p: string) => p.startsWith("/statistics") },
   { href: "/graphs", label: "Tag Graphs", match: (p: string) => p.startsWith("/graphs") },
+  { href: "/list", label: "Lists", match: (p: string) => p.startsWith("/list") },
 ]
 
 export default function TabBar() {
