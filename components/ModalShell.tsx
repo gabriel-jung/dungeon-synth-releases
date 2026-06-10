@@ -42,7 +42,7 @@ export default function ModalShell({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center animate-backdrop-in backdrop-blur-xs bg-backdrop"
+      className="fixed inset-0 z-[10000] flex items-center justify-center backdrop-blur-xs bg-backdrop"
       onClick={onClose}
     >
       <div

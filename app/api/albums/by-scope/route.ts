@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       { route: "api/albums/by-scope", rpc: "list_filtered_albums", err: rpcRes.error.message },
       "RPC failed",
     )
-    return Response.json({ error: rpcRes.error.message }, { status: 500 })
+    return Response.json({ error: "query failed" }, { status: 500 })
   }
 
   return Response.json(

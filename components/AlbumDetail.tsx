@@ -38,27 +38,27 @@ function ReleaseCard({
   const { showHostInline, onArtistClick, openHost, push } = useAlbumCardModals(album, { hideHost })
   const openAlbum = (e?: React.SyntheticEvent) => { e?.stopPropagation(); push("album", album.id) }
 
-  // Card-level click opens the album. Nested buttons stop propagation so
-  // artist/host/date don't trigger the album modal.
+  // Stretched-button pattern: the album-open control is a full-card overlay
+  // button BEHIND the text (siblings, not a parent), so the artist/host
+  // controls aren't nested inside another interactive element. The text layer
+  // is pointer-events-none so empty-area clicks fall through to the overlay;
+  // the interactive children re-enable pointer events above it.
   return (
-    <article
-      onClick={openAlbum}
-      role="button"
-      tabIndex={0}
-      aria-label={`Open ${album.artist} — ${album.title}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAlbum(e) }
-      }}
-      className="py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
-    >
+    <article className="relative py-2.5 pl-2 border-l-2 border-transparent hover:bg-bg-hover hover:border-accent transition-colors group">
+      <button
+        type="button"
+        onClick={openAlbum}
+        aria-label={`Open ${album.artist} — ${album.title}`}
+        className="absolute inset-0 z-0 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+      />
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onArtistClick() }}
-        className="text-[0.95rem] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
+        className="relative z-10 text-[0.95rem] text-accent hover:text-accent-hover hover:underline decoration-dotted underline-offset-2 transition-colors text-left cursor-pointer"
       >
         {album.artist}
       </button>
-      <div>
+      <div className="relative z-10 pointer-events-none">
         <span className="text-text-bright italic text-sm">{album.title}</span>
         {showHostInline && (
           <>
@@ -66,7 +66,7 @@ function ReleaseCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); openHost() }}
-              className="text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
+              className="pointer-events-auto text-text-dim hover:text-accent hover:underline decoration-dotted underline-offset-2 transition-colors text-xs tracking-wide uppercase cursor-pointer"
             >
               {album.host_name}
             </button>
@@ -127,7 +127,7 @@ export default function AlbumDetail({
       return
     }
     const ctrl = new AbortController()
-    fetch(`/api/album?id=${albumStub.id}`, { signal: ctrl.signal })
+    fetch(`/api/album?id=${encodeURIComponent(albumStub.id)}`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -164,7 +164,7 @@ export default function AlbumDetail({
 
   const portal = createPortal(
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center animate-backdrop-in backdrop-blur-xs bg-backdrop"
+      className="fixed inset-0 z-[10000] flex items-center justify-center backdrop-blur-xs bg-backdrop"
       onClick={onClose}
     >
       <div
@@ -177,15 +177,20 @@ export default function AlbumDetail({
         style={{ boxShadow: "0 0 80px -10px rgba(0,0,0,0.8), 0 0 20px -5px color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cover — left side on desktop, top on mobile */}
+        {/* Cover — left side on desktop, top on mobile. Square box reserves
+            layout so the (variable-ratio) art can't shift content when it
+            loads; object-contain shows the full cover without cropping,
+            non-square art letterboxes against the card bg. */}
         <div className="sm:w-72 shrink-0 bg-bg-card flex items-center justify-center">
           {img ? (
-            <BandcampImg
-              src={img}
-              alt={`${albumStub.artist} — ${albumStub.title}`}
-              decoding="async"
-              className="w-full h-auto"
-            />
+            <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
+              <BandcampImg
+                src={img}
+                alt={`${albumStub.artist} — ${albumStub.title}`}
+                decoding="async"
+                className="w-full h-full object-contain"
+              />
+            </div>
           ) : (
             <div className="py-16 sm:py-0 sm:w-full sm:aspect-square flex items-center justify-center">
               <span aria-hidden="true" className="text-5xl text-border select-none">♜</span>
@@ -284,7 +289,7 @@ export default function AlbumDetail({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg-card/80 border border-border transition-colors cursor-pointer text-base leading-none"
+          className="tap-target absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright bg-bg-card/80 border border-border transition-colors cursor-pointer text-base leading-none"
         >
           ×
         </button>

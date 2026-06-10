@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { cloneElement, isValidElement, useState } from "react"
 import { METRICS, type LabelPos, type Metric } from "@/lib/tagGraphLogic"
 import { DEFAULTS } from "@/lib/tagGraphDefaults"
 import type { TagGraphState } from "@/lib/useTagGraphState"
@@ -89,7 +89,12 @@ function SliderRow({
           {reset}
         </span>
       </div>
-      {children}
+      {/* The wrapping <label> binds to its first labelable descendant, which
+          for rows with an input in `display` (e.g. Top-N) is that field, not
+          the range. Inject an explicit aria-label so every slider is named. */}
+      {isValidElement<{ "aria-label"?: string }>(children)
+        ? cloneElement(children, { "aria-label": children.props["aria-label"] ?? label })
+        : children}
     </label>
   )
 }

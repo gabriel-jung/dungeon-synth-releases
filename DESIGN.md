@@ -267,7 +267,7 @@ The page must read as a chronicle, not a feed. Days separated by ornamental rule
   /              → Recent · Past Years ▾ · Upcoming + count + heatmap          [FilterChips]
   /releases/[y]  → same                                                         [FilterChips]
   /statistics    → Overall · By Year                                            [FilterChips]
-  /graphs/*      → Genres · Themes                                              (no chips)
+  /graphs/*      → All · Genres · Themes                                        (no chips)
 [gradient divider]
 ```
 

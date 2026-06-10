@@ -401,6 +401,7 @@ export default function TagGraphCanvas({
                     type="range" min={0} max={1} step={0.005} value={zoomToPos(zoomLevel)}
                     onChange={(e) => setZoomFromSlider(posToZoom(Number(e.target.value)))}
                     aria-label="Zoom"
+                    aria-valuetext={`${zoomLevel.toFixed(1)}×`}
                     className="w-full accent-accent"
                   />
                 </label>

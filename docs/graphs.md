@@ -51,7 +51,7 @@ Graph construction, metrics, edge filtering, and Louvain clustering live in `lib
 
 - **Hover** a node → tooltip with genre name, album count, connection count.
 - **Hover** an edge → tooltip with the two genres, shared album count, similarity weight.
-- **Click** a node → pushes `?genre=<name>` (or `?genre=<name>` on `/graphs/themes` too — the `ScopeModal` handles both categories) and opens the shared scope modal.
+- **Click** a node → pushes `?genre=<name>` and opens the shared scope modal (the `ScopeModal` handles genre and theme tags the same way, so this works on `/graphs/themes` and `/graphs/all` too).
 - **Search** (top bar) → substring match against visible genre names, highlights in place. URL is updated via `history.replaceState` and a `"search-change"` CustomEvent keeps components in sync. No neighbor expansion from search — expansion is reserved for explicitly clicked tags. Searching "punk" highlights just the genre names containing "punk" (Egg Punk, Post-Punk), not everything connected to them.
 - **Fullscreen**, **PNG export**, **arrow-pan / +− zoom** keyboard controls.
 
@@ -93,6 +93,7 @@ State is URL-driven (`?m=…&n=…&d=…&ml=…&lp=…&c=…&sh=…&fh=…&lf=�
 |------|------|
 | `app/graphs/genres/page.tsx` | Server component: fetches counts + pairs for `category='genre'`, renders `<TagGraphCanvas>` inside `<Suspense>` |
 | `app/graphs/themes/page.tsx` | Same as above but `category='theme'` and `itemLabel="theme"` |
+| `app/graphs/all/page.tsx` | Same as above over every category, `fetchTagGraph("all")` and `itemLabel="tag"` |
 | `lib/tagGraph.ts` | `fetchTagGraph(category)` — single-call `tag_counts` + `tag_pairs` (jsonb), cached under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")` |
 | `lib/tagGraphLogic.ts` | Pure graph construction: metrics, edge filter, Louvain (gated by `clustering` arg), endpoint resolution, node/edge types |
 | `lib/tagGraphDefaults.ts` | Shared `DEFAULTS` + URL param key map; imported by canvas and tune script |

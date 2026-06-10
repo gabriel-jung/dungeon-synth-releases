@@ -45,9 +45,10 @@ export default function FilterChips() {
       <button
         type="button"
         onClick={clearAll}
+        aria-label="Clear all filters"
         className="font-display text-[10px] tracking-[0.15em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer pl-1"
       >
-        clear
+        Clear all
       </button>
     </div>
   )

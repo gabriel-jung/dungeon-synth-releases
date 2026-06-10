@@ -45,6 +45,11 @@ export function checkRateLimit(
 }
 
 export function ipFromRequest(request: NextRequest): string {
+  // On Vercel, x-forwarded-for is set by the platform and the client cannot
+  // forge it, so the leftmost entry is the real client IP. If this code is
+  // ever self-hosted behind a different proxy, this becomes spoofable (a
+  // client can send a fake XFF to mint unlimited limiter keys) — switch to a
+  // trusted-proxy-depth scheme there.
   const fwd = request.headers.get("x-forwarded-for")
   if (fwd) return fwd.split(",")[0].trim()
   return request.headers.get("x-real-ip") ?? "unknown"

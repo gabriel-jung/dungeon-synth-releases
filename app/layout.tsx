@@ -97,6 +97,12 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
+        {/* Background app content. `useModal` toggles `inert` on this wrapper
+            while any modal is open so a screen reader can't reach the feed
+            behind the overlay. `display:contents` keeps the body flex layout
+            unchanged. Modal portals mount on document.body OUTSIDE this node,
+            so they stay interactive. */}
+        <div data-app-root className="contents">
         <Suspense>
           <NavigationProgress />
         </Suspense>
@@ -137,6 +143,7 @@ export default async function RootLayout({
         <main id="main-content" tabIndex={-1} className="flex-1 min-h-0">
           <Suspense>{children}</Suspense>
         </main>
+        </div>
         <Suspense>
           <ModalRouter />
         </Suspense>

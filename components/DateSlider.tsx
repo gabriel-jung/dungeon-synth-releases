@@ -155,7 +155,10 @@ export default function DateSlider({
     const list = document.getElementById("release-list")
     if (el && list) {
       const offset = el.offsetTop - list.offsetTop
-      list.scrollTo({ top: offset, behavior: smooth ? "smooth" : "instant" })
+      // CSS prefers-reduced-motion can't override a JS smooth scroll, so honor
+      // it here and fall back to an instant jump.
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      list.scrollTo({ top: offset, behavior: smooth && !reduced ? "smooth" : "instant" })
     } else {
       // Date section not loaded yet — ReleaseList's windowed loader listens
       // for this and fetches the bucket covering the target date.

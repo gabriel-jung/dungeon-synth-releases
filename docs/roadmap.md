@@ -68,9 +68,9 @@ Skip until the reco engine work brings the vector layer into scope or filtered s
 ## Undecided
 
 ### Site shell
-Right now `/` drops straight into the release feed — no onboarding for new visitors. Candidates:
-- Landing / about / methodology page explaining data source + how tag graphs are built.
-- Consistent cross-nav between `/`, `/graphs/genres`, `/graphs/themes`, `/statistics`, `/releases`.
+The `/about` methodology page has shipped (data source + how the views work). Still open for new-visitor onboarding:
+- A landing surface other than dropping straight into the release feed at `/`.
+- Consistent cross-nav between `/`, `/graphs/*`, `/statistics`, `/releases`.
 - Not yet prioritised.
 
 ## Parked / rejected

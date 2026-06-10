@@ -1,6 +1,8 @@
 # Supabase Schema
 
-> Snapshot as of 2026-05-19. Source of truth is the live Supabase project; this file mirrors it. Update the date and the affected sections when tables or RPCs change.
+> Snapshot as of 2026-06-10. Source of truth is the live Supabase project; this file mirrors it. Update the date and the affected sections when tables or RPCs change.
+>
+> Privileges (security pass, applied 2026-06-10): `tag_pair_counts` SELECT and `refresh_tag_graph()` EXECUTE are **revoked from anon** (reads go through the SECURITY DEFINER `tag_pairs`; the MV refresh runs only via pg_cron). Tag/list RPCs clamp their `p_top_k` / `p_limit` server-side. See [`docs/security-hardening.sql`](./security-hardening.sql).
 
 ## Tables
 

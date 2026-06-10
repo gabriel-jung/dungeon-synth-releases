@@ -17,7 +17,7 @@ export default function ModalIconButton({
       onClick={onClick}
       aria-label={label}
       title={title}
-      className="w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright border border-border transition-colors cursor-pointer text-base leading-none"
+      className="tap-target w-7 h-7 flex items-center justify-center text-text-dim hover:text-text-bright border border-border transition-colors cursor-pointer text-base leading-none"
     >
       {children}
     </button>

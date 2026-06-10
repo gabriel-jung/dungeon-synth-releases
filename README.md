@@ -10,7 +10,10 @@ A lightweight web app that aggregates dungeon synth releases from Bandcamp into 
 - **/releases/[year]**: Year archive. Same `ReleaseList` as `/` but all days start collapsed and the scroll hard-stops at Jan 1.
 - **/graphs/genres**: Interactive force-directed graph of genre co-occurrence, with Louvain clustering and four selectable similarity metrics (Jaccard, PMI, cosine, raw). Canvas-rendered via `react-force-graph-2d`. See [docs/graphs.md](docs/graphs.md).
 - **/graphs/themes**: Same component as `/graphs/genres`, fed by `category='theme'` in the `tags` table.
+- **/graphs/all**: Same component over every tag category at once (`itemLabel="tag"`).
 - **/statistics**: All-time aggregate dashboard: releases-per-year bar, top hosts, track-count and duration histograms, popular genres + popular themes. See [docs/statistics.md](docs/statistics.md).
+- **/statistics/by-year/[year]**: The same dashboard scoped to one year (chapter I becomes a daily-activity calendar heatmap).
+- **/about**: Static methodology page, what the site is, where the data comes from, how the views work.
 
 Past years, upcoming releases, and album / artist / host / day / tag detail views are **modal overlays driven by URL params**, no routed pages. See [docs/structure.md](docs/structure.md) for the routing model.
 

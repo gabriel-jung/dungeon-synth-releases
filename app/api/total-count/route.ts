@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server"
 import { HTTP_CACHE_1H, sumYearCounts } from "@/lib/supabase"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
+import { logger } from "@/lib/logger"
 
 // All-time release count with optional ?tag / ?xtag filters. Sums year_counts
 // server-side; row count is tiny (~30 years).
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const count = await sumYearCounts(includeTags, excludeTags)
     return Response.json({ count }, { headers: { "Cache-Control": HTTP_CACHE_1H } })
   } catch (e) {
-    const message = e instanceof Error ? e.message : "unknown error"
-    return Response.json({ error: message }, { status: 500 })
+    logger.error({ route: "api/total-count", err: e instanceof Error ? e.message : "unknown" }, "sumYearCounts failed")
+    return Response.json({ error: "query failed" }, { status: 500 })
   }
 }

@@ -215,6 +215,7 @@ export default function ScopeModal({
       <ScopeHeader
         kind={kind}
         value={kind === "host" && host ? host.name : value}
+        loading={kind === "host" && !host}
         pairPartner={pairPartner}
         onNavigatePair={navigateToSingleGenre}
         coverArtId={coverArtId}
@@ -297,6 +298,7 @@ export default function ScopeModal({
 function ScopeHeader({
   kind,
   value,
+  loading = false,
   pairPartner,
   onNavigatePair,
   coverArtId,
@@ -312,6 +314,7 @@ function ScopeHeader({
 }: {
   kind: ScopeKind
   value: string
+  loading?: boolean
   pairPartner?: string | null
   onNavigatePair?: (name: string) => void
   coverArtId: string | null
@@ -345,7 +348,12 @@ function ScopeHeader({
     </div>
   )
 
-  const titleNode = pairPartner && onNavigatePair ? (
+  const titleNode = loading ? (
+    <span className="inline-flex items-center">
+      <span className="sr-only">Loading host</span>
+      <span aria-hidden className="inline-block h-4 w-32 max-w-full bg-bg-card rounded-sm animate-pulse" />
+    </span>
+  ) : pairPartner && onNavigatePair ? (
     <>
       <button
         type="button"

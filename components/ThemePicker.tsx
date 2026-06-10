@@ -12,7 +12,7 @@ const themes = [
   { id: "abyss", bg: "#0c0a12", accent: "#8b5ec4" },
   { id: "ember", bg: "#181210", accent: "#cc6a2e" },
   { id: "mire", bg: "#101410", accent: "#5a9a4a" },
-  { id: "fog", bg: "#e8e6e1", accent: "#4a7a5a" },
+  { id: "fog", bg: "#e8e6e1", accent: "#40704e" },
   { id: "parchment", bg: "#f0e8d8", accent: "#8b2e20" },
   { id: "overcast", bg: "#2a2a2e", accent: "#8a9ab0" },
   { id: "bone", bg: "#f5f0e8", accent: "#6a5040" },
@@ -41,8 +41,15 @@ export default function ThemePicker() {
         setOpen(false)
       }
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false)
+    }
     document.addEventListener("click", handler, true)
-    return () => document.removeEventListener("click", handler, true)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("click", handler, true)
+      document.removeEventListener("keydown", onKey)
+    }
   }, [open])
 
   function pick(id: string) {
@@ -69,7 +76,7 @@ export default function ThemePicker() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
+        className="tap-target w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-border hover:border-text-dim transition-colors cursor-pointer"
         style={{
           background: `linear-gradient(135deg, ${current.bg} 50%, ${current.accent} 50%)`,
         }}
@@ -112,6 +119,8 @@ export default function ThemePicker() {
               step="0.01"
               value={textureOpacity}
               onChange={(e) => handleTextureChange(parseFloat(e.target.value))}
+              aria-label="Texture overlay opacity"
+              aria-valuetext={`${Math.round((textureOpacity / 0.15) * 100)}%`}
               className="w-24 h-1 accent-accent cursor-pointer"
             />
           </div>

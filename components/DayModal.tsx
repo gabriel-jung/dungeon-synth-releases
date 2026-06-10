@@ -30,7 +30,7 @@ export default function DayModal({
 
   useEffect(() => {
     const ctrl = new AbortController()
-    fetch(`/api/albums?date=${date}&limit=500`, { signal: ctrl.signal })
+    fetch(`/api/albums?date=${encodeURIComponent(date)}&limit=500`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<{ albums: AlbumListItem[] }>

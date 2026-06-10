@@ -16,6 +16,9 @@ const csp = [
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },
+  // Vercel sets HSTS on *.vercel.app by default; declaring it explicitly keeps
+  // it correct on custom domains too. 2y + preload is the standard strong value.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

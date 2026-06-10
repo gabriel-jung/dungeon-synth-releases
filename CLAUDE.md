@@ -34,7 +34,7 @@ The data scraper lives in a separate repo (`bandcamp-explorer-data`). **Don't** 
 
 ```
 app/(releases)/         /  and /releases/[year]
-app/graphs/             /graphs (genres + themes sub-routes)
+app/graphs/             /graphs (all + genres + themes sub-routes)
 app/statistics/              /statistics (overall + by-year sub-routes)
 app/api/                album, albums/{by-scope,tag-context}, daily, revalidate, search, upcoming, year-count, ...
 components/             flat, no subdirs by feature

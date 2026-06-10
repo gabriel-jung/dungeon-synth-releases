@@ -33,7 +33,18 @@ alter table album_tags  enable row level security;
 -- ---------------------------------------------------------------------------
 -- Grant SELECT to anon. The site only reads; no INSERT / UPDATE / DELETE
 -- policies are created, so anon cannot mutate anything.
+--
+-- Starting 2026-10-30, Supabase removes the implicit GRANT to anon /
+-- authenticated on tables in `public`. Existing tables keep their current
+-- grants, but any new table needs an explicit GRANT before PostgREST /
+-- supabase-js can see it (otherwise PostgREST returns error 42501). RLS
+-- policies alone are not enough.
 -- ---------------------------------------------------------------------------
+grant select on albums     to anon;
+grant select on hosts      to anon;
+grant select on tags       to anon;
+grant select on album_tags to anon;
+
 create policy "anon can read albums"
   on albums for select
   to anon
@@ -53,6 +64,21 @@ create policy "anon can read album_tags"
   on album_tags for select
   to anon
   using (true);
+
+
+-- ---------------------------------------------------------------------------
+-- Pattern for future read-only public tables (post-2026-10-30 Supabase change):
+--
+--   grant select on public.<new_table> to anon;
+--   alter table public.<new_table> enable row level security;
+--   create policy "anon can read <new_table>"
+--     on public.<new_table> for select
+--     to anon
+--     using (true);
+--
+-- Skip the GRANT and PostgREST/supabase-js will 42501 with the missing
+-- statement spelled out in the error body.
+-- ---------------------------------------------------------------------------
 
 
 -- ---------------------------------------------------------------------------
