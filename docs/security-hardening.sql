@@ -1,7 +1,9 @@
 -- Migration: security hardening (DoS surface reduction on the RPC layer).
 --
--- APPLY THIS IN SUPABASE BEFORE THE DEPLOY THAT SHIPS THE MATCHING SITE CODE.
--- All statements are idempotent; safe to re-run.
+-- APPLIED in production 2026-06-10. Historical record + fresh-bootstrap replay
+-- only. The clamped function bodies below are a snapshot of what was applied;
+-- docs/rpc.sql is the living source of truth for current function logic, edit
+-- there, not here. All statements are idempotent; safe to re-run.
 --
 -- Why: the site uses the publishable (anon) key, so anyone can call the RPCs
 -- directly via PostgREST, bypassing the Next route rate limiter. The route

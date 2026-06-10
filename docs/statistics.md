@@ -2,7 +2,7 @@
 
 A dashboard of aggregate views over all known dungeon synth releases. Each chapter is its own async server component inside a `<Suspense>` boundary, with its own `"use cache" + cacheLife("days") + cacheTag("stats", "stats:<chapter>")` data fetcher. Cron calls `/api/revalidate?tag=stats` after ingests to invalidate every chapter at once.
 
-Sub-routes: `/statistics` (Overall, this doc) and `/statistics/by-year/[year]` (per-year breakdown, see [By Year](#by-year) below). Sub-nav lives in `app/statistics/layout.tsx` as `Overall · <year> ▾`. The year token is a hover dropdown (`StatsScopeNav` → `YearPicker`) populated from `fetchPastYears()` plus the current year, mirroring the `Past years` dropdown in `ReleasesScopeNav`. Filter chips render absolute on the right of that row.
+Sub-routes: `/statistics` (Overall, this doc) and `/statistics/by-year/[year]` (per-year breakdown, see [By Year](#by-year) below). Sub-nav lives in `app/statistics/layout.tsx` as `Overall · <year> ▾`. The year token is a hover dropdown (`StatsScopeNav` → `YearDropdown`) populated from `fetchPastYears()` plus the current year, mirroring the `Past years` dropdown in `ReleasesScopeNav`. Filter chips render absolute on the right of that row.
 
 Directly below the scope nav, the layout renders the shared `YearReleaseCount` widget (`mode="stats"`) wired to `fetchTotalCount()` for its initial value. The widget reads `usePathname` and:
 
@@ -92,9 +92,9 @@ A monolithic `stats_all` consolidated RPC was rejected: stats may evolve, and a 
 | `components/StatsChapters.tsx` | Per-chapter async server components + their `"use cache"` fetchers |
 | `components/StatsSkeleton.tsx` | Default full-page skeleton + per-chapter named exports for Suspense fallbacks |
 | `components/ChunkDegraded.tsx` | Client island: degraded state + retry form (`useFormStatus`) |
-| `lib/stats-actions.ts` | Server Action: `retryStatsChunk(tag)` validates tag against allow-list + `revalidateTag` |
+| `lib/stats-actions.ts` | Server Action: `retryStatsChunk(tag)` validates tag against allow-list + `updateTag` (read-your-writes; see Per-chunk retry above) |
 | `lib/stats.ts` | Shared types (`StatsFilter`, `HostCount`, `YearRow`, etc.), `unwrap` (strict), `toBins`, `toHostCounts`, `toTagCounts`, `emptyMsg`, `YEAR_LOWER_BOUND` |
-| `components/StatsScopeNav.tsx` | Client scope nav with the hover-dropdown `YearPicker`, mirrors `ReleasesScopeNav` |
+| `components/StatsScopeNav.tsx` | Client scope nav with the hover-dropdown `YearDropdown`, mirrors `ReleasesScopeNav` |
 | `components/HostRow.tsx` | Single ranked host entry with bar; opens `ScopeModal` via `?host=` |
 | `components/TagRow.tsx` | Single ranked tag entry with bar; opens `ScopeModal` via `?genre=` |
 | `components/TagBarScroll.tsx` | Shared scrollable tag bar column, also used by the scope modal's tag-context panel |
