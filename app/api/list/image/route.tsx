@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { type NextRequest } from "next/server"
-import { decodeState, chartIds, chartCapacity, measureChart, chartTile, chartEdge, aspectCanvas, isHorizontalText, resolveBg, chartInk } from "@/lib/listCodec"
+import { decodeState, chartIds, chartCapacity, measureChart, chartTile, chartEdge, aspectCanvas, autoCanvas, isHorizontalText, resolveBg, chartInk, titleFontSize } from "@/lib/listCodec"
 import { fetchAlbumsByIds } from "@/lib/supabase"
 import { coverUrl, formatDateShort, isHostedRelease, type AlbumListItem } from "@/lib/types"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
@@ -17,25 +17,43 @@ export async function GET(request: NextRequest) {
   const state = await decodeState(request.nextUrl.searchParams.get("d"))
   const albums = await fetchAlbumsByIds(chartIds(state))
   const byId = new Map(albums.map((a) => [a.id, a]))
-  const items = state.items
-    .map((id) => byId.get(id))
-    .filter((a): a is AlbumListItem => a != null)
-    .slice(0, chartCapacity(state))
+  const all = state.items.map((id) => byId.get(id)).filter((a): a is AlbumListItem => a != null)
 
-  const bg = resolveBg(state.bg, "#1a1410")
-  const ink = chartInk(state.bg, "#f0e6d6", "#8a7e6e")
+  // Charts larger than cols×rows export one image per page (?page=, 1-based);
+  // numbering continues across pages (OFFSET).
+  const cap = chartCapacity(state)
+  const totalPages = Math.max(1, Math.ceil(all.length / cap))
+  const pageParam = parseInt(request.nextUrl.searchParams.get("page") ?? "1", 10)
+  const pageIdx = Math.min(Math.max(Number.isFinite(pageParam) ? pageParam : 1, 1), totalPages) - 1
+  const OFFSET = pageIdx * cap
+  const items = all.slice(OFFSET, OFFSET + cap)
 
-  const { w: W, h: H } = aspectCanvas(state.aspect)
+  // The "theme" backdrop is a CSS var in the preview; the client passes the
+  // resolved hex along (?bg=) so the PNG matches what the user saw. Only
+  // honoured for the theme preset; explicit backdrops already are concrete.
+  const bgParam = request.nextUrl.searchParams.get("bg")
+  const bgKey =
+    state.bg === "theme" && bgParam && /^#[0-9a-fA-F]{6}$/.test(bgParam) ? bgParam : state.bg
+  const bg = resolveBg(bgKey, "#1a1410")
+  const ink = chartInk(bgKey, "#f0e6d6", "#8a7e6e")
+
+  // Fixed shapes lay out at full capacity (the chosen cols×rows ARE the
+  // chart's dimensions); "auto" hugs the covers this page actually has.
+  // Matches the preview exactly.
+  const layoutCount = state.aspect === "auto" ? Math.max(1, items.length) : cap
+  // "auto" hugs the content; fixed shapes fit the content into the frame.
+  const ac = state.aspect === "auto" ? autoCanvas(state, layoutCount) : null
+  const { w: W, h: H } = ac ?? aspectCanvas(state.aspect)
   const centered = state.anchor === "center"
-  const TILE = chartTile(state, items.length, W, H)
+  const TILE = ac ? ac.tile : chartTile(state, layoutCount, W, H)
   // Outer margin = the inter-cover gap (0 = flush to the corner).
   const PAD = chartEdge(state, TILE)
-  const L = measureChart(state, items.length, TILE, W - 2 * PAD)
+  const L = measureChart(state, layoutCount, TILE, W - 2 * PAD)
   const horiz = isHorizontalText(state.textPos)
   const wrapText = state.wrap
   const ai = state.textAlign === "center" ? "center" : state.textAlign === "right" ? "flex-end" : "flex-start"
 
-  const titleFs = Math.round(TILE * 0.13)
+  const titleFs = titleFontSize(TILE, L.contentW, state.title)
   const crestFs = Math.round(TILE * 0.08)
   const creditFs = Math.round(TILE * 0.05)
 
@@ -67,10 +85,12 @@ export async function GET(request: NextRequest) {
     const fields: Array<{ fs: number; c: string; w: number; t: string }> = []
     if (state.showTitle) fields.push({ fs: L.capTitleFs, c: ink.fg, w: 700, t: a.title })
     if (state.showArtist) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: a.artist })
-    if (state.showLabel) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: isHostedRelease(a) ? a.host_name! : "" })
+    // Skip the label line entirely for self-released albums, matching the
+    // preview (an empty line here would push captions out of sync with it).
+    if (state.showLabel && isHostedRelease(a)) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: a.host_name! })
     if (state.showDate) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: a.date ? formatDateShort(a.date, true) : "" })
     if (fields.length === 0) return null
-    if (withNum && state.numberText) fields[0] = { ...fields[0], t: `${idx + 1}. ${fields[0].t}` }
+    if (withNum && state.numberText) fields[0] = { ...fields[0], t: `${OFFSET + idx + 1}. ${fields[0].t}` }
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: ai, justifyContent: "center", width: capW }}>
         {fields.map((f, i) => (
@@ -102,7 +122,7 @@ export async function GET(request: NextRequest) {
               backgroundColor: "#000000b0",
             }}
           >
-            {idx + 1}
+            {OFFSET + idx + 1}
           </div>
         ) : null}
       </div>
@@ -183,6 +203,10 @@ export async function GET(request: NextRequest) {
                   textTransform: "uppercase",
                   color: ink.fg,
                   textAlign: "center",
+                  maxWidth: L.contentW,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
                 {state.title}
@@ -227,8 +251,11 @@ export async function GET(request: NextRequest) {
         { name: "Cinzel", data: cinzelBold, weight: 700, style: "normal" },
       ],
       headers: {
-        "Content-Disposition": `attachment; filename="dungeon-synth-list.png"`,
-        "Cache-Control": "public, max-age=300",
+        "Content-Disposition": `attachment; filename="dungeon-synth-list${totalPages > 1 ? `-p${pageIdx + 1}` : ""}.png"`,
+        // `d` fully determines the layout; only the album rows behind the ids
+        // can drift, so a day of caching is safe and keeps unfurl crawlers and
+        // re-downloads off Satori.
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
       },
     },
   )

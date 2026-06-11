@@ -1,12 +1,43 @@
+import type { Metadata } from "next"
 import PageHeader from "@/components/PageHeader"
 import ListBuilder from "@/components/ListBuilder"
-import { decodeState, chartIds } from "@/lib/listCodec"
+import { decodeState, chartIds, aspectCanvas, autoCanvas, chartCapacity } from "@/lib/listCodec"
 import { fetchAlbumsByIds } from "@/lib/supabase"
+import { SITE_URL } from "@/lib/site"
 
-export const metadata = {
-  title: "Lists",
-  description: "Build a list of the dungeon synth releases and share it.",
-  alternates: { canonical: "/list" },
+// A shared `?d=` link unfurls as the actual chart: the PNG route renders the
+// exact list, so og:image points straight at it. (The `opengraph-image` file
+// convention can't read query params, but generateMetadata can.)
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ d?: string }>
+}): Promise<Metadata> {
+  const base: Metadata = {
+    title: "Lists",
+    description: "Build a list of the dungeon synth releases and share it.",
+    alternates: { canonical: "/list" },
+  }
+  const { d } = await searchParams
+  if (!d) return base
+  const state = await decodeState(d)
+  if (state.items.length === 0) return base
+  const title = state.title.trim() || "A dungeon synth list"
+  const description = `${state.items.length} release${state.items.length === 1 ? "" : "s"}, shared from Dungeon Synth Releases.`
+  // Mirror the image route's page-1 layout: auto hugs the actual covers.
+  const layoutCount = Math.max(1, Math.min(state.items.length, chartCapacity(state)))
+  const { w, h } = state.aspect === "auto" ? autoCanvas(state, layoutCount) : aspectCanvas(state.aspect)
+  return {
+    ...base,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: [{ url: `${SITE_URL}/api/list/image?d=${encodeURIComponent(d)}`, width: w, height: h }],
+    },
+    twitter: { card: "summary_large_image" },
+  }
 }
 
 // Builder is fully client-driven once mounted; the server pass only hydrates a

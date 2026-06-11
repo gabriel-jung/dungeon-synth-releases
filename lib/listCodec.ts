@@ -1,5 +1,5 @@
 // State codec for the /list chart builder. The chart IS the URL: the full
-// builder state (items + per-item notes + grid + text config) is gzipped and
+// builder state (items + grid + text config) is gzipped and
 // base64url-packed into a single `?d=` param, so a chart is shareable and
 // bookmarkable with no server-side persistence. localStorage mirrors it as the
 // working draft. This keeps the site's "state lives in the URL" property while
@@ -32,12 +32,14 @@ export const DEFAULT_ROWS = 5
 // is fetched at 700px (_16) so even a large tile stays crisp.
 export const EXPORT_TILE = 320
 
-// Output shapes. "auto" hugs the content; the rest are fixed frames the content
-// is fitted + centered into (iOS-Photos style), so the image size stays
-// predictable whatever the layout.
-export const ASPECTS = ["square", "portrait45", "portrait916", "landscape43", "landscape169"] as const
+// Output shapes. "auto" hugs the content (the chart is exactly as big as the
+// grid, no dead space); the rest are fixed frames the content is fitted +
+// centered into (iOS-Photos style), so the image size stays predictable
+// whatever the layout.
+export const ASPECTS = ["auto", "square", "portrait45", "portrait916", "landscape43", "landscape169"] as const
 export type Aspect = (typeof ASPECTS)[number]
-export const ASPECT_CANVAS: Record<Aspect, { w: number; h: number }> = {
+// No "auto" entry: that shape's canvas is computed from the content (autoCanvas).
+export const ASPECT_CANVAS: Partial<Record<Aspect, { w: number; h: number }>> = {
   square: { w: 1080, h: 1080 }, // 1:1
   portrait45: { w: 1080, h: 1350 }, // 4:5
   portrait916: { w: 1080, h: 1920 }, // 9:16
@@ -45,7 +47,7 @@ export const ASPECT_CANVAS: Record<Aspect, { w: number; h: number }> = {
   landscape169: { w: 1920, h: 1080 }, // 16:9
 }
 export function aspectCanvas(aspect: string): { w: number; h: number } {
-  return ASPECT_CANVAS[aspect as Aspect] ?? ASPECT_CANVAS.square
+  return ASPECT_CANVAS[aspect as Aspect] ?? { w: 1080, h: 1080 }
 }
 
 // Cover size: 5 = autofit (covers fill the frame), 1..4 shrink them toward the
@@ -99,16 +101,16 @@ export function emptyState(): ChartState {
     rows: DEFAULT_ROWS,
     gap: DEFAULT_GAP,
     bg: "theme",
-    aspect: "square",
+    aspect: "auto",
     coverSize: DEFAULT_COVER,
-    anchor: "topleft",
+    anchor: "center",
     numbered: false,
     numberText: false,
     textPos: "bottom",
     textSize: DEFAULT_TEXT_SIZE,
     textAlign: "left",
     wrap: false,
-    footer: true,
+    footer: false,
     showTitle: true,
     showArtist: true,
     showLabel: false,
@@ -229,6 +231,31 @@ export function chartEdge(s: ChartState, tile: number): number {
   return Math.round((s.gap / 24) * tile * 0.1)
 }
 
+// Canvas for the "auto" shape: hugs the content plus a gap-sized edge, with
+// the longest side capped so exports stay a sane size. Returns the tile too
+// (coverSize doesn't apply: there is no frame to shrink away from).
+export const AUTO_MAX_SIDE = 2000
+export function autoCanvas(s: ChartState, count: number): { tile: number; w: number; h: number } {
+  const probe = measureChart(s, count, 1000)
+  const edge = Math.round((s.gap / 24) * 1000 * 0.1)
+  const kw = (probe.contentW + 2 * edge) / 1000
+  const kh = (probe.contentH + 2 * edge) / 1000
+  const tile = Math.max(24, Math.floor(Math.min(EXPORT_TILE, AUTO_MAX_SIDE / Math.max(kw, kh))))
+  const pad = chartEdge(s, tile)
+  const m = measureChart(s, count, tile)
+  return { tile, w: m.contentW + 2 * pad, h: m.contentH + 2 * pad }
+}
+
+// One-line title font size. measureChart's titleH budgets a single line, so a
+// wrapping title overflows the canvas (and a centered layout then clips the
+// covers). Satori can't measure text, so estimate ~0.9·fs per uppercase
+// Cinzel character (incl. letter-spacing) and shrink to fit the content width.
+export function titleFontSize(tile: number, contentW: number, title: string): number {
+  const base = Math.round(tile * 0.13)
+  const fit = Math.floor(contentW / Math.max(1, title.trim().length) / 0.9)
+  return Math.max(12, Math.min(base, fit))
+}
+
 function clampInt(n: unknown, lo: number, hi: number, fallback: number): number {
   const v = typeof n === "number" ? Math.round(n) : NaN
   if (!Number.isFinite(v)) return fallback
@@ -265,16 +292,16 @@ export function sanitizeState(raw: unknown): ChartState {
     rows: clampInt(o.rows, MIN_ROWS, MAX_ROWS, DEFAULT_ROWS),
     gap: clampInt(o.gap, MIN_GAP, MAX_GAP, DEFAULT_GAP),
     bg: validBg(o.bg),
-    aspect: (ASPECTS as readonly string[]).includes(o.aspect as string) ? (o.aspect as string) : "square",
+    aspect: (ASPECTS as readonly string[]).includes(o.aspect as string) ? (o.aspect as string) : "auto",
     coverSize: clampInt(o.coverSize, MIN_COVER, MAX_COVER, DEFAULT_COVER),
-    anchor: o.anchor === "center" ? "center" : "topleft",
+    anchor: o.anchor === "topleft" ? "topleft" : "center",
     numbered: !!o.numbered,
     numberText: !!o.numberText,
     textPos: (TEXT_POSITIONS as readonly string[]).includes(o.textPos as string) ? (o.textPos as string) : "bottom",
     textSize: clampInt(o.textSize, MIN_TEXT_SIZE, MAX_TEXT_SIZE, DEFAULT_TEXT_SIZE),
     textAlign: (TEXT_ALIGNS as readonly string[]).includes(o.textAlign as string) ? (o.textAlign as string) : "left",
     wrap: !!o.wrap,
-    footer: o.footer !== false,
+    footer: o.footer === true,
     showTitle: o.showTitle !== false,
     showArtist: o.showArtist !== false,
     showLabel: !!o.showLabel,

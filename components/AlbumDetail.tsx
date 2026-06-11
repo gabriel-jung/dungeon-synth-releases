@@ -6,6 +6,7 @@ import { Album, AlbumListItem, coverUrl, formatDateShort, safeExternalHref } fro
 import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 import { SITE_URL } from "@/lib/site"
+import { addToList, isInList, type AddToListResult } from "@/lib/listDraft"
 import BandcampImg from "./BandcampImg"
 
 export function AlbumGrid({
@@ -106,6 +107,18 @@ export default function AlbumDetail({
   const [reloadKey, setReloadKey] = useState(0)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [listResult, setListResult] = useState<AddToListResult | null>(null)
+  const [inList, setInList] = useState(false)
+  const listTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Show "In list ✓" up front when the album is already in the working list
+  // or the add queue, so it isn't re-added by reflex. isInList asks the page
+  // via a DOM event (and reads localStorage), so it can't run during render.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setListResult(null)
+    setInList(isInList(albumStub.id))
+  }, [albumStub.id])
   const hasInitialRef = useRef(initialAlbum?.id === albumStub.id)
   const { onArtistClick, openHost, push } = useAlbumCardModals(albumStub)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -116,8 +129,20 @@ export default function AlbumDetail({
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      if (listTimerRef.current) clearTimeout(listTimerRef.current)
     }
   }, [])
+
+  // Feeds the /list builder: a mounted builder picks the album up directly,
+  // anywhere else it joins the add queue for the next /list visit.
+  async function handleAddToList() {
+    if (inList) return
+    const r = await addToList(albumStub)
+    setListResult(r)
+    if (r === "added" || r === "exists") setInList(true)
+    if (listTimerRef.current) clearTimeout(listTimerRef.current)
+    listTimerRef.current = setTimeout(() => setListResult(null), 1800)
+  }
 
   useEffect(() => {
     // Caller already handed us the full album — skip the initial fetch.
@@ -263,6 +288,21 @@ export default function AlbumDetail({
                   </button>
                 )}
                 <div className="flex items-center gap-4 ml-auto">
+                  <button
+                    type="button"
+                    onClick={handleAddToList}
+                    className={`font-display text-xs tracking-[0.1em] transition-colors ${
+                      inList ? "text-accent/70 cursor-default" : "text-text-dim hover:text-accent cursor-pointer"
+                    }`}
+                  >
+                    {listResult === "added"
+                      ? "Added ✓"
+                      : listResult === "full"
+                        ? "List full"
+                        : inList
+                          ? "In list ✓"
+                          : "+ List"}
+                  </button>
                   <button
                     type="button"
                     onClick={handleShare}

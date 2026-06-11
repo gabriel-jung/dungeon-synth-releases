@@ -56,7 +56,9 @@ export default function ListSearchAdd({
         const data = (await res.json()) as SearchResponse
         setResults(data.albums ?? [])
       } catch (err) {
-        if ((err as Error).name !== "AbortError") throw err
+        // Network failure: show the empty state rather than leaving a stale
+        // spinner (a rethrow here would just be an unhandled rejection).
+        if ((err as Error).name !== "AbortError") setResults([])
       } finally {
         setLoading(false)
       }

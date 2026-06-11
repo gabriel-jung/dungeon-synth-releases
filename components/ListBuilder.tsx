@@ -7,6 +7,17 @@ import { AlbumListItem, coverUrl, formatDateShort, isHostedRelease } from "@/lib
 import { useOpenModal } from "@/lib/useModalUrl"
 import { cacheAlbumStub } from "@/lib/albumCache"
 import {
+  DRAFT_KEY,
+  type ListDraft as Draft,
+  type SavedList,
+  readSavedLists,
+  saveList,
+  deleteSavedList,
+  readPending,
+  clearPending,
+  PENDING_KEY,
+} from "@/lib/listDraft"
+import {
   ChartState,
   decodeState,
   encodeState,
@@ -19,6 +30,8 @@ import {
   aspectCanvas,
   isHorizontalText,
   textScale,
+  titleFontSize,
+  autoCanvas,
   ASPECTS,
   BG_PRESETS,
   TEXT_POSITIONS,
@@ -38,11 +51,9 @@ import {
   MAX_TITLE_LEN,
 } from "@/lib/listCodec"
 
-const DRAFT_KEY = "ds-list-draft-v1"
-type Draft = { d: string; albums: AlbumListItem[] }
-
 const BG_LABELS: Record<string, string> = { theme: "Theme", black: "Black", parchment: "Parchment", bone: "Bone" }
 const ASPECT_LABELS: Record<string, string> = {
+  auto: "Auto · fit content",
   square: "Square · 1:1",
   portrait45: "Portrait · 4:5",
   portrait916: "Portrait · 9:16",
@@ -70,25 +81,108 @@ export default function ListBuilder({
   const addedIds = useMemo(() => new Set(state.items), [state.items])
   const openModal = useOpenModal()
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  // Preview page (overflow beyond cols×rows paginates); clamped against the
+  // page count where it's consumed.
+  const [pageRaw, setPage] = useState(0)
 
+  // A `?d=` link opens as a read-only shared view, with the builder one tap
+  // away. The author reloading their own link goes straight to the builder
+  // (the URL blob matches the local draft).
+  const [editing, setEditing] = useState(initialState.items.length === 0)
+  useEffect(() => {
+    if (editing) return
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY)
+      const draft = raw ? (JSON.parse(raw) as Draft) : null
+      const d = new URLSearchParams(window.location.search).get("d")
+      if (d && draft?.d === d) setEditing(true)
+    } catch {
+      /* corrupt draft: stay in view mode */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // The "theme" backdrop resolves to a CSS var in the preview; the PNG route
+  // needs the concrete hex so the download matches what the user sees. Track
+  // it across theme switches (data-theme on <html>).
+  const [themeBg, setThemeBg] = useState("")
+  useEffect(() => {
+    const read = () => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim()
+      setThemeBg(/^#[0-9a-fA-F]{6}$/.test(v) ? v : "")
+    }
+    read()
+    const mo = new MutationObserver(read)
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+    return () => mo.disconnect()
+  }, [])
+
+  // Feature-detect after mount so the server render never disagrees.
+  const [canShare, setCanShare] = useState(false)
+  const [canCopyImg, setCanCopyImg] = useState(false)
+  useEffect(() => {
+    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
+    setCanCopyImg(typeof window !== "undefined" && "ClipboardItem" in window && !!navigator.clipboard?.write)
+  }, [])
+
+  const [saved, setSaved] = useState<SavedList[]>([])
+  useEffect(() => {
+    setSaved(readSavedLists())
+  }, [])
+
+  // The last draft is offered as an explicit "Resume" entry instead of
+  // auto-loading, so a bare /list always starts fresh.
+  const [draftEntry, setDraftEntry] = useState<{ state: ChartState; albums: AlbumListItem[] } | null>(null)
   const didRestore = useRef(false)
   useEffect(() => {
     if (didRestore.current) return
     didRestore.current = true
     if (initialState.items.length > 0) return
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(DRAFT_KEY) : null
+    // First visit on a touch device: default to a ranked list (one column,
+    // text beside the covers) instead of the desktop grid.
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      setState((s) => ({ ...s, cols: 1, rows: 10, textPos: "right" }))
+    }
+    // Albums queued via "+ List" on other pages are drained into the working
+    // list by the effect below; here the queue is only peeked (it runs first)
+    // to decide stash-vs-Resume for the old draft.
+    const pending = readPending()
+    const raw = window.localStorage.getItem(DRAFT_KEY)
     if (!raw) return
     try {
       const draft = JSON.parse(raw) as Draft
       decodeState(draft.d).then((s) => {
         if (s.items.length === 0) return
-        setAlbums(Object.fromEntries((draft.albums ?? []).map((a) => [a.id, a])))
-        setState(s)
+        if (pending.length > 0) {
+          // The queue just started a new working list, which will overwrite
+          // the draft on the first sync; stash the old draft in My lists so
+          // nothing is ever lost.
+          setSaved(
+            saveList({
+              d: draft.d,
+              title: s.title.trim(),
+              count: s.items.length,
+              savedAt: Date.now(),
+              albums: draft.albums ?? [],
+            }),
+          )
+        } else {
+          setDraftEntry({ state: s, albums: draft.albums ?? [] })
+        }
       })
     } catch {
       /* ignore a corrupt draft */
     }
   }, [initialState.items.length])
+
+  const resumeDraft = () => {
+    if (!draftEntry) return
+    // A queue-seeded working list would be replaced by the resume: stash it.
+    if (state.items.length > 0) saveCurrent()
+    setAlbums(Object.fromEntries(draftEntry.albums.map((a) => [a.id, a])))
+    setState(draftEntry.state)
+    setDraftEntry(null)
+  }
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -99,6 +193,9 @@ export default function ListBuilder({
         else sp.delete("d")
         const qs = sp.toString()
         window.history.replaceState(null, "", `/list${qs ? `?${qs}` : ""}`)
+        // Viewing someone else's list must not clobber the local draft, and
+        // neither must an empty fresh session (the draft stays resumable).
+        if (!editing || state.items.length === 0) return
         const draft: Draft = { d, albums: state.items.map((id) => albums[id]).filter(Boolean) }
         try {
           window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
@@ -108,7 +205,7 @@ export default function ListBuilder({
       })
     }, 300)
     return () => clearTimeout(t)
-  }, [state, albums])
+  }, [state, albums, editing])
 
   const addAlbum = useCallback((a: AlbumListItem) => {
     setState((s) => {
@@ -116,7 +213,68 @@ export default function ListBuilder({
       return { ...s, items: [...s.items, a.id] }
     })
     setAlbums((m) => (m[a.id] ? m : { ...m, [a.id]: a }))
+    // Jump the preview to wherever the new cover lands (clamped to the last
+    // page), so an add is never invisible.
+    setPage(Number.MAX_SAFE_INTEGER)
   }, [])
+
+  // "Add to list" from the album modal (any page). Claiming the event tells
+  // lib/listDraft not to write the queue itself; addAlbum updates state and
+  // the sync effect persists it. The verdict rides back on the event so the
+  // modal can show "In list ✓" instead of pretending a duplicate was added.
+  useEffect(() => {
+    if (!editing) return
+    const onAdd = (e: Event) => {
+      const ce = e as CustomEvent<AlbumListItem> & { dsResult?: string }
+      if (!ce.detail?.id) return
+      ce.preventDefault()
+      if (addedIds.has(ce.detail.id)) {
+        ce.dsResult = "exists"
+      } else if (addedIds.size >= MAX_ITEMS) {
+        ce.dsResult = "full"
+      } else {
+        addAlbum(ce.detail)
+        ce.dsResult = "added"
+      }
+    }
+    const onHas = (e: Event) => {
+      const ce = e as CustomEvent<string> & { dsHas?: boolean }
+      if (typeof ce.detail === "string") ce.dsHas = addedIds.has(ce.detail)
+    }
+    window.addEventListener("ds-list-add", onAdd)
+    window.addEventListener("ds-list-has", onHas)
+    return () => {
+      window.removeEventListener("ds-list-add", onAdd)
+      window.removeEventListener("ds-list-has", onHas)
+    }
+  }, [editing, addAlbum, addedIds])
+
+  // Drain the "+ List" queue into whichever list is being edited, the moment
+  // one is: bare-mount (fresh list), author detection on a ?d= reload, or the
+  // Edit tap on a shared link. Storage events don't fire in the tab that
+  // wrote the queue, so this is the only same-tab consumption path.
+  useEffect(() => {
+    if (!editing) return
+    const pending = readPending()
+    if (pending.length === 0) return
+    clearPending()
+    pending.forEach((a) => addAlbum(a))
+  }, [editing, addAlbum])
+
+  // "+ List" clicked in ANOTHER tab: CustomEvents don't cross tabs, but
+  // storage events do. Consume the queue live so the add shows up here.
+  useEffect(() => {
+    if (!editing) return
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== PENDING_KEY) return
+      const pending = readPending()
+      if (pending.length === 0) return
+      clearPending()
+      pending.forEach((a) => addAlbum(a))
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [editing, addAlbum])
 
   const removeAt = useCallback((idx: number) => {
     setState((s) => ({ ...s, items: s.items.filter((_, i) => i !== idx) }))
@@ -143,7 +301,58 @@ export default function ListBuilder({
   }, [])
 
   const patch = useCallback((p: Partial<ChartState>) => setState((s) => ({ ...s, ...p })), [])
-  const clearAll = useCallback(() => setState((s) => ({ ...s, items: [], title: "" })), [])
+
+  // Clearing is the one destructive action with no way back (the draft is
+  // overwritten 300ms later), so it takes two taps.
+  const [confirmClear, setConfirmClear] = useState(false)
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearAll = useCallback(() => {
+    if (!confirmClear) {
+      setConfirmClear(true)
+      if (clearTimer.current) clearTimeout(clearTimer.current)
+      clearTimer.current = setTimeout(() => setConfirmClear(false), 2500)
+      return
+    }
+    if (clearTimer.current) clearTimeout(clearTimer.current)
+    setConfirmClear(false)
+    setState((s) => ({ ...s, items: [], title: "" }))
+  }, [confirmClear])
+  useEffect(() => () => { if (clearTimer.current) clearTimeout(clearTimer.current) }, [])
+
+  // One-tap starting points. Each preset sets the full layout shape (so no
+  // residue from the previous one); every option stays adjustable after.
+  const applyPreset = useCallback((k: "grid" | "list" | "card") => {
+    setState((s) => {
+      if (k === "grid")
+        return { ...s, cols: 5, rows: 5, textPos: "bottom", aspect: "auto", textAlign: "left", anchor: "center", coverSize: 5 }
+      if (k === "list")
+        return {
+          ...s,
+          cols: 1,
+          rows: Math.min(MAX_ROWS, Math.max(s.items.length, 5)),
+          textPos: "right",
+          aspect: "auto",
+          textAlign: "left",
+          anchor: "center",
+          coverSize: 5,
+        }
+      // card: one big cover, text centred below, everything centred in the
+      // frame with some air around the cover, like a player view. No rank
+      // numbers, a single card isn't a ranking.
+      return {
+        ...s,
+        cols: 1,
+        rows: 1,
+        textPos: "bottom",
+        aspect: "portrait916",
+        textAlign: "center",
+        anchor: "center",
+        coverSize: 4,
+        numbered: false,
+        numberText: false,
+      }
+    })
+  }, [])
 
   const openAlbum = useCallback(
     (id: string) => {
@@ -158,17 +367,114 @@ export default function ListBuilder({
   const ink = chartInk(state.bg)
   const hasItems = state.items.length > 0
   const count = state.items.length
-  const visible = state.items.slice(0, chartCapacity(state))
-  const hidden = count - visible.length
-  const downloadBase = encoded ? `/api/list/image?d=${encoded}` : null
 
-  // The preview IS the export: same fixed canvas + auto-fit tile (shared with
-  // the PNG route), scaled to the available width. True WYSIWYG.
-  const canvas = aspectCanvas(state.aspect)
+  // Overflow becomes pages: cols×rows covers per page, one exported image per
+  // page. Item indices passed to render/move/remove are global (offset+local)
+  // so numbering and reordering work across pages.
+  const cap = chartCapacity(state)
+  const pages = Math.max(1, Math.ceil(count / cap))
+  const page = Math.min(pageRaw, pages - 1)
+  const offset = page * cap
+  const visible = state.items.slice(offset, offset + cap)
+  // Fixed shapes lay out at full capacity: the chosen cols×rows ARE the
+  // chart's dimensions (empty slots show the skeleton), and tiles stay the
+  // same size on every page. The "auto" shape hugs the actual content: the
+  // canvas is exactly as big as the covers on this page, no dead space.
+  const layoutCount = state.aspect === "auto" ? Math.max(1, visible.length) : cap
+  const bgQs = state.bg === "theme" && themeBg ? `&bg=${encodeURIComponent(themeBg)}` : ""
+  const pageQs = pages > 1 ? `&page=${page + 1}` : ""
+  const downloadBase = encoded ? `/api/list/image?d=${encoded}${bgQs}${pageQs}` : null
+  const shareUrl = encoded ? `/list?d=${encoded}` : null
+
+  const nativeShare = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.share({
+        title: state.title.trim() || "Dungeon synth list",
+        url: `${window.location.origin}${shareUrl}`,
+      })
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  }
+
+  const [imgCopied, setImgCopied] = useState(false)
+  const copyImage = async () => {
+    if (!downloadBase) return
+    try {
+      // Promise form: Safari requires the clipboard write to start inside the
+      // user gesture, before the fetch resolves.
+      const item = new ClipboardItem({ "image/png": fetch(downloadBase).then((r) => r.blob()) })
+      await navigator.clipboard.write([item])
+      setImgCopied(true)
+      setTimeout(() => setImgCopied(false), 1500)
+    } catch {
+      /* clipboard blocked or fetch failed */
+    }
+  }
+
+  const saveCurrent = () => {
+    if (!encoded || state.items.length === 0) return
+    setSaved(
+      saveList({
+        d: encoded,
+        title: state.title.trim(),
+        count: state.items.length,
+        savedAt: Date.now(),
+        albums: state.items.map((id) => albums[id]).filter(Boolean),
+      }),
+    )
+  }
+
+  // The working list autosaves to the single draft slot; before anything
+  // replaces it (loading a saved list, resuming, editing a shared link), the
+  // about-to-be-lost list is stashed into My lists. Nothing is ever dropped.
+  const loadSaved = (s: SavedList) => {
+    decodeState(s.d).then((st) => {
+      if (st.items.length === 0) return
+      if (encoded && encoded !== s.d) saveCurrent()
+      setAlbums((m) => ({ ...m, ...Object.fromEntries((s.albums ?? []).map((a) => [a.id, a])) }))
+      setState(st)
+    })
+  }
+
+  // Editing a shared list makes it the working draft; stash the user's own
+  // draft first (the viewer never wrote over it, so it's still in storage).
+  const enterEdit = async () => {
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const draft = JSON.parse(raw) as Draft
+        if (draft.d && draft.d !== encoded) {
+          const s = await decodeState(draft.d)
+          if (s.items.length > 0) {
+            setSaved(
+              saveList({
+                d: draft.d,
+                title: s.title.trim(),
+                count: s.items.length,
+                savedAt: Date.now(),
+                albums: draft.albums ?? [],
+              }),
+            )
+          }
+        }
+      }
+    } catch {
+      /* corrupt draft: nothing to stash */
+    }
+    setEditing(true)
+  }
+
+  // The preview IS the export: same canvas + tile (shared with the PNG
+  // route), scaled to the available width. True WYSIWYG. "auto" hugs the
+  // content (no dead space); fixed shapes fit the content into the frame.
+  const ac = state.aspect === "auto" ? autoCanvas(state, layoutCount) : null
+  const canvas = ac ? { w: ac.w, h: ac.h } : aspectCanvas(state.aspect)
   const centered = state.anchor === "center"
-  const TILE = chartTile(state, visible.length, canvas.w, canvas.h)
+  const TILE = ac ? ac.tile : chartTile(state, layoutCount, canvas.w, canvas.h)
   const pad = chartEdge(state, TILE)
-  const L = measureChart(state, visible.length, TILE, canvas.w - 2 * pad)
+  const L = measureChart(state, layoutCount, TILE, canvas.w - 2 * pad)
   const horiz = isHorizontalText(state.textPos)
   const ai = state.textAlign === "center" ? "center" : state.textAlign === "right" ? "flex-end" : "flex-start"
 
@@ -179,6 +485,7 @@ export default function ListBuilder({
   const asideRef = useRef<HTMLElement>(null)
   const [scale, setScale] = useState(0)
   const [maxBoxH, setMaxBoxH] = useState(0)
+  const capH = L.capH
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
@@ -186,11 +493,24 @@ export default function ListBuilder({
       const w = stage.clientWidth
       if (w <= 0) return
       const vh = (typeof window !== "undefined" ? window.innerHeight : 900) * 0.85
-      setMaxBoxH(Math.min(asideRef.current?.offsetHeight ?? vh, vh))
-      // Scale so a 100% caption renders at the release-feed size (0.8rem); the
-      // box height is bounded by a scroll container, not by shrinking the text.
-      const fontScale = 12.8 / (TILE * 0.075)
-      setScale(Math.min(1, w / canvas.w, fontScale))
+      if (!editing || !window.matchMedia("(min-width: 64rem)").matches) {
+        // Phone: shape fidelity wins. Fit the whole canvas in the viewport so a
+        // portrait or landscape frame reads as its true shape instead of being
+        // scroll-cropped, and ignore the settings column (it's stacked, not
+        // beside the preview).
+        setMaxBoxH(vh)
+        setScale(Math.min(1, w / canvas.w, vh / canvas.h))
+        return
+      }
+      // Desktop: the whole canvas must fit (a portrait frame has to LOOK
+      // portrait, not get scroll-cropped to a square), so height bounds the
+      // scale too. The caption anchor (100% caption = release-feed 0.8rem)
+      // stays as a ceiling so text never renders oversized; tall frames may
+      // shrink captions below it, shape fidelity wins.
+      const maxH = Math.min(asideRef.current?.offsetHeight ?? vh, vh)
+      setMaxBoxH(maxH)
+      const fontScale = capH > 0 ? 12.8 / (TILE * 0.075) : 1
+      setScale(Math.min(1, w / canvas.w, maxH / canvas.h, fontScale))
     }
     compute()
     const ro = new ResizeObserver(compute)
@@ -201,17 +521,25 @@ export default function ListBuilder({
       ro.disconnect()
       window.removeEventListener("resize", compute)
     }
-  }, [canvas.w, canvas.h, TILE])
+    // hasItems: the stage div only exists once there are items, and a 0→1 item
+    // change leaves TILE identical (measure clamps count to 1), so without it
+    // the observer never attaches after a draft restore and scale stays 0.
+  }, [canvas.w, canvas.h, TILE, capH, editing, hasItems])
   const boxW = Math.round(canvas.w * scale)
 
   const px = (n: number) => `${n}px`
+
+  // The tile buttons sit inside the scale()-ed canvas, so their 24px DOM size
+  // shrinks with it (~7px on a phone). Counter-scale them back toward their
+  // natural size, capped so the three-button row still fits the tile.
+  const btnScale = scale > 0 ? Math.min(1 / scale, TILE / 88) : 1
 
   const renderCover = (id: string, idx: number, showNum: boolean) => {
     const a = albums[id]
     const src = coverUrl(a?.art_id, "xl")
     return (
       <div
-        draggable
+        draggable={editing}
         onDragStart={(e) => {
           setDragIdx(idx)
           e.dataTransfer.effectAllowed = "move"
@@ -223,9 +551,9 @@ export default function ListBuilder({
           if (dragIdx !== null) reorder(dragIdx, idx)
           setDragIdx(null)
         }}
-        className={`group/cell relative bg-bg-card border overflow-hidden cursor-grab active:cursor-grabbing transition-opacity ${
-          dragIdx === idx ? "opacity-40 border-accent" : "border-border"
-        }`}
+        className={`group/cell relative bg-bg-card border overflow-hidden transition-opacity ${
+          editing ? "cursor-grab active:cursor-grabbing" : ""
+        } ${dragIdx === idx ? "opacity-40 border-accent" : "border-border"}`}
         style={{ width: px(TILE), height: px(TILE) }}
       >
         {src ? (
@@ -245,11 +573,16 @@ export default function ListBuilder({
             {idx + 1}
           </span>
         )}
-        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/cell:opacity-100 focus-within:opacity-100 transition-opacity">
-          <TileBtn label="Move earlier" disabled={idx === 0} onClick={() => move(idx, -1)}>←</TileBtn>
-          <TileBtn label="Move later" disabled={idx === visible.length - 1} onClick={() => move(idx, 1)}>→</TileBtn>
-          <TileBtn label="Remove" onClick={() => removeAt(idx)}>×</TileBtn>
-        </div>
+        {editing && (
+          <div
+            className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/cell:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity"
+            style={{ transform: `scale(${btnScale})`, transformOrigin: "top right" }}
+          >
+            <TileBtn label="Move earlier" disabled={idx === 0} onClick={() => move(idx, -1)}>←</TileBtn>
+            <TileBtn label="Move later" disabled={idx === count - 1} onClick={() => move(idx, 1)}>→</TileBtn>
+            <TileBtn label="Remove" onClick={() => removeAt(idx)}>×</TileBtn>
+          </div>
+        )}
       </div>
     )
   }
@@ -265,10 +598,17 @@ export default function ListBuilder({
     const cs = (fs: number) => ({ color: ink.dim, fontSize: px(fs), lineHeight: 1.32, maxWidth: px(capW) }) as const
     return (
       <div
-        className="flex flex-col justify-center cursor-pointer transition-opacity hover:opacity-70"
+        className="flex flex-col justify-center cursor-pointer transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
         style={{ alignItems: ai, width: px(capW) }}
         onClick={() => openAlbum(id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            openAlbum(id)
+          }
+        }}
         role="button"
+        tabIndex={0}
         title="Open details"
       >
         {state.showTitle && <div className={`font-medium ${clip}`} style={{ color: ink.fg, fontSize: px(L.capTitleFs), lineHeight: 1.3, maxWidth: px(capW) }}>{titleText}</div>}
@@ -292,6 +632,18 @@ export default function ListBuilder({
     )
   }
 
+  // Unfilled slots on the current page, drawn as faint outlines (preview only,
+  // not exported) so the chosen grid dimensions stay visible.
+  const emptySlots = Array.from({ length: Math.max(0, layoutCount - visible.length) }, (_, i) => (
+    <li key={`empty-${i}`} className="flex items-start">
+      <div
+        aria-hidden
+        className="border border-border/40"
+        style={{ width: px(TILE), height: px(TILE), backgroundColor: "#00000022" }}
+      />
+    </li>
+  ))
+
   // Side text: one numbered list column beside the grid, rows aligned to grid rows.
   const sideText = horiz && L.capH > 0
   const textListEl = (
@@ -299,22 +651,88 @@ export default function ListBuilder({
       {Array.from({ length: L.rows }).map((_, r) => (
         <div key={r} className="flex flex-col justify-center" style={{ height: px(L.cellH), gap: px(Math.round(TILE * 0.04)) }}>
           {visible.slice(r * L.cols, r * L.cols + L.cols).map((id, i) => (
-            <div key={id}>{renderCaption(id, L.textColW, r * L.cols + i, true)}</div>
+            <div key={id}>{renderCaption(id, L.textColW, offset + r * L.cols + i, true)}</div>
           ))}
         </div>
       ))}
     </div>
   )
 
-  const titleFs = Math.round(TILE * 0.13)
+  const titleFs = titleFontSize(TILE, L.contentW, state.title)
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-16 flex flex-col lg:flex-row gap-6 lg:gap-10">
       {/* ─────────── Controls ─────────── */}
+      {editing && (
       <aside ref={asideRef} className="lg:w-72 lg:shrink-0 flex flex-col gap-4">
         <ListSearchAdd onPick={addAlbum} addedIds={addedIds} />
 
+        {/* My lists sit above the settings: resuming or loading a list is an
+            entry point, not a setting. */}
+        {(draftEntry || saved.length > 0 || hasItems) && (
+        <div className="flex flex-col gap-2">
+          <Eyebrow>My lists</Eyebrow>
+          {/* The working list, pinned on top so it's clear what loading or
+              resuming another list will replace. */}
+          {hasItems && (
+            <div className="flex flex-col gap-0.5 px-3 py-2 border border-accent/50">
+              <span className="truncate font-sans text-xs text-text-bright italic">{state.title.trim() || "Untitled list"}</span>
+              <span className="font-display text-[9px] tracking-[0.15em] uppercase text-accent/80 tabular-nums">
+                Current · {count} {count === 1 ? "release" : "releases"}
+              </span>
+            </div>
+          )}
+          {draftEntry && !hasItems && (
+            <PillBtn onClick={resumeDraft}>
+              ↻ Resume last list ({draftEntry.state.items.length})
+            </PillBtn>
+          )}
+          <PillBtn onClick={saveCurrent} disabled={!hasItems}>♟ Save this list</PillBtn>
+          <p className="font-sans text-[11px] italic leading-snug text-text-dim">
+            The list you are editing autosaves in this browser. Save keeps a separate snapshot here; Copy link keeps a
+            list anywhere else.
+          </p>
+          {saved.map((s) => (
+            <div key={s.d} className="flex items-stretch border border-border/40">
+              <button
+                type="button"
+                onClick={() => loadSaved(s)}
+                title="Load this list"
+                className="flex-1 min-w-0 px-3 py-2 text-left flex flex-col gap-0.5 transition-colors hover:bg-bg-hover cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+              >
+                <span className="truncate font-sans text-xs text-text-bright italic">{s.title || "Untitled list"}</span>
+                <span className="font-display text-[9px] tracking-[0.15em] uppercase text-text-dim tabular-nums">
+                  {s.count} {s.count === 1 ? "release" : "releases"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaved(deleteSavedList(s.d))}
+                aria-label={`Delete saved list ${s.title || "Untitled list"}`}
+                className="shrink-0 w-9 flex items-center justify-center border-l border-border/40 text-sm text-text-dim hover:text-accent hover:bg-bg-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        )}
+
         <div className="bg-bg-card border border-border flex flex-col">
+          <Field label="Quick layout">
+            <div className="flex gap-2">
+              {(["grid", "list", "card"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => applyPreset(k)}
+                  className="flex-1 px-2 py-1.5 border border-border/50 font-display text-[10px] tracking-[0.15em] uppercase text-text-dim hover:text-accent hover:border-accent/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </Field>
           <Field label="Title">
             <input
               type="text"
@@ -326,7 +744,7 @@ export default function ListBuilder({
             />
           </Field>
 
-          <SectionLabel>Layout</SectionLabel>
+          <Section title="Layout">
           <Field label="Columns" value={state.cols}>
             <Slider min={MIN_COLS} max={MAX_COLS} value={state.cols} onChange={(v) => patch({ cols: v })} label="Columns" />
           </Field>
@@ -342,8 +760,9 @@ export default function ListBuilder({
           <Select label="Shape" value={state.aspect} onChange={(v) => patch({ aspect: v })} options={ASPECTS} labels={ASPECT_LABELS} />
           <Select label="Frame position" value={state.anchor} onChange={(v) => patch({ anchor: v })} options={ANCHORS} labels={ANCHOR_LABELS} />
           <Select label="Backdrop" value={state.bg} onChange={(v) => patch({ bg: v })} options={BG_PRESETS} labels={BG_LABELS} />
+          </Section>
 
-          <SectionLabel>Text</SectionLabel>
+          <Section title="Text">
           <Select label="Position" value={state.textPos} onChange={(v) => patch({ textPos: v })} options={TEXT_POSITIONS} labels={POS_LABELS} />
           <Select label="Align" value={state.textAlign} onChange={(v) => patch({ textAlign: v })} options={TEXT_ALIGNS} labels={ALIGN_LABELS} />
           <Field label="Text size" value={`${Math.round(textScale(state.textSize) * 100)}%`}>
@@ -356,41 +775,37 @@ export default function ListBuilder({
           <Toggle label="Show artist" checked={state.showArtist} onChange={(v) => patch({ showArtist: v })} />
           <Toggle label="Show label" checked={state.showLabel} onChange={(v) => patch({ showLabel: v })} />
           <Toggle label="Show date" checked={state.showDate} onChange={(v) => patch({ showDate: v })} />
+          </Section>
 
-          <SectionLabel>Footer</SectionLabel>
+          <Section title="Footer">
           <Toggle label="Show wordmark" checked={state.footer} onChange={(v) => patch({ footer: v })} />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Eyebrow>Share</Eyebrow>
-          <CopyLinkButton href={encoded ? `/list?d=${encoded}` : null} />
-          <PillLink href={downloadBase}>↓ Download image</PillLink>
-          <p className="font-sans text-[11px] italic leading-snug text-text-dim">
-            Copy the link to share this exact list, or download it as a PNG.
-          </p>
+          </Section>
         </div>
 
         {hasItems && (
           <button
             type="button"
             onClick={clearAll}
-            className="self-start font-display text-[10px] tracking-[0.2em] uppercase text-text-dim hover:text-accent transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+            className={`self-start font-display text-[10px] tracking-[0.2em] uppercase transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 ${
+              confirmClear ? "text-accent" : "text-text-dim hover:text-accent"
+            }`}
           >
-            ↺ Clear all
+            {confirmClear ? "✕ Really clear? Tap again" : "↺ Clear all"}
           </button>
         )}
       </aside>
+      )}
 
       {/* ─────────── Preview ─────────── */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 order-first lg:order-none">
         <div
-          className="flex items-center justify-between mb-2"
+          className={`flex items-center justify-between mb-2 ${editing ? "mx-auto lg:mx-0" : "mx-auto"}`}
           style={hasItems && scale > 0 ? { width: px(boxW) } : undefined}
         >
-          <Eyebrow>Preview</Eyebrow>
+          <Eyebrow>{editing ? "Preview" : "Shared list"}</Eyebrow>
           {hasItems && (
             <span className="font-display text-[10px] tracking-[0.15em] uppercase text-text-dim tabular-nums">
-              {hidden > 0 ? `${visible.length} of ${count} shown` : `${count} ${count === 1 ? "release" : "releases"}`}
+              {pages > 1 ? `${count} releases · ${pages} pages` : `${count} ${count === 1 ? "release" : "releases"}`}
             </span>
           )}
         </div>
@@ -406,7 +821,7 @@ export default function ListBuilder({
         ) : (
           <div
             ref={stageRef}
-            className="w-full overflow-x-hidden overflow-y-auto"
+            className={`w-full overflow-x-hidden overflow-y-auto flex flex-col items-center ${editing ? "lg:items-start" : ""}`}
             style={{ maxHeight: maxBoxH ? px(maxBoxH) : undefined, scrollbarWidth: "none" }}
           >
             <div className="border border-border overflow-hidden" style={{ width: px(canvas.w * scale), height: px(canvas.h * scale) }}>
@@ -437,8 +852,8 @@ export default function ListBuilder({
                           }}
                         />
                         <div
-                          className="font-display uppercase text-center"
-                          style={{ color: ink.fg, fontSize: px(titleFs), letterSpacing: "0.07em" }}
+                          className="font-display uppercase text-center whitespace-nowrap overflow-hidden text-ellipsis"
+                          style={{ color: ink.fg, fontSize: px(titleFs), letterSpacing: "0.07em", maxWidth: px(L.contentW) }}
                         >
                           {state.title}
                         </div>
@@ -450,17 +865,19 @@ export default function ListBuilder({
                         <ol className="flex flex-wrap list-none" style={{ gap: px(L.gap), width: px(L.gridW) }}>
                           {visible.map((id, idx) => (
                             <li key={id} className="flex items-center" style={{ height: px(L.cellH) }}>
-                              {renderCover(id, idx, true)}
+                              {renderCover(id, offset + idx, true)}
                             </li>
                           ))}
+                          {emptySlots}
                         </ol>
                         {state.textPos === "right" && textListEl}
                       </div>
                     ) : (
                       <ol className="flex flex-wrap list-none" style={{ gap: px(L.gap), width: px(L.gridW) }}>
                         {visible.map((id, idx) => (
-                          <li key={id}>{renderVCell(id, idx)}</li>
+                          <li key={id}>{renderVCell(id, offset + idx)}</li>
                         ))}
+                        {emptySlots}
                       </ol>
                     )}
                     {state.footer && (
@@ -483,9 +900,46 @@ export default function ListBuilder({
           </div>
         )}
 
-        {hidden > 0 && (
-          <p className="mt-3 text-center font-display text-[10px] tracking-[0.15em] uppercase text-text-dim">
-            +{hidden} more not shown · raise rows or columns
+        {/* Action bar: belongs to the artifact, aligned to the chart box
+            (whatever its shape) instead of floating centered below it. */}
+        {(!editing || hasItems) && (
+          <div
+            className={`mt-3 flex flex-wrap items-center gap-2 ${editing ? "mx-auto lg:mx-0" : "mx-auto justify-center"}`}
+            style={scale > 0 ? { width: px(boxW) } : undefined}
+          >
+            {!editing && (
+              <ActionBtn accent onClick={() => void enterEdit()}>
+                ✎ Edit
+              </ActionBtn>
+            )}
+            {canShare && <ActionBtn onClick={nativeShare} disabled={!shareUrl}>⤴ Share</ActionBtn>}
+            <CopyLinkAction href={shareUrl} />
+            <ActionLink href={downloadBase}>↓ Download</ActionLink>
+            {canCopyImg && (
+              <ActionBtn onClick={copyImage} disabled={!downloadBase}>
+                {imgCopied ? "Copied ✓" : "▣ Copy image"}
+              </ActionBtn>
+            )}
+          </div>
+        )}
+
+        {pages > 1 && (
+          <div className="mt-3 flex items-center justify-center gap-4">
+            <TileBtn label="Previous page" disabled={page === 0} onClick={() => setPage(page - 1)}>←</TileBtn>
+            <span className="font-display text-[10px] tracking-[0.15em] uppercase text-text-dim tabular-nums">
+              Page {page + 1} / {pages}
+            </span>
+            <TileBtn label="Next page" disabled={page === pages - 1} onClick={() => setPage(page + 1)}>→</TileBtn>
+          </div>
+        )}
+
+        {!editing && (
+          <p className="mt-4 text-center font-sans text-[11px] italic leading-snug text-text-dim">
+            Made with the{" "}
+            <a href="/list" className="underline underline-offset-2 hover:text-accent transition-colors">
+              list builder
+            </a>
+            , make your own.
           </p>
         )}
       </div>
@@ -499,12 +953,38 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   return <span className="font-display text-[10px] tracking-[0.2em] uppercase text-text-dim">{children}</span>
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+// Collapsible settings group. Until the user toggles it, `open` is null and the
+// body visibility is pure CSS (open on desktop, collapsed on mobile), so the
+// server and hydration renders agree on every device.
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState<boolean | null>(null)
+  const toggle = () => setOpen((o) => (o === null ? !window.matchMedia("(min-width: 64rem)").matches : !o))
+  const body = open === null ? "hidden lg:flex" : open ? "flex" : "hidden"
   return (
-    <div className="px-4 pt-4 pb-1.5 flex items-center gap-2 select-none">
-      <span aria-hidden className="text-[7px] leading-none text-accent/50">◆</span>
-      <span className="font-display text-[9px] tracking-[0.28em] uppercase text-accent/70">{children}</span>
-      <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-border/60 to-transparent" />
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open ?? undefined}
+        className="w-full px-4 pt-4 pb-1.5 flex items-center gap-2 select-none cursor-pointer group/sec focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+      >
+        <span aria-hidden className="text-[7px] leading-none text-accent/50">◆</span>
+        <span className="font-display text-[9px] tracking-[0.28em] uppercase text-accent/70 transition-colors group-hover/sec:text-accent">{title}</span>
+        <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-border/60 to-transparent" />
+        <span aria-hidden className="text-[8px] leading-none text-text-dim">
+          {open === null ? (
+            <>
+              <span className="lg:hidden">▸</span>
+              <span className="hidden lg:inline">▾</span>
+            </>
+          ) : open ? (
+            "▾"
+          ) : (
+            "▸"
+          )}
+        </span>
+      </button>
+      <div className={`${body} flex-col`}>{children}</div>
     </div>
   )
 }
@@ -620,10 +1100,49 @@ function TileBtn({
   )
 }
 
-function CopyLinkButton({ href }: { href: string | null }) {
+/* Compact action-bar atoms: auto-width pills that sit in a row under the
+   chart, aligned to its box. */
+const ACTION_BASE = "px-3 py-1.5 border font-display text-[10px] tracking-[0.15em] uppercase transition-colors whitespace-nowrap"
+const ACTION_OFF = `${ACTION_BASE} border-border/40 text-text-dim/40 cursor-not-allowed`
+const ACTION_ON = `${ACTION_BASE} cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60`
+
+function ActionBtn({
+  onClick,
+  disabled,
+  accent,
+  children,
+}: {
+  onClick: () => void
+  disabled?: boolean
+  accent?: boolean
+  children: React.ReactNode
+}) {
+  if (disabled) return <span className={ACTION_OFF}>{children}</span>
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${ACTION_ON} ${
+        accent ? "border-accent/60 text-accent hover:bg-accent/10" : "border-border/50 text-text hover:border-accent/60 hover:text-accent"
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ActionLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+  if (!href) return <span className={ACTION_OFF}>{children}</span>
+  return (
+    <a href={href} download className={`${ACTION_ON} border-border/50 text-text hover:border-accent/60 hover:text-accent`}>
+      {children}
+    </a>
+  )
+}
+
+function CopyLinkAction({ href }: { href: string | null }) {
   const [copied, setCopied] = useState(false)
-  const base = "block w-full text-center px-4 py-2 border font-display text-[10px] tracking-[0.2em] uppercase transition-colors"
-  if (!href) return <span className={`${base} border-border/40 text-text-dim/40 cursor-not-allowed`}>⧉ Copy link</span>
+  if (!href) return <span className={ACTION_OFF}>⧉ Copy link</span>
   return (
     <button
       type="button"
@@ -636,23 +1155,24 @@ function CopyLinkButton({ href }: { href: string | null }) {
           /* clipboard blocked (insecure context / denied) */
         }
       }}
-      className={`${base} ${copied ? "border-accent/60 text-accent" : "border-border/50 text-text hover:border-accent/60 hover:text-accent"} cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60`}
+      className={`${ACTION_ON} ${copied ? "border-accent/60 text-accent" : "border-border/50 text-text hover:border-accent/60 hover:text-accent"}`}
     >
       {copied ? "Link copied ✓" : "⧉ Copy link"}
     </button>
   )
 }
 
-function PillLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+function PillBtn({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   const base = "block w-full text-center px-4 py-2 border font-display text-[10px] tracking-[0.2em] uppercase transition-colors"
-  if (!href) return <span className={`${base} border-border/40 text-text-dim/40 cursor-not-allowed`}>{children}</span>
+  if (disabled) return <span className={`${base} border-border/40 text-text-dim/40 cursor-not-allowed`}>{children}</span>
   return (
-    <a
-      href={href}
-      download
+    <button
+      type="button"
+      onClick={onClick}
       className={`${base} border-border/50 text-text hover:border-accent/60 hover:text-accent cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60`}
     >
       {children}
-    </a>
+    </button>
   )
 }
+
