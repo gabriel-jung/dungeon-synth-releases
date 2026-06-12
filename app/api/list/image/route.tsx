@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { type NextRequest } from "next/server"
-import { decodeState, chartIds, chartCapacity, measureChart, chartTile, chartEdge, aspectCanvas, autoCanvas, isHorizontalText, resolveBg, chartInk, titleFontSize } from "@/lib/listCodec"
+import { decodeState, chartIds, chartCapacity, measureChart, chartTile, chartEdge, aspectCanvas, autoCanvas, fitBox, isHorizontalText, resolveBg, chartInk, titleFontSize } from "@/lib/listCodec"
 import { fetchAlbumsByIds } from "@/lib/supabase"
 import { coverUrl, formatDateShort, isHostedRelease, type AlbumListItem } from "@/lib/types"
 import { checkRateLimit, ipFromRequest, rateLimitResponse } from "@/lib/rateLimit"
@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
   const ac = state.aspect === "auto" ? autoCanvas(state, layoutCount) : null
   const { w: W, h: H } = ac ?? aspectCanvas(state.aspect)
   const centered = state.anchor === "center"
-  const TILE = ac ? ac.tile : chartTile(state, layoutCount, W, H)
+  // Stories overlay UI top and bottom; fit the content into the safe band.
+  const box = fitBox(state.aspect, W, H)
+  const TILE = ac ? ac.tile : chartTile(state, layoutCount, box.w, box.h)
   // Outer margin = the inter-cover gap (0 = flush to the corner).
   const PAD = chartEdge(state, TILE)
   const L = measureChart(state, layoutCount, TILE, W - 2 * PAD)
@@ -57,20 +59,37 @@ export async function GET(request: NextRequest) {
   const crestFs = Math.round(TILE * 0.08)
   const creditFs = Math.round(TILE * 0.05)
 
-  const [cinzelRegular, cinzelBold] = await Promise.all([
+  // "art" backdrop: the page's first cover full-bleed under a dark gradient
+  // (Satori has no blur; a dimmed 700px source stretched to canvas reads soft
+  // enough). Covers then get a shadow so they lift off the busy backdrop.
+  const artBgSrc = state.bg === "art" ? coverUrl(items[0]?.art_id, "xl") : null
+  const coverShadow = state.bg === "art" ? "0 24px 80px rgba(0,0,0,0.55)" : undefined
+
+  // Cinzel for the title/wordmark (display), Crimson Text for captions: the
+  // same split the site itself uses, so the export matches the preview's
+  // body-font captions instead of forcing everything into the display face.
+  const [cinzelRegular, cinzelBold, crimsonRegular, crimsonSemiBold, crimsonItalic] = await Promise.all([
     readFile(path.join(process.cwd(), "public/fonts/Cinzel-Regular.woff")),
     readFile(path.join(process.cwd(), "public/fonts/Cinzel-Bold.woff")),
+    readFile(path.join(process.cwd(), "public/fonts/CrimsonText-Regular.ttf")),
+    readFile(path.join(process.cwd(), "public/fonts/CrimsonText-SemiBold.ttf")),
+    readFile(path.join(process.cwd(), "public/fonts/CrimsonText-Italic.ttf")),
   ])
 
-  const oneLine = (fs: number, color: string, weight: number, text: string, maxW: number) => (
+  const oneLine = (fs: number, color: string, weight: number, text: string, maxW: number, italic = false) => (
     <div
       style={{
         display: "flex",
+        fontFamily: "Crimson Text",
         fontSize: fs,
         lineHeight: 1.3,
         fontWeight: weight,
+        fontStyle: italic ? "italic" : "normal",
         color,
         maxWidth: maxW,
+        // Wrapped lines need the explicit alignment; the flex wrapper only
+        // places the block, not the text inside it.
+        textAlign: state.textAlign as "left" | "center" | "right",
         whiteSpace: wrapText ? "normal" : "nowrap",
         overflow: "hidden",
         textOverflow: wrapText ? "clip" : "ellipsis",
@@ -82,9 +101,12 @@ export async function GET(request: NextRequest) {
 
   const captionBlock = (a: AlbumListItem, capW: number, idx: number, withNum: boolean) => {
     if (L.capH <= 0) return null
-    const fields: Array<{ fs: number; c: string; w: number; t: string }> = []
-    if (state.showTitle) fields.push({ fs: L.capTitleFs, c: ink.fg, w: 700, t: a.title })
-    if (state.showArtist) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: a.artist })
+    const ov = state.texts[OFFSET + idx]
+    const fields: Array<{ fs: number; c: string; w: number; t: string; i?: boolean }> = []
+    if (state.showTitle) fields.push({ fs: L.capTitleFs, c: ink.fg, w: 600, t: ov?.t ?? a.title })
+    // Artist runs dim italic (Spotify dims its artist line too): title
+    // semibold bright / artist dim italic / meta dim regular.
+    if (state.showArtist) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: ov?.a ?? a.artist, i: true })
     // Skip the label line entirely for self-released albums, matching the
     // preview (an empty line here would push captions out of sync with it).
     if (state.showLabel && isHostedRelease(a)) fields.push({ fs: L.capSubFs, c: ink.dim, w: 400, t: a.host_name! })
@@ -95,7 +117,7 @@ export async function GET(request: NextRequest) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: ai, justifyContent: "center", width: capW }}>
         {fields.map((f, i) => (
           <div key={i} style={{ display: "flex", width: capW, justifyContent: ai === "flex-end" ? "flex-end" : ai === "center" ? "center" : "flex-start" }}>
-            {oneLine(f.fs, f.c, f.w, f.t, capW)}
+            {oneLine(f.fs, f.c, f.w, f.t, capW, f.i)}
           </div>
         ))}
       </div>
@@ -105,7 +127,8 @@ export async function GET(request: NextRequest) {
   const cover = (a: AlbumListItem, idx: number, showNum: boolean) => {
     const src = coverUrl(a.art_id, "xl")
     return (
-      <div style={{ display: "flex", position: "relative", width: TILE, height: TILE, backgroundColor: "#00000055" }}>
+      // Satori rejects an explicit `boxShadow: undefined`, so spread only when set.
+      <div style={{ display: "flex", position: "relative", width: TILE, height: TILE, backgroundColor: "#00000055", ...(coverShadow ? { boxShadow: coverShadow } : {}) }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {src ? <img src={src} alt="" width={TILE} height={TILE} style={{ objectFit: "cover" }} /> : null}
         {showNum && state.numbered ? (
@@ -181,6 +204,29 @@ export async function GET(request: NextRequest) {
           fontFamily: "Cinzel",
         }}
       >
+        {artBgSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={artBgSrc}
+            alt=""
+            width={W}
+            height={H}
+            style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", opacity: 0.22 }}
+          />
+        ) : null}
+        {artBgSrc ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: W,
+              height: H,
+              backgroundImage: "linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.78) 100%)",
+            }}
+          />
+        ) : null}
         <div style={{ display: "flex", flexDirection: "column", alignItems: centered ? "center" : "flex-start", width: L.contentW }}>
           {state.title.trim() ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: centered ? "center" : "flex-start", marginBottom: Math.round(TILE * 0.12) }}>
@@ -249,6 +295,9 @@ export async function GET(request: NextRequest) {
       fonts: [
         { name: "Cinzel", data: cinzelRegular, weight: 400, style: "normal" },
         { name: "Cinzel", data: cinzelBold, weight: 700, style: "normal" },
+        { name: "Crimson Text", data: crimsonRegular, weight: 400, style: "normal" },
+        { name: "Crimson Text", data: crimsonSemiBold, weight: 600, style: "normal" },
+        { name: "Crimson Text", data: crimsonItalic, weight: 400, style: "italic" },
       ],
       headers: {
         "Content-Disposition": `attachment; filename="dungeon-synth-list${totalPages > 1 ? `-p${pageIdx + 1}` : ""}.png"`,

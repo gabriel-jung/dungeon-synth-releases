@@ -28,6 +28,7 @@ import {
   chartTile,
   chartEdge,
   aspectCanvas,
+  fitBox,
   isHorizontalText,
   textScale,
   titleFontSize,
@@ -49,9 +50,10 @@ import {
   MAX_GAP,
   MAX_ITEMS,
   MAX_TITLE_LEN,
+  CARD_PRESET,
 } from "@/lib/listCodec"
 
-const BG_LABELS: Record<string, string> = { theme: "Theme", black: "Black", parchment: "Parchment", bone: "Bone" }
+const BG_LABELS: Record<string, string> = { theme: "Theme", art: "Artwork", black: "Black", parchment: "Parchment", bone: "Bone" }
 const ASPECT_LABELS: Record<string, string> = {
   auto: "Auto · fit content",
   square: "Square · 1:1",
@@ -81,6 +83,9 @@ export default function ListBuilder({
   const addedIds = useMemo(() => new Set(state.items), [state.items])
   const openModal = useOpenModal()
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  // Item (global index) whose caption is being edited in the panel under the
+  // preview; the form lives outside the scale()-ed canvas so it stays usable.
+  const [editIdx, setEditIdx] = useState<number | null>(null)
   // Preview page (overflow beyond cols×rows paginates); clamped against the
   // page count where it's consumed.
   const [pageRaw, setPage] = useState(0)
@@ -115,14 +120,6 @@ export default function ListBuilder({
     const mo = new MutationObserver(read)
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
     return () => mo.disconnect()
-  }, [])
-
-  // Feature-detect after mount so the server render never disagrees.
-  const [canShare, setCanShare] = useState(false)
-  const [canCopyImg, setCanCopyImg] = useState(false)
-  useEffect(() => {
-    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
-    setCanCopyImg(typeof window !== "undefined" && "ClipboardItem" in window && !!navigator.clipboard?.write)
   }, [])
 
   const [saved, setSaved] = useState<SavedList[]>([])
@@ -276,8 +273,20 @@ export default function ListBuilder({
     return () => window.removeEventListener("storage", onStorage)
   }, [editing, addAlbum])
 
+  // Caption overrides travel with their item through every mutation, so the
+  // texts array is padded to items length before any splice/swap.
+  const paddedTexts = (s: ChartState) => {
+    const t = [...s.texts]
+    while (t.length < s.items.length) t.push(null)
+    return t
+  }
+
   const removeAt = useCallback((idx: number) => {
-    setState((s) => ({ ...s, items: s.items.filter((_, i) => i !== idx) }))
+    setState((s) => ({
+      ...s,
+      items: s.items.filter((_, i) => i !== idx),
+      texts: paddedTexts(s).filter((_, i) => i !== idx),
+    }))
   }, [])
 
   const move = useCallback((idx: number, dir: -1 | 1) => {
@@ -286,7 +295,9 @@ export default function ListBuilder({
       if (j < 0 || j >= s.items.length) return s
       const items = [...s.items]
       ;[items[idx], items[j]] = [items[j], items[idx]]
-      return { ...s, items }
+      const texts = paddedTexts(s)
+      ;[texts[idx], texts[j]] = [texts[j], texts[idx]]
+      return { ...s, items, texts }
     })
   }, [])
 
@@ -296,7 +307,25 @@ export default function ListBuilder({
       const items = [...s.items]
       const [m] = items.splice(from, 1)
       items.splice(to, 0, m)
-      return { ...s, items }
+      const texts = paddedTexts(s)
+      const [mt] = texts.splice(from, 1)
+      texts.splice(to, 0, mt)
+      return { ...s, items, texts }
+    })
+  }, [])
+
+  // Caption override editor: an empty input falls back to the album's own
+  // data. Raw value kept while typing; sanitizeState trims on encode.
+  const setText = useCallback((gi: number, field: "t" | "a", v: string) => {
+    setState((s) => {
+      if (gi < 0 || gi >= s.items.length) return s
+      const texts = paddedTexts(s)
+      const cur = { ...(texts[gi] ?? {}) }
+      const val = v.slice(0, MAX_TITLE_LEN)
+      if (val.trim()) cur[field] = val
+      else delete cur[field]
+      texts[gi] = cur.t || cur.a ? cur : null
+      return { ...s, texts }
     })
   }, [])
 
@@ -315,7 +344,7 @@ export default function ListBuilder({
     }
     if (clearTimer.current) clearTimeout(clearTimer.current)
     setConfirmClear(false)
-    setState((s) => ({ ...s, items: [], title: "" }))
+    setState((s) => ({ ...s, items: [], texts: [], title: "" }))
   }, [confirmClear])
   useEffect(() => () => { if (clearTimer.current) clearTimeout(clearTimer.current) }, [])
 
@@ -324,7 +353,7 @@ export default function ListBuilder({
   const applyPreset = useCallback((k: "grid" | "list" | "card") => {
     setState((s) => {
       if (k === "grid")
-        return { ...s, cols: 5, rows: 5, textPos: "bottom", aspect: "auto", textAlign: "left", anchor: "center", coverSize: 5 }
+        return { ...s, cols: 5, rows: 5, textPos: "bottom", aspect: "auto", textAlign: "left", anchor: "center", coverSize: 5, wrap: false }
       if (k === "list")
         return {
           ...s,
@@ -335,22 +364,11 @@ export default function ListBuilder({
           textAlign: "left",
           anchor: "center",
           coverSize: 5,
+          wrap: false,
         }
-      // card: one big cover, text centred below, everything centred in the
-      // frame with some air around the cover, like a player view. No rank
-      // numbers, a single card isn't a ranking.
-      return {
-        ...s,
-        cols: 1,
-        rows: 1,
-        textPos: "bottom",
-        aspect: "portrait916",
-        textAlign: "center",
-        anchor: "center",
-        coverSize: 4,
-        numbered: false,
-        numberText: false,
-      }
+      // card: one big cover, text centred below, artwork backdrop, wrapped
+      // captions, everything centred in the frame, like a player view.
+      return { ...s, ...CARD_PRESET }
     })
   }, [])
 
@@ -381,37 +399,31 @@ export default function ListBuilder({
   // same size on every page. The "auto" shape hugs the actual content: the
   // canvas is exactly as big as the covers on this page, no dead space.
   const layoutCount = state.aspect === "auto" ? Math.max(1, visible.length) : cap
+  // "art" backdrop mirrors the export: the page's first cover full-bleed,
+  // dimmed under a dark gradient; covers get a shadow to lift off it. A
+  // single-cover card reads its artist line at full ink, player-style.
+  const artBgSrc = state.bg === "art" ? coverUrl(albums[visible[0]]?.art_id, "xl") : null
+  const coverShadow = state.bg === "art" ? "0 24px 80px rgba(0,0,0,0.55)" : undefined
+  // Album behind the caption editor; undefined (panel hidden) once the item
+  // is gone, e.g. removed or cleared while the editor was open.
+  const editAlbum = editIdx !== null && editIdx < state.items.length ? albums[state.items[editIdx]] : undefined
+  // The editor fields are seeded with the effective text (easier to trim a
+  // catalog prefix than retype a title); the local draft keeps the input
+  // stable while typing. Text matching the original stores no override.
+  const [draftCap, setDraftCap] = useState({ t: "", a: "" })
+  useEffect(() => {
+    if (editIdx === null || !editAlbum) return
+    setDraftCap({
+      t: state.texts[editIdx]?.t ?? editAlbum.title,
+      a: state.texts[editIdx]?.a ?? editAlbum.artist,
+    })
+    // Seed only when the edit target changes, not on every override keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editIdx, editAlbum?.id])
   const bgQs = state.bg === "theme" && themeBg ? `&bg=${encodeURIComponent(themeBg)}` : ""
   const pageQs = pages > 1 ? `&page=${page + 1}` : ""
   const downloadBase = encoded ? `/api/list/image?d=${encoded}${bgQs}${pageQs}` : null
   const shareUrl = encoded ? `/list?d=${encoded}` : null
-
-  const nativeShare = async () => {
-    if (!shareUrl) return
-    try {
-      await navigator.share({
-        title: state.title.trim() || "Dungeon synth list",
-        url: `${window.location.origin}${shareUrl}`,
-      })
-    } catch {
-      /* user dismissed the share sheet */
-    }
-  }
-
-  const [imgCopied, setImgCopied] = useState(false)
-  const copyImage = async () => {
-    if (!downloadBase) return
-    try {
-      // Promise form: Safari requires the clipboard write to start inside the
-      // user gesture, before the fetch resolves.
-      const item = new ClipboardItem({ "image/png": fetch(downloadBase).then((r) => r.blob()) })
-      await navigator.clipboard.write([item])
-      setImgCopied(true)
-      setTimeout(() => setImgCopied(false), 1500)
-    } catch {
-      /* clipboard blocked or fetch failed */
-    }
-  }
 
   const saveCurrent = () => {
     if (!encoded || state.items.length === 0) return
@@ -472,7 +484,10 @@ export default function ListBuilder({
   const ac = state.aspect === "auto" ? autoCanvas(state, layoutCount) : null
   const canvas = ac ? { w: ac.w, h: ac.h } : aspectCanvas(state.aspect)
   const centered = state.anchor === "center"
-  const TILE = ac ? ac.tile : chartTile(state, layoutCount, canvas.w, canvas.h)
+  // Stories overlay UI top and bottom; fit the content into the safe band
+  // (same call as the export route, so the preview stays WYSIWYG).
+  const box = fitBox(state.aspect, canvas.w, canvas.h)
+  const TILE = ac ? ac.tile : chartTile(state, layoutCount, box.w, box.h)
   const pad = chartEdge(state, TILE)
   const L = measureChart(state, layoutCount, TILE, canvas.w - 2 * pad)
   const horiz = isHorizontalText(state.textPos)
@@ -531,8 +546,8 @@ export default function ListBuilder({
 
   // The tile buttons sit inside the scale()-ed canvas, so their 24px DOM size
   // shrinks with it (~7px on a phone). Counter-scale them back toward their
-  // natural size, capped so the three-button row still fits the tile.
-  const btnScale = scale > 0 ? Math.min(1 / scale, TILE / 88) : 1
+  // natural size, capped so the four-button row still fits the tile.
+  const btnScale = scale > 0 ? Math.min(1 / scale, TILE / 112) : 1
 
   const renderCover = (id: string, idx: number, showNum: boolean) => {
     const a = albums[id]
@@ -554,7 +569,7 @@ export default function ListBuilder({
         className={`group/cell relative bg-bg-card border overflow-hidden transition-opacity ${
           editing ? "cursor-grab active:cursor-grabbing" : ""
         } ${dragIdx === idx ? "opacity-40 border-accent" : "border-border"}`}
-        style={{ width: px(TILE), height: px(TILE) }}
+        style={{ width: px(TILE), height: px(TILE), boxShadow: coverShadow }}
       >
         {src ? (
           <BandcampImg src={src} alt={a ? `${a.artist} — ${a.title}` : ""} decoding="async" draggable={false} className="w-full h-full object-cover" />
@@ -580,7 +595,8 @@ export default function ListBuilder({
           >
             <TileBtn label="Move earlier" disabled={idx === 0} onClick={() => move(idx, -1)}>←</TileBtn>
             <TileBtn label="Move later" disabled={idx === count - 1} onClick={() => move(idx, 1)}>→</TileBtn>
-            <TileBtn label="Remove" onClick={() => removeAt(idx)}>×</TileBtn>
+            <TileBtn label="Edit caption" onClick={() => setEditIdx(idx)}>✎</TileBtn>
+            <TileBtn label="Remove" onClick={() => { removeAt(idx); setEditIdx(null) }}>×</TileBtn>
           </div>
         )}
       </div>
@@ -593,26 +609,36 @@ export default function ListBuilder({
     const hasLabel = state.showLabel && isHostedRelease(a)
     const clip = state.wrap ? "break-words" : "overflow-hidden whitespace-nowrap text-ellipsis"
     const num = withNum && state.numberText ? `${idx + 1}. ` : ""
-    const titleText = num && state.showTitle ? num + a.title : a.title
-    const artistText = num && !state.showTitle && state.showArtist ? num + a.artist : a.artist
-    const cs = (fs: number) => ({ color: ink.dim, fontSize: px(fs), lineHeight: 1.32, maxWidth: px(capW) }) as const
+    const ov = state.texts[idx]
+    const effTitle = ov?.t ?? a.title
+    const effArtist = ov?.a ?? a.artist
+    const titleText = num && state.showTitle ? num + effTitle : effTitle
+    const artistText = num && !state.showTitle && state.showArtist ? num + effArtist : effArtist
+    // Wrapped lines need the explicit alignment; the flex wrapper only places
+    // the block, not the text inside it.
+    const ta = state.textAlign as "left" | "center" | "right"
+    const cs = (fs: number) => ({ color: ink.dim, fontSize: px(fs), lineHeight: 1.32, maxWidth: px(capW), textAlign: ta }) as const
+    // While editing, the caption is the text being designed: clicking it
+    // opens the caption editor. The album modal stays a view-mode affordance
+    // (the cover's ✎ button also opens the editor).
+    const onCaption = editing ? () => setEditIdx(idx) : () => openAlbum(id)
     return (
       <div
         className="flex flex-col justify-center cursor-pointer transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
         style={{ alignItems: ai, width: px(capW) }}
-        onClick={() => openAlbum(id)}
+        onClick={onCaption}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault()
-            openAlbum(id)
+            onCaption()
           }
         }}
         role="button"
         tabIndex={0}
-        title="Open details"
+        title={editing ? "Edit caption" : "Open details"}
       >
-        {state.showTitle && <div className={`font-medium ${clip}`} style={{ color: ink.fg, fontSize: px(L.capTitleFs), lineHeight: 1.3, maxWidth: px(capW) }}>{titleText}</div>}
-        {state.showArtist && <div className={clip} style={cs(L.capSubFs)}>{artistText}</div>}
+        {state.showTitle && <div className={`font-medium ${clip}`} style={{ color: ink.fg, fontSize: px(L.capTitleFs), lineHeight: 1.3, maxWidth: px(capW), textAlign: ta }}>{titleText}</div>}
+        {state.showArtist && <div className={`italic ${clip}`} style={cs(L.capSubFs)}>{artistText}</div>}
         {hasLabel && <div className={clip} style={cs(L.capSubFs)}>{a.host_name}</div>}
         {state.showDate && a.date && <div className={`tabular-nums ${clip}`} style={cs(L.capSubFs)}>{formatDateShort(a.date, true)}</div>}
       </div>
@@ -829,6 +855,23 @@ export default function ListBuilder({
                 className="relative origin-top-left"
                 style={{ width: px(canvas.w), height: px(canvas.h), transform: `scale(${scale})`, backgroundColor: previewBg }}
               >
+                {artBgSrc && (
+                  <>
+                    <BandcampImg
+                      src={artBgSrc}
+                      alt=""
+                      aria-hidden
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ opacity: 0.22 }}
+                    />
+                    <div
+                      aria-hidden
+                      className="absolute inset-0"
+                      style={{ backgroundImage: "linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.78) 100%)" }}
+                    />
+                  </>
+                )}
                 <div
                   className="absolute inset-0 flex flex-col"
                   style={{
@@ -912,14 +955,60 @@ export default function ListBuilder({
                 ✎ Edit
               </ActionBtn>
             )}
-            {canShare && <ActionBtn onClick={nativeShare} disabled={!shareUrl}>⤴ Share</ActionBtn>}
-            <CopyLinkAction href={shareUrl} />
+            <ShareLinkAction shareUrl={shareUrl} title={state.title.trim() || "Dungeon synth list"} />
             <ActionLink href={downloadBase}>↓ Download</ActionLink>
-            {canCopyImg && (
-              <ActionBtn onClick={copyImage} disabled={!downloadBase}>
-                {imgCopied ? "Copied ✓" : "▣ Copy image"}
-              </ActionBtn>
-            )}
+          </div>
+        )}
+
+        {/* Caption override editor (✎ on a tile). Lives outside the scaled
+            canvas so the inputs render at natural size; aligned to the chart
+            box like the action bar. Empty input = album's own data. */}
+        {editing && editAlbum && editIdx !== null && (
+          <div
+            className="mt-3 mx-auto lg:mx-0 bg-bg-card border border-border px-3 py-2.5 flex flex-col gap-2"
+            style={scale > 0 ? { width: px(boxW) } : undefined}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <Eyebrow>Edit caption · {editIdx + 1}. {editAlbum.artist}</Eyebrow>
+              <button
+                type="button"
+                onClick={() => setEditIdx(null)}
+                aria-label="Close caption editor"
+                className="shrink-0 w-6 h-6 flex items-center justify-center text-sm text-text-dim hover:text-accent transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+              >
+                ×
+              </button>
+            </div>
+            <input
+              type="text"
+              value={draftCap.t}
+              maxLength={MAX_TITLE_LEN}
+              onChange={(e) => {
+                const v = e.target.value
+                setDraftCap((d) => ({ ...d, t: v }))
+                setText(editIdx, "t", v === editAlbum.title ? "" : v)
+              }}
+              placeholder={editAlbum.title}
+              aria-label="Custom title"
+              className="w-full bg-transparent pb-1 border-b border-border/50 text-sm text-text-bright italic font-sans placeholder:text-text-dim/40 placeholder:not-italic focus:outline-none focus-visible:outline-none focus:border-accent/60 transition-colors"
+            />
+            <input
+              type="text"
+              value={draftCap.a}
+              maxLength={MAX_TITLE_LEN}
+              onChange={(e) => {
+                const v = e.target.value
+                setDraftCap((d) => ({ ...d, a: v }))
+                setText(editIdx, "a", v === editAlbum.artist ? "" : v)
+              }}
+              placeholder={editAlbum.artist}
+              aria-label="Custom artist"
+              className="w-full bg-transparent pb-1 border-b border-border/50 text-sm text-text-bright italic font-sans placeholder:text-text-dim/40 placeholder:not-italic focus:outline-none focus-visible:outline-none focus:border-accent/60 transition-colors"
+            />
+            <p className="font-sans text-[11px] italic leading-snug text-text-dim">
+              Shown on this chart only; the release itself is untouched. Restore the original text (or empty the field)
+              to drop the override.
+            </p>
           </div>
         )}
 
@@ -1140,24 +1229,35 @@ function ActionLink({ href, children }: { href: string | null; children: React.R
   )
 }
 
-function CopyLinkAction({ href }: { href: string | null }) {
+// Share = the list LINK (native sheet where it exists, clipboard otherwise).
+// The image is shared by downloading it (the Download pill) and posting the
+// file from the gallery; in-page image shares to Instagram et al. proved
+// unreliable (targets latch onto any URL and refuse it).
+function ShareLinkAction({ shareUrl, title }: { shareUrl: string | null; title: string }) {
   const [copied, setCopied] = useState(false)
-  if (!href) return <span className={ACTION_OFF}>⧉ Copy link</span>
+
+  const shareLink = async () => {
+    if (!shareUrl) return
+    const url = `${window.location.origin}${shareUrl}`
+    if (typeof navigator.share === "function") {
+      try { await navigator.share({ title, url }) } catch {}
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {}
+  }
+
+  if (!shareUrl) return <span className={ACTION_OFF}>⤴ Share link</span>
   return (
     <button
       type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(`${window.location.origin}${href}`)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        } catch {
-          /* clipboard blocked (insecure context / denied) */
-        }
-      }}
+      onClick={shareLink}
       className={`${ACTION_ON} ${copied ? "border-accent/60 text-accent" : "border-border/50 text-text hover:border-accent/60 hover:text-accent"}`}
     >
-      {copied ? "Link copied ✓" : "⧉ Copy link"}
+      {copied ? "Link copied ✓" : "⤴ Share link"}
     </button>
   )
 }

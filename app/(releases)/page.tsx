@@ -3,6 +3,7 @@ import { connection } from "next/server"
 import { supabase, fetchRecentAlbums } from "@/lib/supabase"
 import { type AlbumListItem, coverUrl, dateRange, dedupeById, localDateStr, parseTagParams, pickLatestDate, rpcRowToAlbumListItem } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
+import { encodeCardState } from "@/lib/listCodec"
 import DateSlider from "@/components/DateSlider"
 import ReleaseList from "@/components/ReleaseList"
 import { Suspense } from "react"
@@ -32,7 +33,11 @@ export async function generateMetadata({
     data.date ? `(${data.date})` : null,
   ].filter(Boolean)
   const description = descParts.join(" ") + "."
-  const image = coverUrl(data.art_id, "full")
+  // Unfurl with the styled share card (square: 9:16 crops badly in link
+  // previews) instead of the raw cover; falls back to the cover if no art.
+  const image = data.art_id
+    ? `${SITE_URL}/api/list/image?d=${await encodeCardState(String(data.id), "square")}`
+    : coverUrl(data.art_id, "full")
 
   return {
     title,
@@ -44,9 +49,11 @@ export async function generateMetadata({
       url: `${SITE_URL}/?album=${albumId}`,
       siteName: "Dungeon Synth Releases",
       type: "music.album",
-      ...(image ? { images: [{ url: image, width: 350, height: 350, alt: title }] } : {}),
+      ...(image ? { images: [{ url: image, width: 1080, height: 1080, alt: title }] } : {}),
     },
     twitter: {
+      // summary (square thumb): large_image would centre-crop the square card
+      // to ~2:1 and chop the caption.
       card: "summary",
       title,
       description,

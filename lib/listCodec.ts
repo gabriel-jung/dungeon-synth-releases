@@ -20,7 +20,10 @@ export const DEFAULT_GAP = 8
 
 // Background presets reference theme tokens by key; the builder resolves them
 // to CSS values. A raw hex (#rrggbb) is also accepted for custom backgrounds.
-export const BG_PRESETS = ["theme", "black", "parchment", "bone"] as const
+// "art" layers the first cover full-bleed (dimmed, under a dark gradient) on a
+// near-black base, like streaming-service share cards; the chart's first item
+// drives it, so it follows reorders.
+export const BG_PRESETS = ["theme", "art", "black", "parchment", "bone"] as const
 export type BgPreset = (typeof BG_PRESETS)[number]
 
 export const MIN_ROWS = 1
@@ -50,6 +53,15 @@ export function aspectCanvas(aspect: string): { w: number; h: number } {
   return ASPECT_CANVAS[aspect as Aspect] ?? { w: 1080, h: 1080 }
 }
 
+// Instagram-style story UI covers ~250px at the top (account name) and bottom
+// (reply bar) of a 9:16 canvas. fitBox shrinks the box the content is fitted
+// into so a centred chart always lands inside the visible band; the canvas
+// itself stays the full story size.
+export const STORY_SAFE_Y = 250
+export function fitBox(aspect: string, w: number, h: number): { w: number; h: number } {
+  return aspect === "portrait916" ? { w, h: h - 2 * STORY_SAFE_Y } : { w, h }
+}
+
 // Cover size: 5 = autofit (covers fill the frame), 1..4 shrink them toward the
 // centre of the frame. Fraction of the fit-to-frame tile, so it never clips.
 export const MIN_COVER = 1
@@ -69,9 +81,18 @@ export function textScale(size: number): number {
   return 0.6 + (Math.min(MAX_TEXT_SIZE, Math.max(MIN_TEXT_SIZE, size)) - 1) * 0.2
 }
 
+// Per-item caption override: custom display title (t) / artist (a). Unset
+// fields fall back to the album's own data. Lets users strip catalog-number
+// noise ("KTR086 - ...") or relabel a card without touching the source row.
+export interface CaptionOverride {
+  t?: string
+  a?: string
+}
+
 export interface ChartState {
   v: number
   items: string[] // ordered decimal album ids (string: int8 > MAX_SAFE_INTEGER)
+  texts: Array<CaptionOverride | null> // aligned to items; null = no override
   cols: number
   rows: number // cols×rows = visible slots
   gap: number
@@ -97,6 +118,7 @@ export function emptyState(): ChartState {
   return {
     v: STATE_VERSION,
     items: [],
+    texts: [],
     cols: DEFAULT_COLS,
     rows: DEFAULT_ROWS,
     gap: DEFAULT_GAP,
@@ -279,15 +301,36 @@ export function sanitizeState(raw: unknown): ChartState {
   const o = (raw ?? {}) as Partial<ChartState>
   const seen = new Set<string>()
   const items: string[] = []
-  for (const id of Array.isArray(o.items) ? o.items : []) {
+  // Source index of each accepted item, so texts stay aligned even when a
+  // crafted blob carries invalid or duplicate ids that get dropped.
+  const srcIdx: number[] = []
+  const rawItems = Array.isArray(o.items) ? o.items : []
+  for (let i = 0; i < rawItems.length; i++) {
+    const id = rawItems[i]
     if (typeof id !== "string" || !/^\d+$/.test(id) || seen.has(id)) continue
     seen.add(id)
     items.push(id)
+    srcIdx.push(i)
     if (items.length >= MAX_ITEMS) break
   }
+  const rawTexts = Array.isArray(o.texts) ? o.texts : []
+  const ovField = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.slice(0, MAX_TITLE_LEN).trim() : ""
+    return s ? s : undefined
+  }
+  const texts: Array<CaptionOverride | null> = srcIdx.map((i) => {
+    const e = rawTexts[i] as Partial<CaptionOverride> | null | undefined
+    if (e == null || typeof e !== "object") return null
+    const t = ovField(e.t)
+    const a = ovField(e.a)
+    return t || a ? { ...(t ? { t } : {}), ...(a ? { a } : {}) } : null
+  })
+  // Trailing nulls carry no information; trimming keeps the encoded URL small.
+  while (texts.length > 0 && texts[texts.length - 1] === null) texts.pop()
   return {
     v: STATE_VERSION,
     items,
+    texts,
     cols: clampInt(o.cols, MIN_COLS, MAX_COLS, DEFAULT_COLS),
     rows: clampInt(o.rows, MIN_ROWS, MAX_ROWS, DEFAULT_ROWS),
     gap: clampInt(o.gap, MIN_GAP, MAX_GAP, DEFAULT_GAP),
@@ -359,6 +402,29 @@ export function chartIds(state: ChartState): string[] {
   return state.items
 }
 
+// One-cover share card: the builder's "Card" quick layout. Shared by the
+// preset button, the album modal's Card action, and the ?album= unfurl image
+// so the three can't drift. No rank numbers: a single card isn't a ranking.
+export const CARD_PRESET: Partial<ChartState> = {
+  cols: 1,
+  rows: 1,
+  textPos: "bottom",
+  aspect: "portrait916",
+  textAlign: "center",
+  anchor: "center",
+  coverSize: 4,
+  numbered: false,
+  numberText: false,
+  wrap: true,
+  bg: "art",
+}
+
+// `?d=` blob for a single album's card. portrait916 for story shares; the
+// ?album= unfurl passes "square" (9:16 og:images crop badly in link previews).
+export async function encodeCardState(id: string, aspect: string = "portrait916"): Promise<string> {
+  return encodeState({ ...emptyState(), ...CARD_PRESET, items: [id], aspect })
+}
+
 // Resolve a bg value (preset key or hex) to a concrete CSS color. The "theme"
 // preset is intentionally returned as a CSS var so the in-app preview tracks
 // the active theme; the export route passes a concrete hex instead.
@@ -366,6 +432,7 @@ export function resolveBg(bg: string, themeFallback = "var(--color-bg)"): string
   switch (bg) {
     case "theme":
       return themeFallback
+    case "art":
     case "black":
       return "#0a0a0a"
     case "parchment":
@@ -396,6 +463,10 @@ export function chartInk(
   switch (bg) {
     case "theme":
       return { fg: fgFallback, dim: dimFallback }
+    // Art sits text over a dimmed image, so the dim ink runs brighter than
+    // black's to stay legible against busy artwork.
+    case "art":
+      return { fg: "#ece4d4", dim: "#b8ad9a" }
     case "black":
       return { fg: "#ece4d4", dim: "#9a8f7e" }
     case "parchment":

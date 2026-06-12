@@ -7,6 +7,7 @@ import { useModal } from "@/lib/useModal"
 import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 import { SITE_URL } from "@/lib/site"
 import { addToList, isInList, type AddToListResult } from "@/lib/listDraft"
+import { encodeCardState } from "@/lib/listCodec"
 import BandcampImg from "./BandcampImg"
 
 export function AlbumGrid({
@@ -86,6 +87,8 @@ function ReleaseCard({
   )
 }
 
+type ShareState = null | "link"
+
 function formatDuration(sec: number): string {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -105,7 +108,9 @@ export default function AlbumDetail({
   const [album, setAlbum] = useState<Album | null>(initialAlbum)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [copied, setCopied] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareState, setShareState] = useState<ShareState>(null)
+  const shareRef = useRef<HTMLDivElement>(null)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [listResult, setListResult] = useState<AddToListResult | null>(null)
   const [inList, setInList] = useState(false)
@@ -119,6 +124,28 @@ export default function AlbumDetail({
     setListResult(null)
     setInList(isInList(albumStub.id))
   }, [albumStub.id])
+  // Story-card image query for this album, encoded up front so the Card
+  // entry is ready by the time the menu opens.
+  const [cardQ, setCardQ] = useState<string | null>(null)
+  useEffect(() => {
+    let on = true
+    void encodeCardState(albumStub.id).then((d) => {
+      if (on) setCardQ(d)
+    })
+    return () => {
+      on = false
+    }
+  }, [albumStub.id])
+
+  // Warm the card PNG as soon as the share menu opens: the cold Satori render
+  // takes seconds, so the Card download starts instantly when tapped.
+  const warmedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!shareOpen || !cardQ || warmedRef.current === cardQ) return
+    warmedRef.current = cardQ
+    void fetch(`/api/list/image?d=${cardQ}`)
+  }, [shareOpen, cardQ])
+
   const hasInitialRef = useRef(initialAlbum?.id === albumStub.id)
   const { onArtistClick, openHost, push } = useAlbumCardModals(albumStub)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -132,6 +159,16 @@ export default function AlbumDetail({
       if (listTimerRef.current) clearTimeout(listTimerRef.current)
     }
   }, [])
+
+  // Close the share menu on any press outside it.
+  useEffect(() => {
+    if (!shareOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (!shareRef.current?.contains(e.target as Node)) setShareOpen(false)
+    }
+    document.addEventListener("pointerdown", onDown)
+    return () => document.removeEventListener("pointerdown", onDown)
+  }, [shareOpen])
 
   // Feeds the /list builder: a mounted builder picks the album up directly,
   // anywhere else it joins the add queue for the next /list visit.
@@ -162,7 +199,8 @@ export default function AlbumDetail({
     return () => ctrl.abort()
   }, [albumStub.id, reloadKey])
 
-  async function handleShare() {
+  async function shareLink() {
+    setShareOpen(false)
     const url = `${SITE_URL}/?album=${albumStub.id}`
     const title = `${albumStub.artist} — ${albumStub.title}`
     if (typeof navigator.share === "function") {
@@ -171,9 +209,9 @@ export default function AlbumDetail({
     }
     try {
       await navigator.clipboard.writeText(url)
-      setCopied(true)
+      setShareState("link")
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setCopied(false), 1800)
+      copyTimerRef.current = setTimeout(() => setShareState(null), 1800)
     } catch {}
   }
 
@@ -303,13 +341,46 @@ export default function AlbumDetail({
                           ? "In list ✓"
                           : "+ List"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent transition-colors cursor-pointer"
-                  >
-                    {copied ? "Copied ✓" : "Share"}
-                  </button>
+                  <div ref={shareRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShareOpen((v) => !v)}
+                      aria-expanded={shareOpen}
+                      aria-haspopup="menu"
+                      className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent transition-colors cursor-pointer"
+                    >
+                      {shareState === "link" ? "Link copied ✓" : "Share"}
+                    </button>
+                    {shareOpen && (
+                      <div
+                        role="menu"
+                        className="absolute bottom-full right-0 mb-2 z-20 flex flex-col bg-bg-card border border-border min-w-28"
+                        style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }}
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={shareLink}
+                          title="Share or copy the link to this release"
+                          className="px-3 py-2 text-left font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent hover:bg-bg-hover transition-colors cursor-pointer"
+                        >
+                          Link
+                        </button>
+                        {cardQ && (
+                          <a
+                            role="menuitem"
+                            href={`/api/list/image?d=${cardQ}`}
+                            download
+                            onClick={() => setShareOpen(false)}
+                            title="Download the story-card image, then share it from your files or gallery"
+                            className="px-3 py-2 text-left font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent hover:bg-bg-hover transition-colors cursor-pointer border-t border-border/60"
+                          >
+                            Card ↓
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {bandcampUrl && (
                     <a
                       href={bandcampUrl}
