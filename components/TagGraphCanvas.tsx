@@ -35,10 +35,12 @@ const zoomToPos = (k: number) =>
 export default function TagGraphCanvas({
   counts,
   pairs,
+  totalAlbums,
   itemLabel = "genre",
 }: {
   counts: TagCount[]
   pairs: TagPair[]
+  totalAlbums?: number
   itemLabel?: string
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -99,8 +101,8 @@ export default function TagGraphCanvas({
   )
 
   const { nodes, edges } = useMemo(
-    () => buildTagGraph(counts, pairs, state.metric, debouncedTopN, state.clustering),
-    [counts, pairs, state.metric, debouncedTopN, state.clustering],
+    () => buildTagGraph(counts, pairs, state.metric, debouncedTopN, state.clustering, totalAlbums),
+    [counts, pairs, state.metric, debouncedTopN, state.clustering, totalAlbums],
   )
 
   const visibleEdges = useMemo(

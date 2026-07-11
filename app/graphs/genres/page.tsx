@@ -9,8 +9,8 @@ export const metadata = {
 }
 
 async function GenreGraphAsync() {
-  const { counts, pairs } = await fetchTagGraph("genre")
-  return <TagGraph counts={counts} pairs={pairs} />
+  const { counts, pairs, totalAlbums } = await fetchTagGraph("genre")
+  return <TagGraph counts={counts} pairs={pairs} totalAlbums={totalAlbums} />
 }
 
 export default function GenresPage() {

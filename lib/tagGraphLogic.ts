@@ -44,9 +44,9 @@ export const METRICS: MetricInfo[] = [
   {
     value: "pmi",
     label: "PMI",
-    tex: String.raw`\mathrm{PMI}(A,B) = \log_2 \frac{|A \cap B| \cdot N}{|A| \cdot |B|}`,
+    tex: String.raw`\mathrm{PMI}(A,B) = \max\left(0,\ \log_2 \frac{|A \cap B| \cdot N}{|A| \cdot |B|}\right)`,
     blurb: (p) =>
-      `How much more often two ${p} appear together than pure chance would predict. Great for spotting surprising pairings.`,
+      `How much more often two ${p} appear together than pure chance would predict (pairs rarer than chance count as zero). Great for spotting surprising pairings.`,
     wiki: "https://en.wikipedia.org/wiki/Pointwise_mutual_information",
   },
   {
@@ -109,9 +109,6 @@ export function edgeEndpoints(e: TagEdge): [string, string] {
   return [s, t]
 }
 
-// Laplace smoothing for PMI so log₂ stays defined when counts are tiny.
-const PMI_ALPHA = 1
-
 function weightFor(
   metric: Metric,
   countA: number,
@@ -129,9 +126,12 @@ function weightFor(
     return denom > 0 ? intersection / denom : 0
   }
   if (metric === "pmi") {
+    // Positive PMI: pairs rarer than chance clamp to 0 so edge weights stay
+    // non-negative (Louvain modularity needs that, and a "less likely than
+    // chance" edge carries no visual meaning). The log is always defined:
+    // pairs only exist with intersection >= 1 and both counts >= 1.
     if (countA === 0 || countB === 0) return 0
-    const expected = (countA * countB) / totalAlbums
-    return Math.max(0, Math.log2((intersection + PMI_ALPHA) / (expected + PMI_ALPHA)))
+    return Math.max(0, Math.log2((intersection * totalAlbums) / (countA * countB)))
   }
   return 0
 }
@@ -333,21 +333,23 @@ export function buildTagGraph(
   metric: Metric,
   topN: number,
   clustering: boolean = true,
+  corpusSize?: number,
 ): { nodes: TagNode[]; edges: TagEdge[] } {
   const active = new Set(
     [...counts].sort((x, y) => y.n - x.n).slice(0, topN).map((c) => c.name),
   )
-  // PMI needs N = total albums. We don't have that directly, but sum of
-  // per-tag counts over-counts by (avg tags per album) — still a reasonable
-  // proxy for scale; the PMI ranking is what matters, not the absolute
-  // value. Max-of-counts underestimates N and systematically biases PMI.
+  // PMI needs N = total albums. Callers with DB access pass the real corpus
+  // size; otherwise fall back to summing per-tag counts, which over-counts
+  // by (avg tags per album). Under pure PMI that only shifts every value by
+  // the same additive constant, but it also shifts which pairs clear the
+  // max(0, .) clamp, so prefer the real count.
   const tagCounts = new Map<string, number>()
-  let totalAlbums = 0
+  let countSum = 0
   for (const c of counts) {
     tagCounts.set(c.name, c.n)
-    totalAlbums += c.n
+    countSum += c.n
   }
-  totalAlbums = Math.max(totalAlbums, 1)
+  const totalAlbums = Math.max(corpusSize ?? countSum, 1)
 
   const all: TagEdge[] = []
   for (const p of pairs) {

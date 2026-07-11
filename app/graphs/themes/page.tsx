@@ -9,8 +9,8 @@ export const metadata = {
 }
 
 async function ThemeGraphAsync() {
-  const { counts, pairs } = await fetchTagGraph("theme")
-  return <TagGraph counts={counts} pairs={pairs} itemLabel="theme" />
+  const { counts, pairs, totalAlbums } = await fetchTagGraph("theme")
+  return <TagGraph counts={counts} pairs={pairs} totalAlbums={totalAlbums} itemLabel="theme" />
 }
 
 export default function ThemesPage() {

@@ -9,8 +9,8 @@ export const metadata = {
 }
 
 async function AllGraphAsync() {
-  const { counts, pairs } = await fetchTagGraph("all")
-  return <TagGraph counts={counts} pairs={pairs} itemLabel="tag" />
+  const { counts, pairs, totalAlbums } = await fetchTagGraph("all")
+  return <TagGraph counts={counts} pairs={pairs} totalAlbums={totalAlbums} itemLabel="tag" />
 }
 
 export default function AllTagsPage() {

@@ -19,7 +19,7 @@ Two RPCs aggregate from the filtered category set. Both **return `jsonb` in a si
 - **`tag_counts(p_category default 'genre', p_top_k)`** — jsonb array of `{ name, n }`, where `n` is how many albums carry that tag. `p_top_k` caps to the K most-used tags; `NULL` = unbounded.
 - **`tag_pairs(p_category default 'genre', p_top_k)`** — jsonb array of `{ tag_a, tag_b, n }` for each unordered pair of tags in the category that co-occur on at least one album. When `p_top_k` is set, pairs are restricted to those where both tags are among the top K (bounds the result at C(K,2)). Backed by the `tag_pair_counts` materialized view, so the read is an indexed scan, not a live self-join.
 
-`fetchTagGraph` first queries `count(*) from tags where category = ...` (HEAD with `count=exact`), then passes that count as `p_top_k` to both RPCs so they cover every tag. For `/graphs/all` the count is hard-capped at `ALL_TOP_K` to keep the layout legible. All three calls are wrapped in `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")`, so the extra count round-trip is paid once per revalidation, not per visit.
+`fetchTagGraph` first queries `count(*) from tags where category = ...` (HEAD with `count=exact`), then passes that count as `p_top_k` to both RPCs so they cover every tag. For `/graphs/all` the count is hard-capped at `ALL_TOP_K` to keep the layout legible. It also HEAD-counts `albums` for the true corpus size `N` that PMI needs (client-side fallback: sum of per-tag counts, only used by callers without DB access like the tune script). All four calls are wrapped in `"use cache"` under `cacheTag("genres")` + `cacheTag("tag-graph-{category}")`, so the extra count round-trips are paid once per revalidation, not per visit.
 
 The `tag_pairs` self-join is quadratic in tags-per-album: every album with `T` tags emits `C(T,2)` pair rows before the `GROUP BY` collapses them. Run per-request it timed out for `/graphs/all` on the free-tier vCPU. It is now precomputed into the `tag_pair_counts` materialized view, rebuilt once daily by `refresh_tag_graph()` scheduled via **pg_cron** at 00:00 UTC. pg_cron runs inside Postgres, so the multi-minute refresh is not bound by any Vercel function timeout. The `revalidate?tag=genres` Vercel cron is scheduled at 00:15, after the refresh, so the page cache repopulates from fresh data. Edge data is therefore up to a day stale, which matches the `cacheLife("days")` already on the graph.
 
@@ -31,7 +31,7 @@ Graph construction, metrics, edge filtering, and Louvain clustering live in `lib
 - **Edge weighting** — four similarity metrics are available, each with a LaTeX-rendered formula and a short blurb:
   - **[Jaccard](https://en.wikipedia.org/wiki/Jaccard_index)** — `|A ∩ B| / |A ∪ B|` (default, fairly general)
   - **Raw** — `|A ∩ B|` (leans popular)
-  - **[PMI](https://en.wikipedia.org/wiki/Pointwise_mutual_information)** — `log₂(|A ∩ B| · N / (|A| · |B|))` (surfaces surprising pairings)
+  - **[PMI](https://en.wikipedia.org/wiki/Pointwise_mutual_information)** — `max(0, log₂(|A ∩ B| · N / (|A| · |B|)))`, i.e. positive PMI (surfaces surprising pairings; below-chance pairs get no edge)
   - **[Cosine](https://en.wikipedia.org/wiki/Cosine_similarity)** — `|A ∩ B| / √(|A| · |B|)` (more forgiving when sizes differ)
 - **Min-links floor** — each node retains its top-K strongest edges; avoids isolated nodes at sparse thresholds.
 - **Density cap** — roughly the top X% strongest edges overall are rendered; the rest are dropped from paint but still feed the physics.

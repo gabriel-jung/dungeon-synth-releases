@@ -20,7 +20,7 @@ const ALL_TOP_K = 500
 
 export async function fetchTagGraph(
   category: GraphCategory,
-): Promise<{ counts: TagCount[]; pairs: TagPair[] }> {
+): Promise<{ counts: TagCount[]; pairs: TagPair[]; totalAlbums: number }> {
   "use cache"
   cacheLife("days")
   cacheTag("genres")
@@ -33,12 +33,16 @@ export async function fetchTagGraph(
   const topK = category === "all" ? Math.min(totalTags, ALL_TOP_K) : totalTags
   const rpcCategory = category === "all" ? null : category
 
-  const [countsRes, pairsRes] = await Promise.all([
+  const [countsRes, pairsRes, albumsRes] = await Promise.all([
     supabase.rpc("tag_counts", { p_category: rpcCategory, p_top_k: topK }),
     supabase.rpc("tag_pairs", { p_category: rpcCategory, p_top_k: topK }),
+    // True corpus size for PMI's N. Head-only count, paid once per
+    // revalidation like the rest of this block.
+    supabase.from("albums").select("*", { count: "exact", head: true }),
   ])
   if (countsRes.error) throw new Error(`tag_counts RPC failed: ${countsRes.error.message}`)
   if (pairsRes.error) throw new Error(`tag_pairs RPC failed: ${pairsRes.error.message}`)
+  if (albumsRes.error) throw new Error(`albums count failed: ${albumsRes.error.message}`)
 
   const countsRaw = (countsRes.data ?? []) as Array<{ name: string; n: number | string }>
   const pairsRaw = (pairsRes.data ?? []) as Array<{ tag_a: string; tag_b: string; n: number | string }>
@@ -46,5 +50,5 @@ export async function fetchTagGraph(
   const counts: TagCount[] = countsRaw.map((r) => ({ name: r.name, n: Number(r.n) }))
   const pairs: TagPair[] = pairsRaw.map((r) => ({ a: r.tag_a, b: r.tag_b, n: Number(r.n) }))
 
-  return { counts, pairs }
+  return { counts, pairs, totalAlbums: albumsRes.count ?? 0 }
 }
