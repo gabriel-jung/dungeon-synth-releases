@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
 import { supabase, fetchRecentAlbums } from "@/lib/supabase"
-import { type AlbumListItem, coverUrl, dateRange, dedupeById, localDateStr, parseTagParams, pickLatestDate, rpcRowToAlbumListItem } from "@/lib/types"
+import { type AlbumListItem, dateRange, dedupeById, localDateStr, parseTagParams, pickLatestDate, rpcRowToAlbumListItem } from "@/lib/types"
 import { SITE_URL } from "@/lib/site"
 import { encodeCardState } from "@/lib/listCodec"
 import DateSlider from "@/components/DateSlider"
@@ -34,10 +34,10 @@ export async function generateMetadata({
   ].filter(Boolean)
   const description = descParts.join(" ") + "."
   // Unfurl with the styled share card (square: 9:16 crops badly in link
-  // previews) instead of the raw cover; falls back to the cover if no art.
+  // previews) instead of the raw cover; no card without art, so no image.
   const image = data.art_id
     ? `${SITE_URL}/api/list/image?d=${await encodeCardState(String(data.id), "square")}`
-    : coverUrl(data.art_id, "full")
+    : undefined
 
   return {
     title,

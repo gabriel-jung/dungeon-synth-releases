@@ -8,6 +8,8 @@ import { useAlbumCardModals } from "@/lib/useAlbumCardModals"
 import { SITE_URL } from "@/lib/site"
 import { addToList, isInList, type AddToListResult } from "@/lib/listDraft"
 import { encodeCardState } from "@/lib/listCodec"
+import { useShareLink } from "@/lib/useShareLink"
+import { useClickOutside } from "@/lib/useClickOutside"
 import BandcampImg from "./BandcampImg"
 
 export function AlbumGrid({
@@ -87,8 +89,6 @@ function ReleaseCard({
   )
 }
 
-type ShareState = null | "link"
-
 function formatDuration(sec: number): string {
   const h = Math.floor(sec / 3600)
   const m = Math.floor((sec % 3600) / 60)
@@ -109,9 +109,9 @@ export default function AlbumDetail({
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [shareOpen, setShareOpen] = useState(false)
-  const [shareState, setShareState] = useState<ShareState>(null)
+  const { copied: linkCopied, share } = useShareLink()
   const shareRef = useRef<HTMLDivElement>(null)
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const shareBtnRef = useRef<HTMLButtonElement>(null)
   const [listResult, setListResult] = useState<AddToListResult | null>(null)
   const [inList, setInList] = useState(false)
   const listTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -137,14 +137,16 @@ export default function AlbumDetail({
     }
   }, [albumStub.id])
 
-  // Warm the card PNG as soon as the share menu opens: the cold Satori render
-  // takes seconds, so the Card download starts instantly when tapped.
+  // Warm the card PNG on hover/focus of the Card entry itself: the cold
+  // Satori render takes seconds, so the download starts instantly when
+  // tapped, without spending a render (and rate-limit budget) for everyone
+  // who opens Share just to copy the link.
   const warmedRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!shareOpen || !cardQ || warmedRef.current === cardQ) return
+  const warmCard = () => {
+    if (!cardQ || warmedRef.current === cardQ) return
     warmedRef.current = cardQ
     void fetch(`/api/list/image?d=${cardQ}`)
-  }, [shareOpen, cardQ])
+  }
 
   const hasInitialRef = useRef(initialAlbum?.id === albumStub.id)
   const { onArtistClick, openHost, push } = useAlbumCardModals(albumStub)
@@ -155,19 +157,31 @@ export default function AlbumDetail({
 
   useEffect(() => {
     return () => {
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
       if (listTimerRef.current) clearTimeout(listTimerRef.current)
     }
   }, [])
 
   // Close the share menu on any press outside it.
+  useClickOutside(shareRef, shareOpen, () => setShareOpen(false))
+
+  // Escape closes just the menu (not the whole modal) and hands focus back to
+  // the trigger, so keyboard users aren't stranded on a removed node. Capture
+  // phase so it wins over useModal's window-level Escape handler.
+  const closeShare = () => {
+    setShareOpen(false)
+    shareBtnRef.current?.focus()
+  }
   useEffect(() => {
     if (!shareOpen) return
-    const onDown = (e: PointerEvent) => {
-      if (!shareRef.current?.contains(e.target as Node)) setShareOpen(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      e.stopPropagation()
+      closeShare()
     }
-    document.addEventListener("pointerdown", onDown)
-    return () => document.removeEventListener("pointerdown", onDown)
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+    // closeShare only touches refs + a state setter; the mount-time copy is fine.
+     
   }, [shareOpen])
 
   // Feeds the /list builder: a mounted builder picks the album up directly,
@@ -200,19 +214,8 @@ export default function AlbumDetail({
   }, [albumStub.id, reloadKey])
 
   async function shareLink() {
-    setShareOpen(false)
-    const url = `${SITE_URL}/?album=${albumStub.id}`
-    const title = `${albumStub.artist} — ${albumStub.title}`
-    if (typeof navigator.share === "function") {
-      try { await navigator.share({ title, url }) } catch {}
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-      setShareState("link")
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setShareState(null), 1800)
-    } catch {}
+    closeShare()
+    await share(`${SITE_URL}/?album=${albumStub.id}`, `${albumStub.artist} - ${albumStub.title}`)
   }
 
   // Prefer stub for fields the card already has so the modal paints without
@@ -343,13 +346,14 @@ export default function AlbumDetail({
                   </button>
                   <div ref={shareRef} className="relative">
                     <button
+                      ref={shareBtnRef}
                       type="button"
                       onClick={() => setShareOpen((v) => !v)}
                       aria-expanded={shareOpen}
                       aria-haspopup="menu"
                       className="font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent transition-colors cursor-pointer"
                     >
-                      {shareState === "link" ? "Link copied ✓" : "Share"}
+                      {linkCopied ? "Link copied ✓" : "Share"}
                     </button>
                     {shareOpen && (
                       <div
@@ -371,7 +375,9 @@ export default function AlbumDetail({
                             role="menuitem"
                             href={`/api/list/image?d=${cardQ}`}
                             download
-                            onClick={() => setShareOpen(false)}
+                            onMouseEnter={warmCard}
+                            onFocus={warmCard}
+                            onClick={closeShare}
                             title="Download the story-card image, then share it from your files or gallery"
                             className="px-3 py-2 text-left font-display text-xs tracking-[0.1em] text-text-dim hover:text-accent hover:bg-bg-hover transition-colors cursor-pointer border-t border-border/60"
                           >

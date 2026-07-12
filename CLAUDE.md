@@ -38,7 +38,7 @@ app/(releases)/         /  and /releases/[year]
 app/graphs/             /graphs (all + genres + themes sub-routes)
 app/statistics/              /statistics (overall + by-year sub-routes)
 app/list/               /list shareable list builder (see docs/list.md)
-app/api/                album, albums/{by-scope,by-ids,tag-context}, daily, list/image, revalidate, search, upcoming, year-count, ...
+app/api/                album, albums/{by-scope,tag-context}, daily, list/image, revalidate, search, upcoming, year-count, ...
 components/             flat, no subdirs by feature
 lib/
   modalUrl.ts           open/close/href helpers, canonical modal entry point

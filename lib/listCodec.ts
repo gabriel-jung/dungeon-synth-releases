@@ -1,4 +1,7 @@
-// State codec for the /list chart builder. The chart IS the URL: the full
+// State codec + shared render truth for the /list chart builder. Everything
+// that must not drift between the DOM preview and the PNG export (layout math,
+// caption rule, styling constants) lives here alongside the codec, because
+// both are "the chart, defined once". The chart IS the URL: the full
 // builder state (items + grid + text config) is gzipped and
 // base64url-packed into a single `?d=` param, so a chart is shareable and
 // bookmarkable with no server-side persistence. localStorage mirrors it as the
@@ -7,6 +10,8 @@
 //
 // Encoding: JSON -> gzip (CompressionStream, native in browser + Node) ->
 // base64url. Both ends are async because the compression API is stream-based.
+
+import { formatDateShort, isHostedRelease, type AlbumListItem } from "./types"
 
 export const STATE_VERSION = 1
 export const MAX_ITEMS = 100
@@ -18,12 +23,23 @@ export const MIN_GAP = 0
 export const MAX_GAP = 24
 export const DEFAULT_GAP = 8
 
+export const MIN_FRAME = 0
+export const MAX_FRAME = 6
+export const DEFAULT_FRAME = 0
+// Border px for a cover frame level, scaled to the tile so the weight reads the
+// same across cover sizes and stays identical between the preview and the PNG
+// export. Level 0 = no frame.
+export function frameBorder(tile: number, level: number): number {
+  if (level <= 0) return 0
+  return Math.max(1, Math.round(tile * 0.004 * level))
+}
+
 // Background presets reference theme tokens by key; the builder resolves them
 // to CSS values. A raw hex (#rrggbb) is also accepted for custom backgrounds.
 // "art" layers the first cover full-bleed (dimmed, under a dark gradient) on a
 // near-black base, like streaming-service share cards; the chart's first item
 // drives it, so it follows reorders.
-export const BG_PRESETS = ["theme", "art", "black", "parchment", "bone"] as const
+export const BG_PRESETS = ["theme", "art", "black", "slate", "oxblood", "parchment", "bone"] as const
 export type BgPreset = (typeof BG_PRESETS)[number]
 
 export const MIN_ROWS = 1
@@ -96,6 +112,7 @@ export interface ChartState {
   cols: number
   rows: number // cols×rows = visible slots
   gap: number
+  frameWidth: number // 0 = no cover frame; 1..6 = border weight (scaled to tile)
   bg: string // BgPreset key or #rrggbb
   aspect: string // output frame, see ASPECTS
   coverSize: number // 1..5, 5 = autofit covers to the frame
@@ -122,6 +139,7 @@ export function emptyState(): ChartState {
     cols: DEFAULT_COLS,
     rows: DEFAULT_ROWS,
     gap: DEFAULT_GAP,
+    frameWidth: DEFAULT_FRAME,
     bg: "theme",
     aspect: "auto",
     coverSize: DEFAULT_COVER,
@@ -212,7 +230,7 @@ export function measureChart(s: ChartState, count: number, tile: number, availW?
     textColW = Math.max(Math.round(tile * 0.8), availW - gridW - gap)
   }
 
-  const titleH = s.title.trim() ? Math.round(tile * 0.39) : 0
+  const titleH = s.title.trim() ? Math.round(tile * 0.46) : 0
   const footerH = s.footer ? Math.round(tile * 0.205) : 0
   const contentW = sideHasText ? gridW + gap + textColW : gridW
 
@@ -288,10 +306,16 @@ function clampStr(s: unknown, max: number): string {
   return typeof s === "string" ? s.slice(0, max) : ""
 }
 
+// The one definition of an accepted custom color; every bg validation site
+// (codec, builder, page metadata, image route) shares it.
+export function isHexColor(s: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(s)
+}
+
 function validBg(s: unknown): string {
   if (typeof s !== "string") return "theme"
   if ((BG_PRESETS as readonly string[]).includes(s)) return s
-  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s
+  if (isHexColor(s)) return s
   return "theme"
 }
 
@@ -334,6 +358,7 @@ export function sanitizeState(raw: unknown): ChartState {
     cols: clampInt(o.cols, MIN_COLS, MAX_COLS, DEFAULT_COLS),
     rows: clampInt(o.rows, MIN_ROWS, MAX_ROWS, DEFAULT_ROWS),
     gap: clampInt(o.gap, MIN_GAP, MAX_GAP, DEFAULT_GAP),
+    frameWidth: clampInt(o.frameWidth, MIN_FRAME, MAX_FRAME, DEFAULT_FRAME),
     bg: validBg(o.bg),
     aspect: (ASPECTS as readonly string[]).includes(o.aspect as string) ? (o.aspect as string) : "auto",
     coverSize: clampInt(o.coverSize, MIN_COVER, MAX_COVER, DEFAULT_COVER),
@@ -360,9 +385,32 @@ async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
+// A maxed-out real state (100 ids + 100 two-field overrides at MAX_TITLE_LEN)
+// stays well under this; anything bigger is a decompression bomb, not a list.
+const MAX_DECODED_BYTES = 128 * 1024
+
 async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream("gzip"))
-  return new Uint8Array(await new Response(stream).arrayBuffer())
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.length
+    if (total > MAX_DECODED_BYTES) {
+      await reader.cancel()
+      throw new Error("decoded state too large")
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let off = 0
+  for (const c of chunks) {
+    out.set(c, off)
+    off += c.length
+  }
+  return out
 }
 
 function bytesToB64url(b: Uint8Array): string {
@@ -386,16 +434,27 @@ export async function encodeState(state: ChartState): Promise<string> {
   return bytesToB64url(packed)
 }
 
-// Decode a `?d=` blob to a sanitized ChartState. Returns emptyState() on any
-// malformation (bad base64, bad gzip, bad JSON) so a hostile link never throws.
-export async function decodeState(d: string | null | undefined): Promise<ChartState> {
-  if (!d) return emptyState()
+// Decode a `?d=` blob to a sanitized ChartState, or null on any malformation
+// (bad base64, bad gzip, bad JSON, oversized, future version). The null lets
+// callers that care (the /list page's "damaged link" notice) read the real
+// outcome instead of inferring failure from an empty item list.
+export async function decodeStateOrNull(d: string | null | undefined): Promise<ChartState | null> {
+  if (!d) return null
   try {
     const json = new TextDecoder().decode(await gunzip(b64urlToBytes(d)))
-    return sanitizeState(JSON.parse(json))
+    const raw = JSON.parse(json) as { v?: unknown }
+    // A blob from a future codec version may carry different field semantics;
+    // treat it as invalid rather than silently re-reading it under v1 rules.
+    if (typeof raw?.v === "number" && raw.v > STATE_VERSION) return null
+    return sanitizeState(raw)
   } catch {
-    return emptyState()
+    return null
   }
+}
+
+// Same, but a hostile or missing link degrades to emptyState() instead of null.
+export async function decodeState(d: string | null | undefined): Promise<ChartState> {
+  return (await decodeStateOrNull(d)) ?? emptyState()
 }
 
 export function chartIds(state: ChartState): string[] {
@@ -425,6 +484,60 @@ export async function encodeCardState(id: string, aspect: string = "portrait916"
   return encodeState({ ...emptyState(), ...CARD_PRESET, items: [id], aspect })
 }
 
+// ── Shared caption + ornament styling (preview DOM + PNG export). The chart is
+// rendered twice (JSX for the browser, Satori JSX for the PNG); everything
+// that must not drift between the two lives here. ──
+
+// Rank-number badge over the cover: a bottom gradient band with a large numeral.
+// All lengths are fractions of the tile.
+export const NUMBER_BADGE = {
+  band: 0.42,
+  padLeft: 0.06,
+  padBottom: 0.035,
+  fontSize: 0.2,
+  gradient: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0) 100%)",
+  ink: "#f0e6d6",
+  textShadow: "0 1px 3px rgba(0,0,0,0.55)",
+} as const
+
+// "art" backdrop: first cover full-bleed, dimmed under a dark gradient, with a
+// lift shadow on the covers.
+export const ART_BACKDROP = {
+  opacity: 0.22,
+  gradient: "linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.78) 100%)",
+  coverShadow: "0 24px 80px rgba(0,0,0,0.55)",
+} as const
+
+// One caption line. `bright` = title tier (semibold, fg ink); the rest render
+// dim, artist italic.
+export interface CaptionField {
+  kind: "title" | "artist" | "label" | "date"
+  text: string
+  bright: boolean
+  italic: boolean
+}
+
+// The caption lines for one album, with overrides and the rank-number rule
+// applied. Single source of truth for WHICH lines exist and WHERE the number
+// goes: the number prefixes the title, or the artist when the title is hidden,
+// and nothing else (label/date lines are never numbered). A date line only
+// exists when the album has a date; a label line only for hosted releases.
+// `rank` is the 1-based rank, or null when this layout never numbers captions.
+export function captionFields(
+  s: ChartState,
+  a: Pick<AlbumListItem, "title" | "artist" | "host_name" | "date">,
+  ov: CaptionOverride | null | undefined,
+  rank: number | null,
+): CaptionField[] {
+  const num = rank !== null && s.numberText ? `${rank}. ` : ""
+  const fields: CaptionField[] = []
+  if (s.showTitle) fields.push({ kind: "title", text: num + (ov?.t ?? a.title), bright: true, italic: false })
+  if (s.showArtist) fields.push({ kind: "artist", text: (s.showTitle ? "" : num) + (ov?.a ?? a.artist), bright: false, italic: true })
+  if (s.showLabel && isHostedRelease(a)) fields.push({ kind: "label", text: a.host_name!, bright: false, italic: false })
+  if (s.showDate && a.date) fields.push({ kind: "date", text: formatDateShort(a.date, true), bright: false, italic: false })
+  return fields
+}
+
 // Resolve a bg value (preset key or hex) to a concrete CSS color. The "theme"
 // preset is intentionally returned as a CSS var so the in-app preview tracks
 // the active theme; the export route passes a concrete hex instead.
@@ -435,12 +548,16 @@ export function resolveBg(bg: string, themeFallback = "var(--color-bg)"): string
     case "art":
     case "black":
       return "#0a0a0a"
+    case "slate":
+      return "#13171f"
+    case "oxblood":
+      return "#250d10"
     case "parchment":
       return "#e8dcc0"
     case "bone":
       return "#d8d0c0"
     default:
-      return /^#[0-9a-fA-F]{6}$/.test(bg) ? bg : themeFallback
+      return isHexColor(bg) ? bg : themeFallback
   }
 }
 
@@ -469,6 +586,10 @@ export function chartInk(
       return { fg: "#ece4d4", dim: "#b8ad9a" }
     case "black":
       return { fg: "#ece4d4", dim: "#9a8f7e" }
+    case "slate":
+      return { fg: "#e7ecf3", dim: "#8a93a3" }
+    case "oxblood":
+      return { fg: "#f0dcd8", dim: "#b0888a" }
     case "parchment":
       return { fg: "#3a3020", dim: "#6a5f48" }
     case "bone":
